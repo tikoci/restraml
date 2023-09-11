@@ -178,11 +178,11 @@ async function parseChildren(rpath = [], memo = {}) {
   return start
 }
 
-function ramlRestResponses() {
+function ramlRestResponses(successJsonType = "any") {
   return {
     200: {
       description: "Success",
-      body: { "application/json": { type: "any" } },
+      body: { "application/json": { type: successJsonType } },
     },
     400: {
       description: "Bad command or error",
@@ -193,6 +193,20 @@ function ramlRestResponses() {
       body: { "application/json": { type: "object" } },
     },
   }
+}
+
+function cmdToGetQueryParams(obj) {
+  var props = {}
+  Object.entries(obj)
+  .filter((i) => i[1].type == "arg")
+  .map((j) => {
+    props[j[0]] = {
+      type: "any",
+      required: false,
+      description: j[1].description,
+    }
+  })
+  return props
 }
 
 function cmdToPostSchema(obj) {
@@ -234,8 +248,11 @@ function parse(obj) {
           required: false,
         }
         if (key == "get") {
-          currentObj["get"] = {}
-          currentObj["get"].responses = ramlRestResponses()
+          const getqueryparams = cmdToGetQueryParams(currentObj["get"])
+          currentObj["get"] = {
+            queryParameters: getqueryparams,
+            responses: ramlRestResponses("array")
+          }
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
           currentObj["/{id}"].get = {
             uriParameters: {
@@ -265,7 +282,7 @@ function parse(obj) {
             },
           }
         }
-        delete currentObj[key]
+        if (key != "get") delete currentObj[key]
       } else if (typeof currentObj[key] === "object") {
         const src = currentObj[key]
         currentObj[`/${key}`] = currentObj[key]
