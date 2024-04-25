@@ -8,13 +8,13 @@ const argPath = process.argv.slice(2)
 async function main() {
   // STEP ZERO: calling the script "manually"...
   //    a. install bun (on MacOS, "brew install oven-sh/bun/bun")
-  //    b. save script this to a new directory, like ~/ros2rest/...
+  //    b. save script this to a new directory, like ~/rest2raml/...
   //    c. install YAML parse, "bun install js-yaml"
   //    d. Router's IP and authentication are provided by env variables that are provide in shell:
-  //       >  URLBASE=https://change.me/rest BASICAUTH=admin:changeme bun ros2rest.js
+  //       >  URLBASE=https://change.me/rest BASICAUTH=admin:changeme bun rest2raml.js
   //    e. Wait a while as for this code to run – may take an HOUR for entire schema to process
-  //    f. Optionally, ros2rest.js takes args with path to start out, seperated by *spaces*:
-  //       >  bun ros2rest.js ip address
+  //    f. Optionally, rest2raml.js takes args with path to start out, seperated by *spaces*:
+  //       >  bun rest2raml.js ip address
   //  So, assuming, done getting version for router should work...
   const ver = await fetchVersion()
   console.log(`Using version ${ver}...`)
