@@ -7,7 +7,7 @@ const argPath = process.argv.slice(2)
 
 async function main() {
   // STEP ZERO: calling the script "manually"...
-  //    a. install bun (on MacOS, "brew install bun")
+  //    a. install bun (on MacOS, "brew install oven-sh/bun/bun")
   //    b. save script this to a new directory, like ~/ros2rest/...
   //    c. install YAML parse, "bun install js-yaml"
   //    d. Router's IP and authentication are provided by env variables that are provide in shell:
