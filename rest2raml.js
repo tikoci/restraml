@@ -19,14 +19,13 @@ async function main() {
   //       >  bun rest2raml.js ip address
   //  So, assuming, done getting version for router should work...
   const ver = await fetchVersion()
-  console.log(`Using version ${ver}...`)
-
   const {opts, argPath} = parseArguments()
   if (opts && opts.version) {
     console.log(ver)
     return 0
   }
-  
+  console.log(`Using version ${ver}...`)
+
   // STEP ONE: use REST to traverse router's /console/inspect output (save to )
   let rosSchema = {}
   if (process.env.INSPECTFILE) {
