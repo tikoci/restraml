@@ -58,7 +58,7 @@ jobs:
         exit 1
 
     - name: Test HTTP Server with curl
-      run: curl -X GET http://localhost:9180/rest/ip/address --json
+      run: curl -X GET http://localhost:9180/rest/ip/address
 
     - name: Cleanup Running Docker
       run: docker-compose down
