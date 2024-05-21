@@ -43,7 +43,9 @@ jobs:
         echo "version: '3'
         services:
           routeros:
-            build: ./Dockerfile.chr-qemu 
+            build: 
+              context: .
+              dockerfile: ./Dockerfile.chr-qemu 
               args:
                 - ARG_ROUTEROS_VERSION: ${ROUTEROS_VERSION}
             restart: unless-stopped
