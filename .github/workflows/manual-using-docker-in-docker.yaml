@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       rosver:
-        description: 'RouterOS Version'
+        description: 'Tag for RouterOS Docker Image (latest)'
         required: true
+        default: "latest"
       start_path:
         description: 'Starting path (space seperated)'
         required: false
@@ -35,15 +36,13 @@ jobs:
         echo "version: '3'
         services:
           routeros:
-            image: evilfreelancer/docker-routeros
+            image: evilfreelancer/docker-routeros:${{ github.event.inputs.rosver }}
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
             devices:
               - /dev/net/tun
               - /dev/kvm
-            environment:
-              - ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
             ports:
               - 9180:80" > docker-compose.yml
         docker-compose up -d
@@ -70,7 +69,7 @@ jobs:
       uses: oven-sh/setup-bun@v1
       with:
         bun-version: 'latest' 
-        
+
     - name: Test Bun Connection to RouterOS    
       id: connection-check
       run: |
