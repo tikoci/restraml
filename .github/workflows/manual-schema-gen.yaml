@@ -24,20 +24,22 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v3
 
-    - name: Set up Bun
+    - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v1
       with:
         bun-version: 'latest' 
 
-    - name: Run JavaScript with Bun
+    - name: Run RAML Generator Code with Bun
       run: |
         bun install js-yaml raml2html raml2html-slate-theme
         bun rest2raml.js ${{ github.event.inputs.start_path }}
-        raml2html --theme raml2html-slate-theme ros-rest*.raml > ros-rest-generated.html
+        find . -name raml2html
+        ./node_modules/.bin/raml2html --theme raml2html-slate-theme ros-rest*.raml > ros-rest-generated.html
       env:
         URLBASE: https://${{ secrets.ROS_HOST}}/rest 
         BASICAUTH: ${{ secrets.ROS_USER }}:${{ secrets.ROS_PASSWD }} 
-    - name: Save build artifacts
+
+    - name: Save Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: build-results
