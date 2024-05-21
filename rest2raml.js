@@ -22,7 +22,7 @@ async function main() {
   console.log(`Using version ${ver}...`)
 
   const {opts, argPath} = parseArguments()
-  if (opts.version) {
+  if (opts && opts.version) {
     console.log(ver)
     return 0
   }
@@ -57,19 +57,20 @@ async function main() {
 }
 
 function parseArguments() {
-  const { opts, positionals } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: Bun.argv,
     options: {
       "version": {
         type: "boolean",
-        short: "i"
+        short: "v"
       },
     },
     strict: true,
     allowPositionals: true,
   })
-  const [, , ...path] = positionals
-  return { opts, path }
+  const [, , ...argPath] = positionals
+  const opts = values
+  return { opts, argPath }
 }
 
 function generateRAMLPrefix(ver = "7.0", tag = "dev") {
