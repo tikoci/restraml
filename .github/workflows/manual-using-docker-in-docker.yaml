@@ -1,4 +1,4 @@
-name: test-evilfreelancer-routeros
+name: manual-using-docker-in-docker
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
         required: false
 
 jobs:
-  ros-in-action:
+  job-using-docker-in-docker:
     runs-on: ubuntu-latest
 
     steps:
