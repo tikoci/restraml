@@ -33,20 +33,25 @@ jobs:
 
     - name: Run Docker Compose
       run: |
-        ROS_GH_VER=${{ github.event.inputs.rosver }}
-        echo $ROS_GH_VER
+        ROUTEROS_VERSION=${{ github.event.inputs.rosver }}
+        ROUTEROS_IMAGE="chr-${ROUTEROS_VERSION}.vdi"
+        ROUTEROS_PATH="https://cdn.mikrotik.com/routeros/${ROUTEROS_VERSION}/${ROUTEROS_IMAGE}.zip"
+        echo $ROUTEROS_VERSION
+        echo $ROUTEROS_IMAGE
+        echo $ROUTEROS_PATH
+
         echo "version: '3'
         services:
           routeros:
-            image: evilfreelancer/docker-routeros
+            build: . 
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
             devices:
               - /dev/net/tun
               - /dev/kvm
-            environment:
-              - ROUTEROS_VERSION=${ROS_GH_VER}
+            args:
+              - ARG_ROUTEROS_VERSION=${ROUTEROS_VERSION}
             ports:
               - 9180:80" > docker-compose.yml
         docker-compose up -d
