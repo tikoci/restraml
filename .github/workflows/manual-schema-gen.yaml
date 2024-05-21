@@ -38,7 +38,7 @@ jobs:
         URLBASE: https://${{ secrets.ROS_HOST}}/rest 
         BASICAUTH: ${{ secrets.ROS_USER }}:${{ secrets.ROS_PASSWD }} 
     - name: Save build artifacts
-      uses: actions/upload-artifact@4
+      uses: actions/upload-artifact@v4
       with:
         name: build-results
         path: |
