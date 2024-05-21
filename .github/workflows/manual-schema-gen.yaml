@@ -1,4 +1,4 @@
-name: Manually-triggered (workflow_dispatch) to generate RAML schema from publicly available router.
+name: schema-gen-manual-from-secrets
 
 on:
   workflow_dispatch:
