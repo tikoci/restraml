@@ -54,7 +54,7 @@ jobs:
       run: |
         echo "Waiting for the HTTP server to start..."
         for i in {1..1000}; do
-          if curl -S --fail http://localhost:9180/; then
+          if curl -m 5 -S --fail http://localhost:9180/; then
             echo "Server is up!"
             exit 0
           else
@@ -66,7 +66,7 @@ jobs:
         exit 1
 
     - name: Test HTTP Server with curl
-      run: curl -S --fail http://admin@localhost:9180/rest/ip/address
+      run: curl -c 30 -S --fail http://admin@localhost:9180/rest/ip/address
 
     - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v1
