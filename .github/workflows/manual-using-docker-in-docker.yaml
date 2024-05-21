@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       rosver:
-        description: 'Tag for RouterOS Docker Image (latest)'
+        description: 'RouterOS Version'
         required: true
-        default: "latest"
+        default: "7.12.1"
       start_path:
         description: 'Starting path (space seperated)'
         required: false
@@ -33,16 +33,19 @@ jobs:
 
     - name: Run Docker Compose
       run: |
+        echo ${{ github.event.inputs.rosver }} 
         echo "version: '3'
         services:
           routeros:
-            image: evilfreelancer/docker-routeros:${{ github.event.inputs.rosver }}
+            image: evilfreelancer/docker-routeros
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
             devices:
               - /dev/net/tun
               - /dev/kvm
+            environment:
+              - ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
             ports:
               - 9180:80" > docker-compose.yml
         docker-compose up -d
