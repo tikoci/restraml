@@ -277,33 +277,21 @@ function parse(obj) {
             responses: ramlRestResponses("array")
           }
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
-          currentObj["/{id}"].get = {
-            uriParameters: {
-              id: { type: "string" },
-            },
-            responses: ramlRestResponses(),
-          }
+          currentObj["/{id}"].get = { responses: ramlRestResponses() }
+          currentObj["/{id}"].uriParameters = { id: { type: "string" } }
         }
         if (key == "set") {
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
-          currentObj["/{id}"].patch = {
-            ...cmdToPostSchema(currentObj[key]),
-            uriParameters: {
-              id: { type: "string" },
-            },
-          }
+          currentObj["/{id}"].patch = { ...cmdToPostSchema(currentObj[key]) }
+          currentObj["/{id}"].uriParameters = { id: { type: "string" } }
         }
         if (key == "add") {
           currentObj.put = cmdToPostSchema(currentObj[key])
         }
         if (key == "remove") {
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
-          currentObj["/{id}"].delete = {
-            ...cmdToPostSchema(currentObj[key]),
-            uriParameters: {
-              id: { type: "string" },
-            },
-          }
+          currentObj["/{id}"].delete = { ...cmdToPostSchema(currentObj[key]) }
+          currentObj["/{id}"].uriParameters = { id: { type: "string" } }
         }
         if (key != "get") delete currentObj[key]
       } else if (typeof currentObj[key] === "object") {
