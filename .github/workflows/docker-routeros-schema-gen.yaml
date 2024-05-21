@@ -75,7 +75,7 @@ jobs:
         find . -name raml2html
         ./node_modules/.bin/raml2html --theme raml2html-slate-theme ros-rest*.raml > ros-rest-generated.html
       env:
-        URLBASE: httpf://localhost:9180/rest 
+        URLBASE: http://localhost:9180/rest 
         BASICAUTH: "admin:" 
 
     - name: Save Build Artifacts
