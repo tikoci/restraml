@@ -43,15 +43,16 @@ jobs:
         echo "version: '3'
         services:
           routeros:
-            build: . 
+            build: ./Dockerfile.chr-qemu 
+              args:
+                - ARG_ROUTEROS_VERSION=${ROUTEROS_VERSION}
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
             devices:
               - /dev/net/tun
               - /dev/kvm
-            args:
-              - ARG_ROUTEROS_VERSION=${ROUTEROS_VERSION}
+            
             ports:
               - 9180:80" > docker-compose.yml
         docker-compose up -d
