@@ -1,6 +1,5 @@
 const fs = require("fs")
 const YAML = require("js-yaml")
-import { parseArgs } from "util"
 
 const rosSchemaFilename = "./ros-inspect"
 const ramlSchemaFilename = "./ros-rest"
