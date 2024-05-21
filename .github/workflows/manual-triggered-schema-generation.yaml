@@ -32,7 +32,7 @@ jobs:
     - name: Run JavaScript with Bun
       run: |
         bun install js-yaml raml2html raml2html-slate-theme
-        bun rest2raml.js ${{ github.event.inputs.param1 }}
+        bun rest2raml.js ${{ github.event.inputs.start_path }}
       env:
         URLBASE: https://${{ secrets.ROS_HOST}}/rest 
         BASICAUTH: ${{ secrets.ROS_USER }}:${{ secrets.ROS_PASSWD }} 
