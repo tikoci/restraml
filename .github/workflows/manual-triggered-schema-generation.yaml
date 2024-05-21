@@ -34,7 +34,7 @@ jobs:
         bun install js-yaml raml2html raml2html-slate-theme
         bun rest2raml.js ${{ github.event.inputs.param1 }}
       env:
-        URLBASE: https://${{ secrets.ROS_HOST}}}/rest 
+        URLBASE: https://${{ secrets.ROS_HOST}}/rest 
         BASICAUTH: ${{ secrets.ROS_USER }}:${{ secrets.ROS_PASSWD }} 
 
 #    - name: Archive results
