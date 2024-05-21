@@ -1,8 +1,11 @@
 const fs = require("fs")
 const YAML = require("js-yaml")
+import { parseArgs } from "util"
 
 const rosSchemaFilename = "./ros-inspect"
 const ramlSchemaFilename = "./ros-rest"
+
+import { parseArgs } from "util";
 const argPath = process.argv.slice(2)
 
 async function main() {
@@ -19,15 +22,20 @@ async function main() {
   const ver = await fetchVersion()
   console.log(`Using version ${ver}...`)
 
+  const {opts, argPath} = parseArguments()
+  if (opts.version) {
+    console.log(ver)
+    return 0
+  }
+  
   // STEP ONE: use REST to traverse router's /console/inspect output (save to )
   let rosSchema = {}
   if (process.env.INSPECTFILE) {
     rosSchema = JSON.parse(fs.readFileSync(process.env.INSPECTFILE, { encoding: "utf-8" }))
   } else {
     rosSchema = await parseChildren(argPath)
-    const rosSchemaPath = `${rosSchemaFilename}-${
-      argPath.join("+") || "all"
-    }.json`
+    const rosSchemaPath = `${rosSchemaFilename}-${argPath.join("+") || "all"
+      }.json`
     fs.writeFileSync(rosSchemaPath, JSON.stringify(rosSchema))
     console.log(`Fetching /console/inspect data written to: ${rosSchemaPath}`)
   }
@@ -40,13 +48,29 @@ async function main() {
   fs.writeFileSync(
     ramlPath,
     "#%RAML 1.0\n" +
-      YAML.dump({
-        ...generateRAMLPrefix(ver, argPath.join("+") || "all"),
-        ...ramlSchema,
-      })
+    YAML.dump({
+      ...generateRAMLPrefix(ver, argPath.join("+") || "all"),
+      ...ramlSchema,
+    })
   )
 
   console.log(`Done, exported ${ramlPath}`)
+}
+
+function parseArguments() {
+  const { opts, positionals } = parseArgs({
+    args: Bun.argv,
+    options: {
+      "version": {
+        type: "boolean",
+        short: "i"
+      },
+    },
+    strict: true,
+    allowPositionals: true,
+  })
+  const [, , ...path] = positionals
+  return { opts, path }
 }
 
 function generateRAMLPrefix(ver = "7.0", tag = "dev") {
@@ -198,14 +222,14 @@ function ramlRestResponses(successJsonType = "any") {
 function cmdToGetQueryParams(obj) {
   var props = {}
   Object.entries(obj)
-  .filter((i) => i[1].type == "arg")
-  .map((j) => {
-    props[j[0]] = {
-      type: "any",
-      required: false,
-      description: j[1].description,
-    }
-  })
+    .filter((i) => i[1].type == "arg")
+    .map((j) => {
+      props[j[0]] = {
+        type: "any",
+        required: false,
+        description: j[1].description,
+      }
+    })
   return props
 }
 
@@ -239,10 +263,10 @@ function parse(obj) {
           currentObj[`/${key}`] = {}
         currentObj[`/${key}`].post = cmdToPostSchema(prev)
         currentObj[`/${key}`].post.body["application/json"].properties[".proplist"] =
-          {
-            type: "any",
-            required: false,
-          }
+        {
+          type: "any",
+          required: false,
+        }
         currentObj[`/${key}`].post.body["application/json"].properties[".query"] = {
           type: "array",
           required: false,
