@@ -260,6 +260,11 @@ function parse(obj) {
       if (currentObj[key].type == "cmd") {
         if (typeof currentObj[`/${key}`] !== "object")
           currentObj[`/${key}`] = {}
+        /* TODO: uriParameters, i believe, should be top level... it may just assume string, dunno. 
+        uriParameters: {
+          id: { type: "string" },
+        }, */
+
         currentObj[`/${key}`].post = cmdToPostSchema(prev)
         currentObj[`/${key}`].post.body["application/json"].properties[".proplist"] =
         {
@@ -278,19 +283,13 @@ function parse(obj) {
           }
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
           currentObj["/{id}"].get = {
-            uriParameters: {
-              id: { type: "string" },
-            },
             responses: ramlRestResponses(),
           }
         }
         if (key == "set") {
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
           currentObj["/{id}"].patch = {
-            ...cmdToPostSchema(currentObj[key]),
-            uriParameters: {
-              id: { type: "string" },
-            },
+            ...cmdToPostSchema(currentObj[key])
           }
         }
         if (key == "add") {
@@ -299,10 +298,7 @@ function parse(obj) {
         if (key == "remove") {
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
           currentObj["/{id}"].delete = {
-            ...cmdToPostSchema(currentObj[key]),
-            uriParameters: {
-              id: { type: "string" },
-            },
+            ...cmdToPostSchema(currentObj[key])
           }
         }
         if (key != "get") delete currentObj[key]
