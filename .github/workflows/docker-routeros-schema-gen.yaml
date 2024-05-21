@@ -1,0 +1,64 @@
+name: Test HTTP Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      rosver:
+        description: 'RouterOS Version'
+        required: true
+
+jobs:
+  ros-in-action:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Compose
+      uses: docker/setup-buildx-action@v1
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+
+    - name: Run Docker Compose
+      run: |
+        echo "version: '3'
+        services:
+          routeros:
+            image: evilfreelancer/docker-routeros
+            restart: unless-stopped
+            cap_add:
+              - NET_ADMIN
+            devices:
+              - /dev/net/tun
+              - /dev/kvm
+            environment:
+              - ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+            ports:
+              - 9180:80" > docker-compose.yml
+        docker-compose up -d
+
+    - name: Wait For `curl`
+      run: |
+        echo "Waiting for the HTTP server to start..."
+        for i in {1..1000}; do
+          if curl --fail http://localhost:9180/; then
+            echo "Server is up!"
+            exit 0
+          else
+            echo "Server not ready yet. Retrying in 10 seconds..."
+            sleep 10
+          fi
+        done
+        echo "Server did not start within expected time."
+        exit 1
+
+    - name: Test HTTP Server with curl
+      run: curl -X GET http://localhost:9180/rest/ip/address --json
+
+    - name: Cleanup Running Docker
+      run: docker-compose down
