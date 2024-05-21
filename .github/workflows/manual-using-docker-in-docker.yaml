@@ -45,7 +45,7 @@ jobs:
           routeros:
             build: ./Dockerfile.chr-qemu 
               args:
-                - ARG_ROUTEROS_VERSION=${ROUTEROS_VERSION}
+                - ARG_ROUTEROS_VERSION: ${ROUTEROS_VERSION}
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
