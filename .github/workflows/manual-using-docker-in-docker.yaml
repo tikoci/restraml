@@ -93,7 +93,7 @@ jobs:
     - name: Run RAML Generator Code with Bun
       run: |
         bun install js-yaml raml2html raml2html-slate-theme
-        bun rest2raml.js ${{ github.event.inputs.start_path }}
+        bun rest2raml.js --ramlspec 1.0 ${{ github.event.inputs.start_path }}
         ./node_modules/.bin/raml2html -v --theme raml2html-slate-theme ros-rest*.raml > ros-rest-generated.html
 
     - name: Move Built File to /docs
