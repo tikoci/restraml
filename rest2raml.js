@@ -1,11 +1,11 @@
 const fs = require("fs")
 const YAML = require("js-yaml")
+// TODO const wap = require("webapi-parser").WebApiParser
 
 const rosSchemaFilename = "./ros-inspect"
 const ramlSchemaFilename = "./ros-rest"
 
-import { parseArgs } from "util";
-const argPath = process.argv.slice(2)
+const { parseArgs } = require("util")
 
 async function main() {
   // STEP ZERO: calling the script "manually"...
@@ -18,8 +18,13 @@ async function main() {
   //    f. Optionally, rest2raml.js takes args with path to start out, seperated by *spaces*:
   //       >  bun rest2raml.js ip address
   //  So, assuming, done getting version for router should work...
+  const { opts, argPath } = parseArguments()
+  if (opts && opts.validate) {
+    // TODO
+    validateRaml(opts.validate)
+    return 1 // return error code since it's not implemented 
+  }
   const ver = await fetchVersion()
-  const {opts, argPath} = parseArguments()
   if (opts && opts.version) {
     console.log(ver)
     return 0
@@ -29,7 +34,9 @@ async function main() {
   // STEP ONE: use REST to traverse router's /console/inspect output (save to )
   let rosSchema = {}
   if (process.env.INSPECTFILE) {
-    rosSchema = JSON.parse(fs.readFileSync(process.env.INSPECTFILE, { encoding: "utf-8" }))
+    rosSchema = JSON.parse(
+      fs.readFileSync(process.env.INSPECTFILE, { encoding: "utf-8" })
+    )
   } else {
     rosSchema = await parseChildren(argPath)
     const rosSchemaPath = `${rosSchemaFilename}-${argPath.join("+") || "all"
@@ -45,7 +52,7 @@ async function main() {
   const ramlPath = `${ramlSchemaFilename}-${argPath.join("+") || "all"}.raml`
   fs.writeFileSync(
     ramlPath,
-    "#%RAML 1.0\n" +
+    `#%RAML ${opts.ramlspec}\n` +
     YAML.dump({
       ...generateRAMLPrefix(ver, argPath.join("+") || "all"),
       ...ramlSchema,
@@ -59,10 +66,16 @@ function parseArguments() {
   const { values, positionals } = parseArgs({
     args: Bun.argv,
     options: {
-      "version": {
+      version: {
         type: "boolean",
-        short: "v"
       },
+      validate: {
+        type: "string",
+      },
+      ramlspec: {
+        type: "string",
+        default: "0.8"
+      }
     },
     strict: true,
     allowPositionals: true,
@@ -70,6 +83,14 @@ function parseArguments() {
   const [, , ...argPath] = positionals
   const opts = values
   return { opts, argPath }
+}
+
+async function validateRaml(filename) {
+  // const raml = fs.readFileSync(filename, { encoding: "utf-8" })
+  // const model = await wap.raml10.parse(raml)
+  // const report = await wap.raml10.validate(model)
+  // console.log("Validation errors:", report.toString())
+  console.warn("Not implemented.")
 }
 
 function generateRAMLPrefix(ver = "7.0", tag = "dev") {
@@ -173,7 +194,7 @@ async function parseChildren(rpath = [], memo = {}) {
   for (const child of children) {
     if (child.type == "child") {
       const newpath = [...rpath, child.name]
-      memo[child.name] = { type: child["node-type"] }
+      memo[child.name] = { _type: child["node-type"] }
       // try {
       if (child["node-type"] == "arg") {
         if (
@@ -221,7 +242,7 @@ function ramlRestResponses(successJsonType = "any") {
 function cmdToGetQueryParams(obj) {
   var props = {}
   Object.entries(obj)
-    .filter((i) => i[1].type == "arg")
+    .filter((i) => i[1]._type == "arg")
     .map((j) => {
       props[j[0]] = {
         type: "any",
@@ -239,7 +260,7 @@ function cmdToPostSchema(obj) {
   op.body["application/json"] = { type: "object" }
   let props = (op.body["application/json"].properties = {})
   Object.entries(obj)
-    .filter((i) => i[1].type == "arg")
+    .filter((i) => i[1]._type == "arg")
     .map((j) => {
       props[j[0]] = {
         type: "any",
@@ -257,16 +278,19 @@ function parse(obj) {
   function parser(currentObj) {
     for (const key in currentObj) {
       const prev = currentObj[key]
-      if (currentObj[key].type == "cmd") {
+      if (currentObj[key]._type == "cmd") {
         if (typeof currentObj[`/${key}`] !== "object")
           currentObj[`/${key}`] = {}
         currentObj[`/${key}`].post = cmdToPostSchema(prev)
-        currentObj[`/${key}`].post.body["application/json"].properties[".proplist"] =
-        {
+        currentObj[`/${key}`].post.body["application/json"].properties[
+          ".proplist"
+        ] = {
           type: "any",
           required: false,
         }
-        currentObj[`/${key}`].post.body["application/json"].properties[".query"] = {
+        currentObj[`/${key}`].post.body["application/json"].properties[
+          ".query"
+        ] = {
           type: "array",
           required: false,
         }
@@ -274,7 +298,7 @@ function parse(obj) {
           const getqueryparams = cmdToGetQueryParams(currentObj["get"])
           currentObj["get"] = {
             queryParameters: getqueryparams,
-            responses: ramlRestResponses("array")
+            responses: ramlRestResponses("array"),
           }
           if (typeof currentObj["/{id}"] !== "object") currentObj["/{id}"] = {}
           currentObj["/{id}"].get = { responses: ramlRestResponses() }
@@ -298,10 +322,10 @@ function parse(obj) {
         const src = currentObj[key]
         currentObj[`/${key}`] = currentObj[key]
         if (
-          currentObj[`/${key}`].type == "path" ||
-          currentObj[`/${key}`].type == "dir"
+          currentObj[`/${key}`]._type == "path" ||
+          currentObj[`/${key}`]._type == "dir"
         ) {
-          delete currentObj[`/${key}`].type
+          delete currentObj[`/${key}`]._type
         }
         parser(currentObj[`/${key}`])
         delete currentObj[key]
