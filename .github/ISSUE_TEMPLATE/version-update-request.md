@@ -1,7 +1,7 @@
 ---
-name: Schema Build Request
+name: Version Update Request
 about: Use this issue to require a specific version be built.
-title: Schema Build Request
+title: Version Update Request
 labels: ''
 assignees: mobileskyfi
 
