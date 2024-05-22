@@ -99,7 +99,7 @@ jobs:
       run: |
         bun install js-yaml raml2html raml2html-slate-theme
         bun rest2raml.js ${{ github.event.inputs.start_path }}
-        ./node_modules/.bin/raml2html -v --theme raml2html-slate-theme ros-rest*.raml > ros-rest-generated.html
+        ./node_modules/.bin/raml2html -v --theme raml2html-slate-theme ros-rest*.raml > index.html
 
     - name: Validate RAML 1.0 using webapi-parse library
       run: |
@@ -111,11 +111,13 @@ jobs:
       run: |
         echo ${{ steps.connection-check.outputs.rosver }}
         echo $ROS_FILTER
-        ROS_FILTER=$(echo ${{ github.event.inputs.start_path }} | tr ' ' '/')
+        ROS_FILTER=$(echo ${{ github.event.inputs.start_path }} | tr ' ' '+')
         DOCS_PATH=docs/${{ steps.connection-check.outputs.rosver }}/$ROS_FILTER
         echo $DOCS_PATH
-        mkdir -p $DOCS_PATH
-        cp ros-* $DOCS_PATH
+        mkdir -p $DOCS_PATH/docs
+        cp index.html $DOCS_PATH/docs
+        cp ros-rest*.raml $DOCS_PATH/schema.raml
+        cp ros-inspect*.json $DOCS_PATH/inspect.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
@@ -134,9 +136,9 @@ jobs:
       with:
         name: build-results
         path: |
-          ros-rest*
-          ros-inspect*
-          ros-rest-generated*
+          ros-rest*.raml
+          ros-inspect*.json
+          index.html
 
     - name: Cleanup Running Docker
       run: docker-compose down
