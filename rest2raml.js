@@ -74,7 +74,7 @@ function parseArguments() {
       },
       ramlspec: {
         type: "string",
-        default: "0.8"
+        default: "1.0"
       }
     },
     strict: true,
