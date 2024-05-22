@@ -1,7 +1,7 @@
 ---
-name: Version Update Request
+name: Need a specific version?
 about: Use this issue to require a specific version be built.
-title: Version Update Request
+title: "**Build Request** for specific version"
 labels: ''
 assignees: mobileskyfi
 
