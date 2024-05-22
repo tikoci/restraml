@@ -5,13 +5,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RouterOS REST API Schemas and Docs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+    </style>
 </head>
 
 <body>
     <main class="container">
-
-        <h2>Generated Schemas and Docs</h1>
+        <section>
+            <div>
+                <div style="background-image: url(https://mikrotik.com/logo/assets/donot-bgpattern3-OTvv-Xcl.jpg)">
+                    <img src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" />
+                </div>
+            </div>
+        </section>
+        <h3>Generated Schemas and Docs</h3>
             <div id="filelist-div">
                 <table>
                     <thead>
@@ -76,4 +96,5 @@
             .catch(error => console.error('Error fetching files:', error))
     </script>
 </body>
+
 </html>
