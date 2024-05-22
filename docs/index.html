@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RouterOS Schemas and Docs</title>
+    <title>RouterOS API/Command Schemas</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
         rel="stylesheet">
     <link
@@ -20,22 +20,49 @@
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
     </style>
+    <style>
+        header nav li a svg {
+            width: var(--font-size);
+            height: var(--font-size);
+            color: var(--contrast);
+        }
+
+    </style>
 </head>
 
 <body>
-    <main class="container">
-        <section>
-            <div>
+
+    <!--<img src="" />-->
+    <header class="container">
+
+        <nav>
+            <ul>
+                <!-- using the **unauthorized** logo image to highlight that fact -->
                 <div style="background-image: url(https://mikrotik.com/logo/assets/donot-bgpattern3-OTvv-Xcl.jpg)">
                     <img src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" />
                 </div>
-            </div>
-        </section>
+                <!-- 
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg">
+                -->
+            </ul>
+            <ul>
+            </ul><ul>
+                <li>
+                    <a id="theme_switcher" href="#"></a>
+                </li>
+            </ul>
+        </nav>
+        <h1><mark>Unofficial</mark> RouterOS API/Command Schemas</h1>
+
+    </header>
+    <main class="container">
         <section>
             <h3>Usage</h3>
             <div>
                 <p>See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a> for
-                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>.</p>
+                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>.
+                </p>
             </div>
         </section>
         <section>
@@ -65,11 +92,25 @@
                 </table>
             </div>
         </section>
-        <h3>Help?</h3>
-        <p><a href="https://github.com/tikoci/restraml/issues/new/choose">Create an issue</a> using GitHub</p>
+        <section>
+            <br />
+            <h3>Help?</h3>
+            <p><a href="https://github.com/tikoci/restraml/issues/new/choose">Create an issue</a> using GitHub</p>
+            <br />
+        </section>
+        <section>
+            <blockquote>
+                <h5>* Disclaimer</h5>
+                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
+                    connected
+                    with <a href="https://mikrotik.com">Mikrotik</a>.
+                    All product and company names are trademarks™ or registered® trademarks of their respective holders.
+                    Use
+                    of them does not imply any affiliation with or endorsement by them.</small>
+            </blockquote>
         </section>
     </main>
-    
+
     <script>
         const owner = 'tikoci'
         const repo = 'restraml'
@@ -117,6 +158,25 @@
                 })
             })
             .catch(error => console.error('Error fetching files:', error))
+    </script>
+    <script>
+        let isLight = true
+        const html = document.documentElement
+        const switchTheme = document.getElementById('theme_switcher')
+        const sun = '<svg width="30px" height="30px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
+        const moon = '<svg width="30px" height="30px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
+        const os_default = '<svg width="30px" height="30px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+
+        document.addEventListener('DOMContentLoaded', () => {
+            switchTheme.innerHTML = os_default
+            html.setAttribute('data-theme', 'auto')
+        })
+        switchTheme.addEventListener('click', (e) => {
+            e.preventDefault()
+            isLight = !isLight
+            html.setAttribute('data-theme', isLight ? 'light' : 'dark')
+            switchTheme.innerHTML = isLight ? sun : moon
+        })
     </script>
 </body>
 
