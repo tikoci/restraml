@@ -66,7 +66,7 @@ The schema generation is done via JavaScript, specifically using `bun`, in `rest
 #### Actions
 
 GitHub Actions is used to build the schema published on this project's website:
- * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-using-docker-in-docker.yaml) for `manual-from-docker-in-docker.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-from-docker-in-docker.yaml) - start a RouterOS CHR (via docker-compose and QEMU) **within the build**, and then `rest2raml.js` uses the "internal" CHR to generate the schema, without any external resources needed.
+ * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-using-docker-in-docker.yaml) for `manual-from-docker-in-docker.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-using-docker-in-docker.yaml) - start a RouterOS CHR (via docker-compose and QEMU) **within the build**, and then `rest2raml.js` uses the "internal" CHR to generate the schema, without any external resources needed.
  * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-from-secrets.yaml) for `manual-from-secrets.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-from-secrets.yaml) - uses GitHub Secret with information to connection to a RouterOS device on internet
 
 
