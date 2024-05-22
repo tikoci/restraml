@@ -13,7 +13,7 @@ Included are three files:
  * `HTML` - documentation, generated from the schema
  * `JSON` - intermediate raw data from RouterOS's `/console/inspect` in JSON format, for use with data analytics.
 
-### Postman Usage
+## Usage with Postman
 For detailed instructions on using the RAML schema with Postman, see this forum article:
 https://forum.mikrotik.com/viewtopic.php?p=1041886
 
@@ -26,7 +26,7 @@ showing the process, including a video of the process.
 
 
 ## Build
-## Generating the RAML file
+### Generating the RAML file
 
 1. Install [Bun](https://bun.sh/)
 2. Clone this repository
@@ -41,7 +41,7 @@ showing the process, including a video of the process.
  Wait a while for this code to run. It could take as long as an hour to process the entire schema.
 5. Open a pull request to add the RAML file to this repository if it's missing 😉
 
-## Generating the HTML page
+### Generating the HTML page
 
 1. Follow steps 1-2 above, or 1-4 if this repository doesn't currently contain a RAML file for your RouterOS version.
 2. Install `raml2html` and `raml2html-slate-theme`: 
