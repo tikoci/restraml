@@ -1,6 +1,6 @@
 #%RAML 1.0
-title: RouterOS REST Schema (v7.15rc4.28605739-tool)
-version: v7.15rc4.28605739-tool
+title: RouterOS REST Schema (v7.15rc4.28605759-tool)
+version: v7.15rc4.28605759-tool
 protocols:
   - HTTPS
   - HTTP
@@ -4742,82 +4742,228 @@ documentation:
             application/json:
               type: object
     /add:
-      /type:
-        type: arg
-      /certificate:
-        type: arg
-      /check-certificate:
-        type: arg
-      /comment:
-        type: arg
-        desc: string value
-      /copy-from:
-        type: arg
-      /disabled:
-        type: arg
-      /down-script:
-        type: arg
-        desc: string value
-      /host:
-        type: arg
-        desc: see documentation
-      /http-codes:
-        type: arg
-      /interval:
-        type: arg
-        desc: 1s..71w2h27m52s950ms    (time interval)
-      /name:
-        type: arg
-        desc: string value
-      /packet-count:
-        type: arg
-      /packet-interval:
-        type: arg
-        desc: 20ms..71w2h27m52s950ms    (time interval)
-      /packet-size:
-        type: arg
-      /port:
-        type: arg
-      /src-address:
-        type: arg
-        desc: see documentation
-      /start-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /startup-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /test-script:
-        type: arg
-        desc: string value
-      /thr-avg:
-        type: arg
-        desc: time interval
-      /thr-http-time:
-        type: arg
-        desc: time interval
-      /thr-jitter:
-        type: arg
-        desc: time interval
-      /thr-loss-count:
-        type: arg
-      /thr-loss-percent:
-        type: arg
-      /thr-max:
-        type: arg
-        desc: time interval
-      /thr-stdev:
-        type: arg
-        desc: time interval
-      /thr-tcp-conn-time:
-        type: arg
-        desc: 0s..30s    (time interval)
-      /timeout:
-        type: arg
-        desc: 10ms..4w    (time interval)
-      /up-script:
-        type: arg
-        desc: string value
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              certificate:
+                type: any
+                required: false
+              check-certificate:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              copy-from:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              down-script:
+                type: any
+                required: false
+              host:
+                type: any
+                required: false
+              http-codes:
+                type: any
+                required: false
+              interval:
+                type: any
+                required: false
+              name:
+                type: any
+                required: false
+              packet-count:
+                type: any
+                required: false
+              packet-interval:
+                type: any
+                required: false
+              packet-size:
+                type: any
+                required: false
+              port:
+                type: any
+                required: false
+              src-address:
+                type: any
+                required: false
+              start-delay:
+                type: any
+                required: false
+              startup-delay:
+                type: any
+                required: false
+              test-script:
+                type: any
+                required: false
+              thr-avg:
+                type: any
+                required: false
+              thr-http-time:
+                type: any
+                required: false
+              thr-jitter:
+                type: any
+                required: false
+              thr-loss-count:
+                type: any
+                required: false
+              thr-loss-percent:
+                type: any
+                required: false
+              thr-max:
+                type: any
+                required: false
+              thr-stdev:
+                type: any
+                required: false
+              thr-tcp-conn-time:
+                type: any
+                required: false
+              timeout:
+                type: any
+                required: false
+              type:
+                type: any
+                required: false
+              up-script:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    put:
+      body:
+        application/json:
+          type: object
+          properties:
+            certificate:
+              type: any
+              required: false
+            check-certificate:
+              type: any
+              required: false
+            comment:
+              type: any
+              required: false
+            copy-from:
+              type: any
+              required: false
+            disabled:
+              type: any
+              required: false
+            down-script:
+              type: any
+              required: false
+            host:
+              type: any
+              required: false
+            http-codes:
+              type: any
+              required: false
+            interval:
+              type: any
+              required: false
+            name:
+              type: any
+              required: false
+            packet-count:
+              type: any
+              required: false
+            packet-interval:
+              type: any
+              required: false
+            packet-size:
+              type: any
+              required: false
+            port:
+              type: any
+              required: false
+            src-address:
+              type: any
+              required: false
+            start-delay:
+              type: any
+              required: false
+            startup-delay:
+              type: any
+              required: false
+            test-script:
+              type: any
+              required: false
+            thr-avg:
+              type: any
+              required: false
+            thr-http-time:
+              type: any
+              required: false
+            thr-jitter:
+              type: any
+              required: false
+            thr-loss-count:
+              type: any
+              required: false
+            thr-loss-percent:
+              type: any
+              required: false
+            thr-max:
+              type: any
+              required: false
+            thr-stdev:
+              type: any
+              required: false
+            thr-tcp-conn-time:
+              type: any
+              required: false
+            timeout:
+              type: any
+              required: false
+            type:
+              type: any
+              required: false
+            up-script:
+              type: any
+              required: false
+      responses:
+        '200':
+          description: Success
+          body:
+            application/json:
+              type: any
+        '400':
+          description: Bad command or error
+          body:
+            application/json:
+              type: object
+        '401':
+          description: Unauthorized
+          body:
+            application/json:
+              type: object
     /comment:
       post:
         body:
@@ -5113,6 +5259,114 @@ documentation:
             body:
               application/json:
                 type: object
+      patch:
+        body:
+          application/json:
+            type: object
+            properties:
+              certificate:
+                type: any
+                required: false
+              check-certificate:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              down-script:
+                type: any
+                required: false
+              host:
+                type: any
+                required: false
+              http-codes:
+                type: any
+                required: false
+              interval:
+                type: any
+                required: false
+              name:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              packet-count:
+                type: any
+                required: false
+              packet-interval:
+                type: any
+                required: false
+              packet-size:
+                type: any
+                required: false
+              port:
+                type: any
+                required: false
+              src-address:
+                type: any
+                required: false
+              start-delay:
+                type: any
+                required: false
+              startup-delay:
+                type: any
+                required: false
+              test-script:
+                type: any
+                required: false
+              thr-avg:
+                type: any
+                required: false
+              thr-http-time:
+                type: any
+                required: false
+              thr-jitter:
+                type: any
+                required: false
+              thr-loss-count:
+                type: any
+                required: false
+              thr-loss-percent:
+                type: any
+                required: false
+              thr-max:
+                type: any
+                required: false
+              thr-stdev:
+                type: any
+                required: false
+              thr-tcp-conn-time:
+                type: any
+                required: false
+              timeout:
+                type: any
+                required: false
+              type:
+                type: any
+                required: false
+              up-script:
+                type: any
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
     /print:
       post:
         body:
@@ -5227,159 +5481,235 @@ documentation:
               application/json:
                 type: object
     /reset:
-      /type:
-        type: arg
-      /certificate:
-        type: arg
-      /check-certificate:
-        type: arg
-      /comment:
-        type: arg
-        desc: string value
-      /disabled:
-        type: arg
-      /down-script:
-        type: arg
-        desc: string value
-      /host:
-        type: arg
-        desc: see documentation
-      /http-codes:
-        type: arg
-      /interval:
-        type: arg
-        desc: 1s..71w2h27m52s950ms    (time interval)
-      /name:
-        type: arg
-        desc: string value
-      /numbers:
-        type: arg
-      /packet-count:
-        type: arg
-      /packet-interval:
-        type: arg
-        desc: 20ms..71w2h27m52s950ms    (time interval)
-      /packet-size:
-        type: arg
-      /port:
-        type: arg
-      /src-address:
-        type: arg
-        desc: see documentation
-      /start-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /startup-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /test-script:
-        type: arg
-        desc: string value
-      /thr-avg:
-        type: arg
-        desc: time interval
-      /thr-http-time:
-        type: arg
-        desc: time interval
-      /thr-jitter:
-        type: arg
-        desc: time interval
-      /thr-loss-count:
-        type: arg
-      /thr-loss-percent:
-        type: arg
-      /thr-max:
-        type: arg
-        desc: time interval
-      /thr-stdev:
-        type: arg
-        desc: time interval
-      /thr-tcp-conn-time:
-        type: arg
-        desc: 0s..30s    (time interval)
-      /timeout:
-        type: arg
-        desc: 10ms..4w    (time interval)
-      /up-script:
-        type: arg
-        desc: string value
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              certificate:
+                type: any
+                required: false
+              check-certificate:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              down-script:
+                type: any
+                required: false
+              host:
+                type: any
+                required: false
+              http-codes:
+                type: any
+                required: false
+              interval:
+                type: any
+                required: false
+              name:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              packet-count:
+                type: any
+                required: false
+              packet-interval:
+                type: any
+                required: false
+              packet-size:
+                type: any
+                required: false
+              port:
+                type: any
+                required: false
+              src-address:
+                type: any
+                required: false
+              start-delay:
+                type: any
+                required: false
+              startup-delay:
+                type: any
+                required: false
+              test-script:
+                type: any
+                required: false
+              thr-avg:
+                type: any
+                required: false
+              thr-http-time:
+                type: any
+                required: false
+              thr-jitter:
+                type: any
+                required: false
+              thr-loss-count:
+                type: any
+                required: false
+              thr-loss-percent:
+                type: any
+                required: false
+              thr-max:
+                type: any
+                required: false
+              thr-stdev:
+                type: any
+                required: false
+              thr-tcp-conn-time:
+                type: any
+                required: false
+              timeout:
+                type: any
+                required: false
+              type:
+                type: any
+                required: false
+              up-script:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
     /set:
-      /type:
-        type: arg
-      /certificate:
-        type: arg
-      /check-certificate:
-        type: arg
-      /comment:
-        type: arg
-        desc: string value
-      /disabled:
-        type: arg
-      /down-script:
-        type: arg
-        desc: string value
-      /host:
-        type: arg
-        desc: see documentation
-      /http-codes:
-        type: arg
-      /interval:
-        type: arg
-        desc: 1s..71w2h27m52s950ms    (time interval)
-      /name:
-        type: arg
-        desc: string value
-      /numbers:
-        type: arg
-      /packet-count:
-        type: arg
-      /packet-interval:
-        type: arg
-        desc: 20ms..71w2h27m52s950ms    (time interval)
-      /packet-size:
-        type: arg
-      /port:
-        type: arg
-      /src-address:
-        type: arg
-        desc: see documentation
-      /start-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /startup-delay:
-        type: arg
-        desc: 0s..1h    (time interval)
-      /test-script:
-        type: arg
-        desc: string value
-      /thr-avg:
-        type: arg
-        desc: time interval
-      /thr-http-time:
-        type: arg
-        desc: time interval
-      /thr-jitter:
-        type: arg
-        desc: time interval
-      /thr-loss-count:
-        type: arg
-      /thr-loss-percent:
-        type: arg
-      /thr-max:
-        type: arg
-        desc: time interval
-      /thr-stdev:
-        type: arg
-        desc: time interval
-      /thr-tcp-conn-time:
-        type: arg
-        desc: 0s..30s    (time interval)
-      /timeout:
-        type: arg
-        desc: 10ms..4w    (time interval)
-      /up-script:
-        type: arg
-        desc: string value
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              certificate:
+                type: any
+                required: false
+              check-certificate:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              down-script:
+                type: any
+                required: false
+              host:
+                type: any
+                required: false
+              http-codes:
+                type: any
+                required: false
+              interval:
+                type: any
+                required: false
+              name:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              packet-count:
+                type: any
+                required: false
+              packet-interval:
+                type: any
+                required: false
+              packet-size:
+                type: any
+                required: false
+              port:
+                type: any
+                required: false
+              src-address:
+                type: any
+                required: false
+              start-delay:
+                type: any
+                required: false
+              startup-delay:
+                type: any
+                required: false
+              test-script:
+                type: any
+                required: false
+              thr-avg:
+                type: any
+                required: false
+              thr-http-time:
+                type: any
+                required: false
+              thr-jitter:
+                type: any
+                required: false
+              thr-loss-count:
+                type: any
+                required: false
+              thr-loss-percent:
+                type: any
+                required: false
+              thr-max:
+                type: any
+                required: false
+              thr-stdev:
+                type: any
+                required: false
+              thr-tcp-conn-time:
+                type: any
+                required: false
+              timeout:
+                type: any
+                required: false
+              type:
+                type: any
+                required: false
+              up-script:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
     /unset:
       post:
         body:
@@ -7169,25 +7499,57 @@ documentation:
               application/json:
                 type: object
     /send:
-      /type:
-        type: arg
-      /as-value:
-        type: arg
-      /channel:
-        type: arg
-      /message:
-        type: arg
-        desc: string value
-      /phone-number:
-        type: arg
-        desc: string value
-      /port:
-        type: arg
-      /smsc:
-        type: arg
-        desc: string value
-      /status-report-request:
-        type: arg
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              as-value:
+                type: any
+                required: false
+              channel:
+                type: any
+                required: false
+              message:
+                type: any
+                required: false
+              phone-number:
+                type: any
+                required: false
+              port:
+                type: any
+                required: false
+              smsc:
+                type: any
+                required: false
+              status-report-request:
+                type: any
+                required: false
+              type:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
     /set:
       post:
         body:
