@@ -5,14 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RouterOS API/Command Schemas</title>
+    <!-- Use picocss - https://picocss.com/ -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <!-- Download Mikrotik official fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
-        rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
         rel="stylesheet">
+    <!-- Set "JetBrains Mono" as default -->
     <style>
         :root {
             --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
@@ -20,21 +21,19 @@
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
     </style>
+    <!-- "Dark Mode" icon -->
     <style>
         header nav li a svg {
             width: var(--font-size);
             height: var(--font-size);
             color: var(--contrast);
         }
-
     </style>
 </head>
 
 <body>
 
-    <!--<img src="" />-->
     <header class="container">
-
         <nav>
             <ul>
                 <!-- using the **unauthorized** logo image to highlight that fact -->
@@ -47,15 +46,16 @@
                 -->
             </ul>
             <ul>
-            </ul><ul>
+            </ul>
+            <ul>
                 <li>
                     <a id="theme_switcher" href="#"></a>
                 </li>
             </ul>
         </nav>
         <h1><mark>Unofficial</mark> RouterOS API/Command Schemas</h1>
-
     </header>
+
     <main class="container">
         <section>
             <h3>Usage</h3>
@@ -65,6 +65,7 @@
                 </p>
             </div>
         </section>
+
         <section>
             <h3>Downloads</h3>
             <div id="filelist-div">
@@ -72,32 +73,35 @@
                     <thead>
                         <tr>
                             <th scope="col">Version</th>
-                            <th scope="col"><mark>RAML</mark> Schema</th>
-                            <th scope="col"><mark>HTML</mark> API Docs</th>
-                            <th scope="col"><mark>JSON</mark> Inspect </th>
+                            <td><small><mark>RAML</mark></small> API Schema</td>
+                            <td><small><mark>HTML</mark></small> Docs</td>
+                            <td><small><code>/console/inspect</code></small></td>
                         </tr>
                     </thead>
                     <tbody id="filerows">
+                        <!-- Generated Table of Versions -->
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td><a
-                                    href="https://github.com/tikoci/restraml/issues/new?assignees=mobileskyfi&labels=&projects=&template=version-update-request.md&title=Version+Update+Request">request</a>
-                            </td>
-                            <td><small>RAML for Postman App</small></td>
-                            <td></td>
-                            <td><small>JSON for data analytics</small></td>
+                            <td><small>
+                                <a href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                            </small></td>
+                            <th scope="col"></th>
+                            <th scope="col"></th>
+                            <th scope="col"></th>
                         </tr>
                     </tfoot>
                 </table>
             </div>
         </section>
+
         <section>
             <br />
             <h3>Help?</h3>
             <p><a href="https://github.com/tikoci/restraml/issues/new/choose">Create an issue</a> using GitHub</p>
             <br />
         </section>
+
         <section>
             <blockquote>
                 <h5>* Disclaimer</h5>
@@ -111,61 +115,68 @@
         </section>
     </main>
 
-    <script>
-        const owner = 'tikoci'
-        const repo = 'restraml'
-        const path = 'docs'
-        const pagesUrl = `https://${owner}.github.io/${repo}/`
 
+    <script>
+        /*** Build Table of Versions ***/
+
+        /* GH project info to find used to find available version */
+        const owner = 'tikoci';
+        const repo = 'restraml';
+        const path = 'docs';
+        const pagesUrl = `https://${owner}.github.io/${repo}/`;
+
+        function createColumn(tag, content, link, download) {
+            const col = document.createElement(tag);
+            if (link) {
+                const a = document.createElement('a');
+                a.href = link;
+                a.textContent = content;
+                if (download) {
+                    a.download = download;
+                }
+                col.appendChild(a);
+            } else {
+                col.textContent = content;
+            }
+            return col;
+        }
+
+        function createRow(file) {
+            const row = document.createElement('tr');
+            const col1 = createColumn('th', file.name);
+            row.appendChild(col1);
+            const col2 = createColumn('td', 'RAML', `${pagesUrl}${file.path.replace('docs/', '')}/schema.raml`, `ros-schema-${file.name}.raml`);
+            row.appendChild(col2);
+            const col3 = createColumn('td', 'HTML', `${pagesUrl}${file.path.replace('docs/', '')}/docs`, `ros-schema-docs-${file.name}.html`);
+            row.appendChild(col3);
+            const col4 = createColumn('td', 'JSON', `${pagesUrl}${file.path.replace('docs/', '')}/inspect.json`, `ros-schema-docs-${file.name}.json`);
+            row.appendChild(col4);
+            return row;
+        }
+
+        /* Use GitHub API to `ls` the /docs, then call createRow() on directories */
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
             .then(response => response.json())
             .then(data => {
-                const fileList = document.getElementById("filerows")
-                console.log(fileList)
-                console.log(data)
+                const fileList = document.getElementById("filerows");
                 data.forEach(file => {
-                    console.log(file)
                     if (file.type === "dir") {
-                        const row = document.createElement('tr')
-
-                        const col1 = document.createElement('th')
-                        col1.textContent = file.name
-                        row.appendChild(col1)
-
-                        const col2 = document.createElement('td')
-                        const raml = document.createElement('a')
-                        raml.href = pagesUrl + file.path.replace('docs/', '') + '/schema.raml'
-                        raml.textContent = "RAML"
-                        col2.appendChild(raml)
-                        row.appendChild(col2)
-
-                        const col3 = document.createElement('td')
-                        const html = document.createElement('a')
-                        html.href = pagesUrl + file.path.replace('docs/', '') + '/docs'
-                        html.textContent = "HTML"
-                        col3.appendChild(html)
-                        row.appendChild(col3)
-
-                        const col4 = document.createElement('td')
-                        const inspectjson = document.createElement('a')
-                        inspectjson.href = pagesUrl + file.path.replace('docs/', '') + '/inspect.json'
-                        inspectjson.textContent = "JSON"
-                        col4.appendChild(inspectjson)
-                        row.appendChild(col4)
-
-                        fileList.appendChild(row)
+                        const row = createRow(file);
+                        fileList.appendChild(row);
                     }
-                })
+                });
             })
-            .catch(error => console.error('Error fetching files:', error))
+            .catch(error => console.error('Error fetching files:', error));
     </script>
+
     <script>
+        /*** Dark Mode Handling ***/
         let isLight = true
         const html = document.documentElement
         const switchTheme = document.getElementById('theme_switcher')
-        const sun = '<svg width="30px" height="30px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
-        const moon = '<svg width="30px" height="30px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
-        const os_default = '<svg width="30px" height="30px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+        const sun = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
+        const moon = '<svg width="23px" height="23px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
+        const os_default = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
 
         document.addEventListener('DOMContentLoaded', () => {
             switchTheme.innerHTML = os_default
