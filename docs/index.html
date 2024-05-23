@@ -143,13 +143,14 @@
 
         function createRow(file) {
             const row = document.createElement('tr');
+            const urlPageBase = `${pagesUrl}${file.path.replace('docs/', '')}`
             const col1 = createColumn('th', file.name);
             row.appendChild(col1);
-            const col2 = createColumn('td', 'RAML', `${pagesUrl}${file.path.replace('docs/', '')}/schema.raml`, `ros-schema-${file.name}.raml`);
+            const col2 = createColumn('td', 'RAML', `${urlPageBase}/schema.raml`, `ros-schema-${file.name}.raml`);
             row.appendChild(col2);
-            const col3 = createColumn('td', 'HTML', `${pagesUrl}${file.path.replace('docs/', '')}/docs`, `ros-schema-docs-${file.name}.html`);
+            const col3 = createColumn('td', 'HTML', `${urlPageBase}/docs`, `ros-raml-docs-${file.name}.html`);
             row.appendChild(col3);
-            const col4 = createColumn('td', 'JSON', `${pagesUrl}${file.path.replace('docs/', '')}/inspect.json`, `ros-schema-docs-${file.name}.json`);
+            const col4 = createColumn('td', 'JSON', `${urlPageBase}/inspect.json`, `ros-inspect-${file.name}.json`);
             row.appendChild(col4);
             return row;
         }
