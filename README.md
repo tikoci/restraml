@@ -24,6 +24,14 @@ To import this schema into Postman App 11.1.14 _or greater_, the RAML schema mus
 https://github.com/postmanlabs/raml1-to-postman/issues/84#issuecomment-2125114449)
 showing the process, including a video of the process.
 
+> [!TIP] 
+> ### What about OpenAPI?
+> The RAML schema can be converted to an OpenAPI schema ("OAS").  Right now, it a manual process.  You can use any RAML from [Downloads](https://tikoci.github.io/restraml), then paste that into MuleSoft's online converter here:
+>
+> https://mulesoft.github.io/oas-raml-converter
+>
+> It _should_ produce a OAS 2.0 schema usable in the latest Postman via import, and other tool.  While OpenAPI schemas are more wildly supported, RAML is used as base schema here since it's easier to generate programatically.
+> _Automated RAML->OAS convertion is "planned" — comment in [#4 Issue](https://github.com/tikoci/restraml/issues/4) if this would be useful to you._
 
 ## Build
 ### Generating the RAML file
