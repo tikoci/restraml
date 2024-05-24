@@ -5,15 +5,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RouterOS API/Command Schemas</title>
-    <!-- Use picocss - https://picocss.com/ -->
+
+    <!-- Pico CCS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
-    <!-- Download Mikrotik official fonts -->
+
+    <!-- Mikrotik Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
+        rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
         rel="stylesheet">
-    <!-- Set "JetBrains Mono" as default -->
+
+    <!-- Highlight.JS (for diff) -->
+    <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/diff.min.js"></script>
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/json.min.js"></script>
+
+    <!-- json diff *modules*-->
+    <script>
+        const module = {}
+    </script>
+    <script type="module">
+        import { diffString, diff } from 'https://cdn.jsdelivr.net/npm/json-diff@1.0.6/+esm'
+        module.diffString = diffString
+        module.diff = diff
+    </script>
+
+    <!-- DeepDiff for stats -->
+    <script src="https://cdn.jsdelivr.net/npm/deep-diff@1/dist/deep-diff.min.js"></script>
+
+    <!-- JsonPath to search inspect JSON for stats -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonpath/1.1.1/jsonpath.min.js"
+        integrity="sha512-fdudyA6TY0Kv3vTiHyZj6wkhDbmZFCflZmxtiC/lR5xRNQJaF7ODChpx0ajIIeFBBtaucDolRB1qG0r/U7eYSg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- Override CSS to use Mikrotik fonts-->
     <style>
         :root {
             --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
@@ -21,7 +50,8 @@
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
     </style>
-    <!-- "Dark Mode" icon -->
+
+    <!-- Dark Mode Support -->
     <style>
         header nav li a svg {
             width: var(--font-size);
@@ -68,7 +98,7 @@
 
         <section>
             <h3>Downloads</h3>
-            <div id="filelist-div">
+            <div>
                 <table>
                     <thead>
                         <tr>
@@ -79,13 +109,13 @@
                         </tr>
                     </thead>
                     <tbody id="filerows">
-                        <!-- Generated Table of Versions -->
                     </tbody>
                     <tfoot>
                         <tr>
                             <td><small>
-                                <a href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
-                            </small></td>
+                                    <a
+                                        href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                                </small></td>
                             <th scope="col"></th>
                             <th scope="col"></th>
                             <th scope="col"></th>
@@ -93,6 +123,60 @@
                     </tfoot>
                 </table>
             </div>
+        </section>
+
+        <section>
+
+            <h3><code>diff</code> RouterOS Commands</h3>
+
+            <fieldset class="grid">
+                <div id="inspect1">
+                    <select id="compare1" required>
+                        <option selected disabled value="">
+                            Version to compare...
+                        </option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div><b>Commands:</b>
+                                <span name="cmd">0</span>
+                            </div>
+                            <div><b>Attributes:</b>
+                                <span name="arg">0</span>
+                            </div>
+                        </div>
+                    </small>
+                </div>
+                <div id="inspect2">
+                    <select id="compare2" required>
+                        <option selected disabled value="">
+                            ...against this version
+                        </option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div><b>Commands:</b>
+                                <span name="cmd">0</span>
+                            </div>
+                            <div><b>Attributes:</b>
+                                <span name="arg">0</span>
+                            </div>
+                        </div>
+                    </small>
+                </div>
+            </fieldset>
+
+            <!-- For Debug Use -->
+            <!-- <details open>
+                <summary>Metadata</summary>
+                <pre><code id="diffmeta" class="language-json"></code></pre>
+            </details> -->
+
+            <details id=diffcodedetails open hidden>
+                <summary><code>diff</code> Output</summary>
+                <pre><code id="diffcode" class="hljs language-diff"></code></pre>
+            </details>
+
         </section>
 
         <section>
@@ -116,58 +200,198 @@
     </main>
 
 
-    <script>
-        /*** Build Table of Versions ***/
 
-        /* GH project info to find used to find available version */
+    <script>
+        // GH project info to find used to find available version
         const owner = 'tikoci';
         const repo = 'restraml';
         const path = 'docs';
-        const pagesUrl = `https://${owner}.github.io/${repo}/`;
+        const pagesUrl = `https://${owner}.github.io/${repo}`
+        const pageFolders = []
 
-        function createColumn(tag, content, link, download) {
-            const col = document.createElement(tag);
-            if (link) {
-                const a = document.createElement('a');
-                a.href = link;
-                a.textContent = content;
-                if (download) {
-                    a.download = download;
+        // version table
+        const filerows = document.getElementById("filerows");
+
+        // version table rows
+        document.addEventListener("builddir", e => {
+            const file = e.detail
+            console.log(e.detail)
+
+            // build download table of versions
+            function appendVerCell(row, tag, content, link, download) {
+                const col = document.createElement(tag);
+                if (link) {
+                    const a = document.createElement('a');
+                    a.href = link;
+                    a.textContent = content;
+                    if (download) {
+                        a.download = download;
+                    }
+                    col.appendChild(a);
+                } else {
+                    col.textContent = content;
                 }
-                col.appendChild(a);
-            } else {
-                col.textContent = content;
+                row.appendChild(col);
             }
-            return col;
+
+            function appendVerRow(filerows, file) {
+                console.log(file)
+                const row = document.createElement('tr');
+                row.id = file.name
+                appendVerCell(row, 'th', file.name);
+                appendVerCell(row, 'td', 'RAML', `${file.pagesUrl}/schema.raml`, `ros-schema-${file.name}.raml`);
+                appendVerCell(row, 'td', 'HTML', `${file.pagesUrl}/docs`, `ros-schema-docs-${file.name}.html`);
+                appendVerCell(row, 'td', 'JSON', `${file.pagesUrl}/inspect.json`, `ros-schema-docs-${file.name}.json`);
+                filerows.appendChild(row)
+            }
+
+            appendVerRow(filerows, file)
+        })
+
+
+        // version diff inputs 
+        const compare1 = document.getElementById('compare1')
+        const compare2 = document.getElementById('compare2')
+        // verison diff output
+        const diffcode = document.getElementById('diffcode')
+        const diffcodedetails = document.getElementById('diffcodedetails')
+        // version diff logic
+        compare1.addEventListener("change", e => {
+            if (compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+        compare2.addEventListener("change", e => {
+            if (compare1.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+        // add version to diff dropdowns
+        document.addEventListener("builddir", e => {
+            const file = e.detail
+            compare1.appendChild(new Option(file.name, file.name))
+            compare2.appendChild(new Option(file.name, file.name))
+        })
+        document.addEventListener("vercompare", e => {
+            async function onVerCompare() {
+                console.log("in onvercompare")
+                const files = [
+                    await fetchInspect(compare1.value),
+                    await fetchInspect(compare2.value)
+                ]
+
+                // run json-diff to get textual diff, and add color back via highlight.js
+                diffcode.removeAttribute('data-highlighted')
+                diffcode.textContent = module.diffString(files[0], files[1], { colors: false })
+                diffcodedetails.hidden = false
+                console.log(diffcode)
+                hljs.highlightElement(diffcode)
+
+                console.log("json diff stats", jsonDiffStats(files[0], files[1]))
+            }
+
+
+            onVerCompare()
+        })
+
+        document.addEventListener('inspectdownload', e => {
+            const ever = e.detail.ver
+            const ejson = JSON.parse(JSON.stringify(e.detail.json))
+            console.log(jsonpath)
+
+            const types = (new jsonpath.JSONPath()).query(ejson, `$..*[?(@._type)]._type`)
+            const stats = { arg: 0, cmd: 0, dir: 0 }
+            types.forEach(x => stats[x]++)
+            console.log("calcinspectststats", stats, types, ever)
+
+            console.log("on inspectdownload", ever, ejson, e.detail)
+            let tag = document.querySelector(`#compare1`).value
+            console.log("foreach tag", tag, stats, ever)
+            if (tag === ever) {
+                console.log("should update stats", ever, stats)
+                document.querySelector(`#inspect1 [name=cmd]`).textContent = stats.cmd
+                document.querySelector(`#inspect1 [name=arg]`).textContent = stats.arg
+                document.querySelector(`#inspect1 [name=inspectstats]`).hidden = false
+            }
+            tag = document.querySelector(`#compare2`).value
+            if (tag === ever) {
+                console.log("should update stats", ever, stats)
+                document.querySelector(`#inspect2 [name=cmd]`).textContent = stats.cmd
+                document.querySelector(`#inspect2 [name=arg]`).textContent = stats.arg
+                document.querySelector(`#inspect2 [name=inspectstats]`).hidden = false
+            }
+        })
+
+        function fetchInspect(ver) {
+            return fetch(`${pagesUrl}/${ver}/inspect.json`)
+                .then(response => response.json())
+                .then(data => {
+                    document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
+                    console.log("json lenght", data)
+                    return data
+                })
+                .catch(error => console.error('Error fetching inspect data', ver, error));
         }
 
-        function createRow(file) {
-            const row = document.createElement('tr');
-            const urlPageBase = `${pagesUrl}${file.path.replace('docs/', '')}`
-            const col1 = createColumn('th', file.name);
-            row.appendChild(col1);
-            const col2 = createColumn('td', 'RAML', `${urlPageBase}/schema.raml`, `ros-schema-${file.name}.raml`);
-            row.appendChild(col2);
-            const col3 = createColumn('td', 'HTML', `${urlPageBase}/docs`, `ros-raml-docs-${file.name}.html`);
-            row.appendChild(col3);
-            const col4 = createColumn('td', 'JSON', `${urlPageBase}/inspect.json`, `ros-inspect-${file.name}.json`);
-            row.appendChild(col4);
-            return row;
-        }
 
-        /* Use GitHub API to `ls` the /docs, then call createRow() on directories */
+        // fetch all the version info
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
             .then(response => response.json())
             .then(data => {
-                const fileList = document.getElementById("filerows");
                 data.forEach(file => {
                     if (file.type === "dir") {
-                        const row = createRow(file);
-                        fileList.appendChild(row);
+                        console.debug("Got file from GitHub", file)
+                        file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
+                        document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
                     }
-                });
+                })
             })
-            .catch(error => console.error('Error fetching files:', error));
+            .catch(error => console.error('Error fetching build list from GitHub:', error));
+
+    </script>
+
+    <script>
+        function jsonDiffStats(oldJson, newJson) {
+            // Generate the diff
+            const differences = DeepDiff(oldJson, newJson);
+
+            // Schema for results
+            const stats = {
+                added: 0,
+                removed: 0,
+                changed: 0,
+                elements: {
+                    added: 0,
+                    removed: 0,
+                    changed: 0
+                },
+            }
+
+            // Process DeepDiff
+            differences.forEach(diff => {
+                const path = diff.path.join('.');
+                switch (diff.kind) {
+                    case 'N': // New value
+                        stats.added++
+                        break
+                    case 'D': // Deleted value
+                        stats.removed++
+                        break
+                    case 'E': // Edited value
+                        stats.changed++
+                        break
+                    case 'A': // Array change
+                        if (diff.item.kind === 'N') {
+                            stats.elements.added++
+                        } else if (diff.item.kind === 'D') {
+                            stats.elements.removed++
+                        } else if (diff.item.kind === 'E') {
+                            stats.elements.changed++
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            return stats
+        }
     </script>
 
     <script>
@@ -190,6 +414,7 @@
             switchTheme.innerHTML = isLight ? sun : moon
         })
     </script>
+
 </body>
 
 </html>
