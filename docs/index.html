@@ -106,6 +106,7 @@
                             <td><small><mark>RAML</mark></small> API Schema</td>
                             <td><small><mark>HTML</mark></small> Docs</td>
                             <td><small><code>/console/inspect</code></small></td>
+                            <td><small>SNMP <mark>MIB</mark></small></td>
                         </tr>
                     </thead>
                     <tbody id="filerows">
@@ -242,6 +243,7 @@
                 appendVerCell(row, 'td', 'RAML', `${file.pagesUrl}/schema.raml`, `ros-schema-${file.name}.raml`);
                 appendVerCell(row, 'td', 'HTML', `${file.pagesUrl}/docs`, `ros-schema-docs-${file.name}.html`);
                 appendVerCell(row, 'td', 'JSON', `${file.pagesUrl}/inspect.json`, `ros-schema-docs-${file.name}.json`);
+                appendVerCell(row, 'td', 'MIB', `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`, `ros-snmp-${file.name}.mib`);
                 filerows.appendChild(row)
             }
 
