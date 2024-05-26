@@ -81,7 +81,7 @@ jobs:
       run: |
         mkdir extra
         cd extra
-        curl https://download.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip
+        wget https://download.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip
         unzip all_packages*.zip
         rm all_packages*.zip
         cd ..
