@@ -332,6 +332,17 @@
                 .catch(error => console.error('Error fetching inspect data', ver, error));
         }
 
+        async function checkUrlExists(url) {
+            try {
+                const response = await fetch(url);
+                console.log(response)
+                if (!response.ok) return false;
+                return true
+            } catch (error) {
+                console.log(`Error checking URL: ${error}`);
+                return false
+            }
+        }
 
         // fetch all the version info
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)

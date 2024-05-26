@@ -89,7 +89,8 @@ jobs:
 
     - name: Reboot CHR to use extra-packages
       run: |
-        curl -X POST http://admin@localhost:9180/rest/system/reboot --header "Content-Type: application/json"
+        # curl -X POST http://admin@localhost:9180/rest/system/reboot --header "Content-Type: application/json"
+        ssh -p 9122 admin@localhost /system/reboot
 
     - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v1
@@ -116,8 +117,8 @@ jobs:
         echo "Server did not start within expected time."
         exit 1
 
-    - name: 2nd Test REST API to CHR with curl
-      run: curl -c 30 -S --fail http://admin@localhost:9180/rest/ip/address
+    - name: Get let of pacakges from REST API to CHR with curl
+      run: curl -c 30 -S --fail http://admin@localhost:9180/rest/system/package | jq '.[] | .name' 
 
 
     - name: Test Bun Connection to RouterOS    
