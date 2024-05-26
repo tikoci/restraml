@@ -90,7 +90,7 @@ jobs:
     - name: Reboot CHR to use extra-packages
       run: |
         # curl -X POST http://admin@localhost:9180/rest/system/reboot --header "Content-Type: application/json"
-        ssh -p 9122 admin@localhost /system/reboot
+        ssh -p 9122 admin@localhost /system/reboot || true
 
     - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v1
