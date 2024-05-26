@@ -1,4 +1,4 @@
-name: manual-using-docker-in-docker
+name: manual-using-extra-docker-in-docker
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
         required: false
 
 jobs:
-  job-using-docker-in-docker:
+  job-using-extra-docker-in-docker:
     runs-on: ubuntu-latest
 
     env:
@@ -55,8 +55,8 @@ jobs:
               - /dev/net/tun
               - /dev/kvm
             ports:
-              - 9180:80" 
-              - 9122:22 > docker-compose.yml
+              - 9180:80 
+              - 9122:22" > docker-compose.yml
         docker-compose up -d
 
     - name: Wait For `curl` to CHR
