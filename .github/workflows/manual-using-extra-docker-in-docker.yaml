@@ -77,7 +77,7 @@ jobs:
     - name: Test REST API to CHR with curl
       run: curl -c 30 -S --fail http://admin@localhost:9180/rest/ip/address
 
-    - name: Install extra-packages packages to CHR
+    - name: Copy extra-packages packages to CHR
       run: |
         mkdir extra
         cd extra
@@ -85,7 +85,10 @@ jobs:
         unzip all_packages*.zip
         rm all_packages*.zip
         cd ..
-        scp -P 9122 extra/* admin@localhost:/
+        scp -o 'StrictHostKeyChecking no' -P 9122 extra/* admin@localhost:/
+        
+    - name: Reboot CHR to use extra-packages
+      run: |
         curl -X POST http://admin@localhost:9180/rest/system/reboot --json {}
 
     - name: Setup Bun Runtime
@@ -98,7 +101,7 @@ jobs:
       with:
         node-version: 18
 
-    - name: Wait For `curl` to CHR
+    - name: 2nd Wait For `curl` to CHR
       run: |
         echo "Waiting for the HTTP server to start..."
         for i in {1..1000}; do
@@ -113,7 +116,7 @@ jobs:
         echo "Server did not start within expected time."
         exit 1
 
-    - name: Test REST API to CHR with curl
+    - name: 2nd Test REST API to CHR with curl
       run: curl -c 30 -S --fail http://admin@localhost:9180/rest/ip/address
 
 
@@ -144,10 +147,10 @@ jobs:
         ROS_FILTER=$(echo ${{ github.event.inputs.start_path }} | tr ' ' '+')
         DOCS_PATH=docs/${{ steps.connection-check.outputs.rosver }}/$ROS_FILTER
         echo $DOCS_PATH
-        mkdir -p $DOCS_PATH/docs
-        cp index.html $DOCS_PATH/docs
-        cp ros-rest*.raml $DOCS_PATH/schema.raml
-        cp ros-inspect*.json $DOCS_PATH/inspect.json
+        mkdir -p $DOCS_PATH/docs/extra
+        cp index.html $DOCS_PATH/docs/extra
+        cp ros-rest*.raml $DOCS_PATH/extra/schema.raml
+        cp ros-inspect*.json $DOCS_PATH/extra/inspect.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
