@@ -86,10 +86,10 @@ jobs:
         rm all_packages*.zip
         cd ..
         scp -o 'StrictHostKeyChecking no' -P 9122 extra/* admin@localhost:/
-        
+
     - name: Reboot CHR to use extra-packages
       run: |
-        curl -X POST http://admin@localhost:9180/rest/system/reboot --json {}
+        curl -X POST http://admin@localhost:9180/rest/system/reboot --header "Content-Type: application/json"
 
     - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v1
