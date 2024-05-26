@@ -352,7 +352,7 @@
                     if (file.type === "dir") {
                         console.debug("Got file from GitHub", file)
                         file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
-                        if (!file.pageUrl.includes("extra")) {
+                        if (file.name !== "extra") {
                             document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
                         }
                     }
