@@ -55,8 +55,8 @@ jobs:
               - /dev/net/tun
               - /dev/kvm
             ports:
-              - 9180:80 
-              - 9122:22" > docker-compose.yml
+              - '9180:80' 
+              - '9122:22'" > docker-compose.yml
         docker-compose up -d
 
     - name: Wait For `curl` to CHR
