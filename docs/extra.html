@@ -241,9 +241,9 @@
                 const row = document.createElement('tr');
                 row.id = file.name
                 appendVerCell(row, 'th', file.name);
-                appendVerCell(row, 'td', 'RAML', `${file.pagesUrl}/schema.raml`, `ros-schema-${file.name}.raml`);
-                appendVerCell(row, 'td', 'HTML', `${file.pagesUrl}/docs`, `ros-schema-docs-${file.name}.html`);
-                appendVerCell(row, 'td', 'JSON', `${file.pagesUrl}/inspect.json`, `ros-inspect-${file.name}.json`);
+                appendVerCell(row, 'td', 'RAML', `${file.pagesUrl}/extra/schema.raml`, `ros-schema-extra-${file.name}.raml`);
+                appendVerCell(row, 'td', 'HTML', `${file.pagesUrl}/extra/docs`, `ros-schema-extra-docs-${file.name}.html`);
+                appendVerCell(row, 'td', 'JSON', `${file.pagesUrl}/extra/inspect.json`, `ros-inspect-extra-${file.name}.json`);
                 appendVerCell(row, 'td', 'MIB', `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`, `ros-snmp-${file.name}.mib`);
                 filerows.appendChild(row)
             }
@@ -322,7 +322,7 @@
         })
 
         function fetchInspect(ver) {
-            return fetch(`${pagesUrl}/${ver}/inspect.json`)
+            return fetch(`${pagesUrl}/${ver}/extra/inspect.json`)
                 .then(response => response.json())
                 .then(data => {
                     document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))

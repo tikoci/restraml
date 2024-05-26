@@ -145,12 +145,12 @@ jobs:
         echo ${{ steps.connection-check.outputs.rosver }}
         echo $ROS_FILTER
         ROS_FILTER=$(echo ${{ github.event.inputs.start_path }} | tr ' ' '+')
-        DOCS_PATH=docs/${{ steps.connection-check.outputs.rosver }}/$ROS_FILTER
+        DOCS_PATH=docs/${{ steps.connection-check.outputs.rosver }}/extra/$ROS_FILTER
         echo $DOCS_PATH
-        mkdir -p $DOCS_PATH/docs/extra
-        cp index.html $DOCS_PATH/docs/extra
-        cp ros-rest*.raml $DOCS_PATH/extra/schema.raml
-        cp ros-inspect*.json $DOCS_PATH/extra/inspect.json
+        mkdir -p $DOCS_PATH/docs
+        cp index.html $DOCS_PATH/docs
+        cp ros-rest*.raml $DOCS_PATH/schema.raml
+        cp ros-inspect*.json $DOCS_PATH/inspect.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
