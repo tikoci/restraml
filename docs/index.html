@@ -194,27 +194,48 @@
                 <thead>
                     <tr>
                         <th scope="col">Version</th>
-                        <td>REST Schema</td>
+                        <td colspan="2">REST Schema</td>
+                        <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
                         <td>API Docs</td>
-                        <td><small><code>/console/inspect</code></small></td>
                         <td>SNMP MIB</td>
                     </tr>
                 </thead>
-                <tbody id="filerows">
+                <tbody id="filerows" style="vertical-align: text-top;">
                     <template id="_vercellextra">
-                        <small><mark>XXXX</mark>
-                            <a class="ver-base" href="#">base</a>
-                            <a class="ver-extra" href="#">+extra</a>
+                        <small>
+                            <span><mark>XXXX</mark></span>
+                            <div><a class="ver-base" href="#">base</a>
+                                <a class="ver-extra" href="#">+extra</a>
+                            </div>
+
                         </small>
                     </template>
+                    <style>
+                        .cell-vername {
+                            vertical-align: middle;
+                            a:link {
+                                text-decoration: none;
+                            };
+                            a:visited {
+                                text-decoration: none;
+                            };
+                            a:hover {
+                                text-decoration: underline;
+                            };
+                            a:active {
+                                text-decoration: underline;
+                            };
+                        };
+                    </style>
                     <template id="_verrow">
                         <tr class="row-ver">
-                            <td class="cell-vername"><a href="#"></a></td>
+                            <th class="cell-vername"><a href="#"></a></th>
                             <!--TODO: <button data-target="modal-example" onclick="toggleModal(event) />-->
                             <td class="cell-raml"></td>
-                            <td class="cell-html"></td>
+                            <td class="cell-oas2"></td>
                             <td class="cell-json"></td>
-                            <td class="cell-mib"><small><a href="#">mib</a></small></td>
+                            <td class="cell-html"></td>
+                            <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
                         </tr>
                     </template>
                 </tbody>
@@ -300,18 +321,21 @@
             cellver.textContent = file.name
 
             // set RAML, HTML, and inspect.json - which deal with extra-pacakges
-            function makeVerCellExtra(schematype = "raml", schemafile = "schema", extension = true) {
-                const filepart = extension ? `${schemafile}.${schematype}` : schemafile
+            function makeVerCellExtra(schematype = "raml", schemafile = "schema.raml", opts = { base: true }) {
+                const filepart = schemafile //extension ? `${schemafile}.${schematype}` : schemafile
                 const cell = verrow.querySelector(`.cell-${schematype}`)
                 cell.appendChild(document.getElementById("_vercellextra").content.cloneNode(true))
                 cell.querySelector("mark").textContent = schematype.toUpperCase()
                 const verbase = cell.querySelector(".ver-base")
-                verbase.href = `${file.name}/${filepart}`
+                opts.base ?
+                    verbase.href = `${file.name}/${filepart}` :
+                    verbase.hidden = true
                 cell.querySelector(".ver-extra").href = `${file.name}/extra/${filepart}`
             }
-            makeVerCellExtra("raml", "schema")
-            makeVerCellExtra("html", "docs", false)
-            makeVerCellExtra("json", "inspect")
+            makeVerCellExtra("raml", "schema.raml",)
+            makeVerCellExtra("oas2", "oas2.json", { base: false })
+            makeVerCellExtra("html", "docs",)
+            makeVerCellExtra("json", "inspect.json")
 
             // set version row label
             const cellmib = verrow.querySelector(".cell-mib a")

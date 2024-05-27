@@ -140,7 +140,7 @@ jobs:
         npm install webapi-parser
         node validraml.cjs ros-rest*.raml 
 
-    - name: Validate RAML 1.0 using webapi-parse library
+    - name: Convert RAML 1.0 to OAS 2.0 using webapi-parse library
       run: |
         npm install webapi-parser
         node raml2oas.cjs ros-rest*.raml 
