@@ -1,5 +1,11 @@
 # RouterOS REST API "Schema Tools"
 
+## <mark>NEW</mark> — `diff` RouterOS Commands
+
+The project web site has an [`diff` tool]((https://tikoci.github.io/restraml)) that compares the output of `/console/inspect` between RouterOS Versions.
+
+[![](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
+
 ## Download
 
 Pre-build schema files for RouterOS REST API are available on this project's website at
