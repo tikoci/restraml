@@ -66,14 +66,14 @@
     <header class="container">
         <nav>
             <ul>
-                <!-- using the **unauthorized** logo image to highlight that fact -->
+                <!-- using the **unauthorized** logo image to highlight that fact 
                 <div style="background-image: url(https://mikrotik.com/logo/assets/donot-bgpattern3-OTvv-Xcl.jpg)">
                     <img src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" />
                 </div>
-                <!-- 
+                -->
+                <!-- just cheat for dark/light mode - i.e. it moves... -->
                 <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg">
                 <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg">
-                -->
             </ul>
             <ul>
             </ul>
@@ -83,53 +83,40 @@
                 </li>
             </ul>
         </nav>
-        <h1><mark>Unofficial</mark> RouterOS API/Command Schemas</h1>
+        <h1><mark>Unofficial</mark> RouterOS API Schemas</h1>
     </header>
 
     <main class="container">
         <section>
-            <h3>Usage</h3>
-            <div>
+            <h5>
                 <p>See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a> for
-                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>.
+                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
+                    <br>
+                    Problems? Create an <a href="https://github.com/tikoci/restraml/issues/new/choose">issue</a>
+                    using GitHub.
+                    <br>
                 </p>
-            </div>
+            </h5>
         </section>
+        <br><br>
 
         <section>
-            <h3>Downloads</h3>
-            <div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">Version</th>
-                            <td><small><mark>RAML</mark></small> Schema</td>
-                            <td><small><mark>HTML</mark></small> Docs</td>
-                            <td><small><code>/console/inspect</code></small></td>
-                            <td><small>SNMP <mark>MIB</mark></small></td>
-                        </tr>
-                    </thead>
-                    <tbody id="filerows">
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td><small>
-                                    <a
-                                        href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
-                                </small></td>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </section>
+            <nav>
+                <ul>
+                    <h3>
 
-        <section>
-
-            <h3><code>diff</code> RouterOS Commands</h3>
+                        </name><code>diff</code> RouterOS Commands
+                    </h3>
+                </ul>
+                <ul>
+                    <div>
+                        <label>
+                            <input id="diffextra" type="checkbox" role="switch" checked />
+                            <i>with</i> <code>extra-packages</code>
+                        </label>
+                    </div>
+                </ul>
+            </nav>
 
             <fieldset class="grid">
                 <div id="inspect1">
@@ -140,14 +127,15 @@
                     </select>
                     <small>
                         <div name="inspectstats" class="grid" hidden>
-                            <div><b>Commands:</b>
-                                <span name="cmd">0</span>
+                            <div>
+                                <b><span name="cmd">0</span></b> commands
                             </div>
-                            <div><b>Attributes:</b>
-                                <span name="arg">0</span>
+                            <div>
+                                <b><span name="arg">0</span></b> attributes
                             </div>
                         </div>
                     </small>
+
                 </div>
                 <div id="inspect2">
                     <select id="compare2" required>
@@ -157,21 +145,17 @@
                     </select>
                     <small>
                         <div name="inspectstats" class="grid" hidden>
-                            <div><b>Commands:</b>
-                                <span name="cmd">0</span>
+                            <div>
+                                <b><span name="cmd">0</span></b> commands
                             </div>
-                            <div><b>Attributes:</b>
-                                <span name="arg">0</span>
+                            <div>
+                                <b><span name="arg">0</span></b> attributes
                             </div>
                         </div>
                     </small>
+
                 </div>
-                <div>
-                    <label>
-                        <input name="diffextra" type="checkbox" role="switch" />
-                        <i>with</i> <code>extra-packages</code>
-                      </label>
-                </div>
+
             </fieldset>
 
             <!-- For Debug Use -->
@@ -181,18 +165,81 @@
             </details> -->
 
             <details id=diffcodedetails open hidden>
-                <summary><code>diff</code> Output</summary>
-                <pre><code id="diffcode" class="hljs language-diff"></code></pre>
+                <summary>
+                    <div class="grid">
+                        <div>
+                            <h4><code>diff</code>&nbsp;Output</h4>
+                        </div>
+                        <div class="grid">
+                            <div><b><span class="cmddiff"></span></b> commands</div>
+                            <div><b><span class="argdiff"></span></b> attributes</div>
+                        </div>
+                    </div>
+                </summary>
+                <pre><code id="diffcode" class="language-diff"></code></pre>
             </details>
 
         </section>
 
+        <br><br>
+
         <section>
-            <br />
-            <h3>Help?</h3>
-            <p><a href="https://github.com/tikoci/restraml/issues/new/choose">Create an issue</a> using GitHub</p>
-            <br />
+            <h3>Downloads</h3>
+            <article>
+                <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
+                </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
+                    <code>extra-packages.zip</code> available for X86.</i>
+            </article>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Version</th>
+                        <td>REST Schema</td>
+                        <td>API Docs</td>
+                        <td><small><code>/console/inspect</code></small></td>
+                        <td>SNMP MIB</td>
+                    </tr>
+                </thead>
+                <tbody id="filerows">
+                    <template id="_vercellextra">
+                        <small><mark>XXXX</mark>
+                            <a class="ver-base" href="#">base</a>
+                            <a class="ver-extra" href="#">+extra</a>
+                        </small>
+                    </template>
+                    <template id="_verrow">
+                        <tr class="row-ver">
+                            <td class="cell-vername"><a href="#"></a></td>
+                            <!--TODO: <button data-target="modal-example" onclick="toggleModal(event) />-->
+                            <td class="cell-raml"></td>
+                            <td class="cell-html"></td>
+                            <td class="cell-json"></td>
+                            <td class="cell-mib"><small><a href="#">mib</a></small></td>
+                        </tr>
+                    </template>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><small>
+                                <a
+                                    href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                            </small></td>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                    </tr>
+                </tfoot>
+            </table>
+            <article>
+                <h5>OpenAPI Format?</h5>
+                If an OpenAPI ("OAS") schema is needed, try using the <mark>RAML</mark> schema above with
+                Mulesoft's <a href="https://mulesoft.github.io/oas-raml-converter/">RAML to OAS Converter</a>. Also, <a
+                    href="https://getpostman.com">Postman</a> can also do similar API schema conversions.
+            </article>
         </section>
+
+        <br><br>
 
         <section>
             <blockquote>
@@ -205,7 +252,28 @@
                     of them does not imply any affiliation with or endorsement by them.</small>
             </blockquote>
         </section>
+
+        <!-- TODO
+        <dialog id="modal-example">
+            <article>
+                <header>
+                    <button aria-label="Close" rel="prev" data-target="modal-example"
+                        onclick="toggleModal(event)"></button>
+                    <h3>Release Notes</h3>
+                </header>
+                <p>
+                <pre>// TODO: Release notes should appear in modal</pre>
+                </p>
+                <footer>
+                    <button autofocus data-target="modal-example" onclick="toggleModal(event)">
+                        Close
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+        -->
     </main>
+
 
 
 
@@ -215,7 +283,6 @@
         const repo = 'restraml';
         const path = 'docs';
         const pagesUrl = `https://${owner}.github.io/${repo}`
-        const pageFolders = []
 
         // version table
         const filerows = document.getElementById("filerows");
@@ -223,123 +290,154 @@
         // version table rows
         document.addEventListener("builddir", e => {
             const file = e.detail
-            console.log(e.detail)
 
-            // build download table of versions
-            function appendVerCell(row, tag, content, link, download) {
-                const col = document.createElement(tag);
-                if (link) {
-                    const a = document.createElement('a');
-                    a.href = link;
-                    a.textContent = content;
-                    if (download) {
-                        a.download = download;
-                    }
-                    col.appendChild(a);
-                } else {
-                    col.textContent = content;
-                }
-                row.appendChild(col);
+            // create a new version row
+            const verrow = document.getElementById("_verrow").content.cloneNode(true)
+
+            // set version row label
+            const cellver = verrow.querySelector(".cell-vername a")
+            cellver.href = `https://download.mikrotik.com/routeros/${file.name}/CHANGELOG`
+            cellver.textContent = file.name
+
+            // set RAML, HTML, and inspect.json - which deal with extra-pacakges
+            function makeVerCellExtra(schematype = "raml", schemafile = "schema", extension = true) {
+                const filepart = extension ? `${schemafile}.${schematype}` : schemafile
+                const cell = verrow.querySelector(`.cell-${schematype}`)
+                cell.appendChild(document.getElementById("_vercellextra").content.cloneNode(true))
+                cell.querySelector("mark").textContent = schematype.toUpperCase()
+                const verbase = cell.querySelector(".ver-base")
+                verbase.href = `${file.name}/${filepart}`
+                cell.querySelector(".ver-extra").href = `${file.name}/extra/${filepart}`
             }
+            makeVerCellExtra("raml", "schema")
+            makeVerCellExtra("html", "docs", false)
+            makeVerCellExtra("json", "inspect")
 
-            function appendVerRow(filerows, file) {
-                console.log(file)
-                const row = document.createElement('tr');
-                row.id = file.name
-                appendVerCell(row, 'th', file.name);
-                appendVerCell(row, 'td', 'RAML', `${file.pagesUrl}/schema.raml`, `ros-schema-${file.name}.raml`);
-                appendVerCell(row, 'td', 'HTML', `${file.pagesUrl}/docs`, `ros-schema-docs-${file.name}.html`);
-                appendVerCell(row, 'td', 'JSON', `${file.pagesUrl}/inspect.json`, `ros-inspect-${file.name}.json`);
-                appendVerCell(row, 'td', 'MIB', `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`, `ros-snmp-${file.name}.mib`);
-                filerows.appendChild(row)
-            }
+            // set version row label
+            const cellmib = verrow.querySelector(".cell-mib a")
+            cellmib.href = `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`
 
-            appendVerRow(filerows, file)
+            // add version row to table
+            filerows.appendChild(verrow)
         })
 
 
         // version diff inputs 
         const compare1 = document.getElementById('compare1')
         const compare2 = document.getElementById('compare2')
+        const diffextra = document.getElementById('diffextra')
+
         // verison diff output
         const diffcode = document.getElementById('diffcode')
         const diffcodedetails = document.getElementById('diffcodedetails')
-        // version diff logic
+        const ecmddiff = diffcodedetails.querySelector(".cmddiff")
+        const eargdiff = diffcodedetails.querySelector(".argdiff")
+
+        // version diff UI logic
         compare1.addEventListener("change", e => {
             if (compare2.value) { document.dispatchEvent(new Event("vercompare")) }
         })
         compare2.addEventListener("change", e => {
             if (compare1.value) { document.dispatchEvent(new Event("vercompare")) }
         })
+        diffextra.addEventListener("change", e => {
+            if (compare1.value && compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+
         // add version to diff dropdowns
         document.addEventListener("builddir", e => {
             const file = e.detail
             compare1.appendChild(new Option(file.name, file.name))
             compare2.appendChild(new Option(file.name, file.name))
         })
+
+        // actual version diff
         document.addEventListener("vercompare", e => {
             async function onVerCompare() {
-                console.log("in onvercompare")
+                console.debug("Starting diff.", { compare1, compare2, diffextra, e })
+                // lock version selection while running
+                compare1.disabled = true
+                compare2.disabled = true
+                diffextra.disabled = true
+                diffcodedetails.hidden = true
+                document.querySelectorAll(`[name=inspectstats]`).forEach(e => e.hidden = true)
+
+                const useextra = diffextra.checked
                 const files = [
-                    await fetchInspect(compare1.value),
-                    await fetchInspect(compare2.value)
+                    await fetchInspect(compare1.value, useextra),
+                    await fetchInspect(compare2.value, useextra)
                 ]
 
                 // run json-diff to get textual diff, and add color back via highlight.js
                 diffcode.removeAttribute('data-highlighted')
                 diffcode.textContent = module.diffString(files[0], files[1], { colors: false })
                 diffcodedetails.hidden = false
-                console.log(diffcode)
                 hljs.highlightElement(diffcode)
+                diffcode.classList.remove("hljs")
 
-                console.log("json diff stats", jsonDiffStats(files[0], files[1]))
+                // show diff stats
+                const ncmd1 = document.querySelector(`#inspect1 [name=cmd]`).textContent
+                const narg1 = document.querySelector(`#inspect1 [name=arg]`).textContent
+                const ncmd2 = document.querySelector(`#inspect2 [name=cmd]`).textContent
+                const narg2 = document.querySelector(`#inspect2 [name=arg]`).textContent
+                const ncmddiff = ncmd2 - ncmd1
+                const nargdiff = narg2 - narg1
+                ecmddiff.textContent = `${ncmddiff > 0 ? "+" : ""}${ncmddiff}`
+                eargdiff.textContent = `${nargdiff > 0 ? "+" : ""}${nargdiff}`
+                ecmddiff.style = `color: ${ncmddiff > 0 ? "green" : "red"}`
+                eargdiff.style = `color: ${nargdiff > 0 ? "green" : "red"}`
+
+
+                // re-enable controls
+                compare1.disabled = false
+                compare2.disabled = false
+                diffextra.disabled = false
+
+                console.debug("Diff done.  JSON diff stats:", jsonDiffStats(files[0], files[1]))
             }
-
 
             onVerCompare()
         })
 
+        // update stats on ver diff, for each file after downloaded
         document.addEventListener('inspectdownload', e => {
+            console.debug("inspectdownload event fired", e)
             const ever = e.detail.ver
             const ejson = JSON.parse(JSON.stringify(e.detail.json))
-            console.log(jsonpath)
 
             const types = (new jsonpath.JSONPath()).query(ejson, `$..*[?(@._type)]._type`)
             const stats = { arg: 0, cmd: 0, dir: 0 }
             types.forEach(x => stats[x]++)
-            console.log("calcinspectststats", stats, types, ever)
 
-            console.log("on inspectdownload", ever, ejson, e.detail)
             let tag = document.querySelector(`#compare1`).value
-            console.log("foreach tag", tag, stats, ever)
             if (tag === ever) {
-                console.log("should update stats", ever, stats)
                 document.querySelector(`#inspect1 [name=cmd]`).textContent = stats.cmd
                 document.querySelector(`#inspect1 [name=arg]`).textContent = stats.arg
                 document.querySelector(`#inspect1 [name=inspectstats]`).hidden = false
             }
             tag = document.querySelector(`#compare2`).value
             if (tag === ever) {
-                console.log("should update stats", ever, stats)
                 document.querySelector(`#inspect2 [name=cmd]`).textContent = stats.cmd
                 document.querySelector(`#inspect2 [name=arg]`).textContent = stats.arg
                 document.querySelector(`#inspect2 [name=inspectstats]`).hidden = false
             }
         })
 
-        function fetchInspect(ver) {
-            return fetch(`${pagesUrl}/${ver}/inspect.json`)
+        // helper to do the fetch
+        function fetchInspect(ver, extra = false) {
+            console.debug("fetchInspect() called", { ver, extra })
+            const subdir = extra ? "/extra" : ""
+            return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
                 .then(response => response.json())
                 .then(data => {
                     document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
-                    console.log("json lenght", data)
                     return data
                 })
-                .catch(error => console.error('Error fetching inspect data', ver, error));
+                .catch(error => console.error('Error fetching inspect data', ver, extra, error));
         }
 
 
-        // fetch all the version info
+        // "MAIN" - fetch all the version from GitHub, which triggers everything via builddir
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
             .then(response => response.json())
             .then(data => {
@@ -425,7 +523,80 @@
             switchTheme.innerHTML = isLight ? sun : moon
         })
     </script>
+    <!-- TODO 
+    <script>
+       
+        // Config
+        const isOpenClass = "modal-is-open";
+        const openingClass = "modal-is-opening";
+        const closingClass = "modal-is-closing";
+        const scrollbarWidthCssVar = "--pico-scrollbar-width";
+        const animationDuration = 400; // ms
+        let visibleModal = null;
 
+        // Toggle modal
+        const toggleModal = (event) => {
+            event.preventDefault();
+            const modal = document.getElementById(event.currentTarget.dataset.target);
+            if (!modal) return;
+            modal && (modal.open ? closeModal(modal) : openModal(modal));
+        };
+
+        // Open modal
+        const openModal = (modal) => {
+            const { documentElement: html } = document;
+            const scrollbarWidth = getScrollbarWidth();
+            if (scrollbarWidth) {
+                html.style.setProperty(scrollbarWidthCssVar, `${scrollbarWidth}px`);
+            }
+            html.classList.add(isOpenClass, openingClass);
+            setTimeout(() => {
+                visibleModal = modal;
+                html.classList.remove(openingClass);
+            }, animationDuration);
+            modal.showModal();
+        };
+
+        // Close modal
+        const closeModal = (modal) => {
+            visibleModal = null;
+            const { documentElement: html } = document;
+            html.classList.add(closingClass);
+            setTimeout(() => {
+                html.classList.remove(closingClass, isOpenClass);
+                html.style.removeProperty(scrollbarWidthCssVar);
+                modal.close();
+            }, animationDuration);
+        };
+
+        // Close with a click outside
+        document.addEventListener("click", (event) => {
+            if (visibleModal === null) return;
+            const modalContent = visibleModal.querySelector("article");
+            const isClickInside = modalContent.contains(event.target);
+            !isClickInside && closeModal(visibleModal);
+        });
+
+        // Close with Esc key
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && visibleModal) {
+                closeModal(visibleModal);
+            }
+        });
+
+        // Get scrollbar width
+        const getScrollbarWidth = () => {
+            const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+            return scrollbarWidth;
+        };
+
+        // Is scrollbar visible
+        const isScrollbarVisible = () => {
+            return document.body.scrollHeight > screen.height;
+        };
+
+    </script>
+    -->
 </body>
 
 </html>
