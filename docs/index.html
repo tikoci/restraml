@@ -166,6 +166,12 @@
                         </div>
                     </small>
                 </div>
+                <div>
+                    <label>
+                        <input name="diffextra" type="checkbox" role="switch" />
+                        <i>with</i> <code>extra-packages</code>
+                      </label>
+                </div>
             </fieldset>
 
             <!-- For Debug Use -->
@@ -341,7 +347,9 @@
                     if (file.type === "dir") {
                         console.debug("Got file from GitHub", file)
                         file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
-                        document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
+                        if (file.name !== "extra") {
+                            document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
+                        }
                     }
                 })
             })
