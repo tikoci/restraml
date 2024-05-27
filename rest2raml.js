@@ -94,11 +94,10 @@ async function validateRaml(filename) {
 }
 
 function generateRAMLPrefix(ver = "7.0", tag = "dev") {
-  const verString = `v${ver}.${Math.round(Date.now() / 1000 / 60)}-${tag}`
   return {
-    title: `RouterOS REST Schema (${verString})`,
-    version: verString,
-    protocols: ["HTTPS", "HTTP"],
+    title: `RouterOS REST Schema v${ver} (${tag})`,
+    version: `v${ver}`,
+    protocols: ["https", "http"],
     mediaType: ["application/json"],
     securitySchemes: {
       basic: {

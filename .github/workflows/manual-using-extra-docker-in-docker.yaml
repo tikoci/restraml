@@ -158,7 +158,7 @@ jobs:
         cp ros-rest*.raml $DOCS_PATH/schema.raml
         cp ros-inspect*.json $DOCS_PATH/inspect.json
         cp ros-oas2*.json $DOCS_PATH/oas2.json
-        cp ros-oas3*.json $DOCS_PATH/oas3.json
+        # cp ros-oas3*.json $DOCS_PATH/oas3.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
