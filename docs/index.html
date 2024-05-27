@@ -383,6 +383,7 @@
                 compare1.disabled = true
                 compare2.disabled = true
                 diffextra.disabled = true
+                diffcodedetails.open = false
                 diffcodedetails.hidden = true
                 document.querySelectorAll(`[name=inspectstats]`).forEach(e => e.hidden = true)
 
@@ -396,6 +397,7 @@
                 diffcode.removeAttribute('data-highlighted')
                 diffcode.textContent = module.diffString(files[0], files[1], { colors: false })
                 diffcodedetails.hidden = false
+                diffcodedetails.open = true
                 hljs.highlightElement(diffcode)
                 diffcode.classList.remove("hljs")
 
