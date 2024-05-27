@@ -138,7 +138,7 @@ jobs:
     - name: Validate RAML 1.0 using webapi-parse library
       run: |
         npm install webapi-parser
-        node validraml.cjs ros-rest*.raml
+        node validraml.cjs ros-rest*.raml 
 
     - name: Move Built File to /docs
       id: publish-to-docs
@@ -152,6 +152,8 @@ jobs:
         cp index.html $DOCS_PATH/docs
         cp ros-rest*.raml $DOCS_PATH/schema.raml
         cp ros-inspect*.json $DOCS_PATH/inspect.json
+        cp ros-oas2*.json $DOCS_PATH/oas2.json
+        cp ros-oas3*.json $DOCS_PATH/oas3.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
