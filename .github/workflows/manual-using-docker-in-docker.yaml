@@ -54,12 +54,12 @@ jobs:
             devices:
               - /dev/net/tun
               - /dev/kvm
-            
             ports:
-              - 9180:80" > docker-compose.yml
+              - '9180:80' 
+              - '9122:22'" > docker-compose.yml
         docker-compose up -d
 
-    - name: Wait For `curl`
+    - name: Wait For `curl` to CHR
       run: |
         echo "Waiting for the HTTP server to start..."
         for i in {1..1000}; do
@@ -74,7 +74,7 @@ jobs:
         echo "Server did not start within expected time."
         exit 1
 
-    - name: Test HTTP Server with curl
+    - name: Test REST API to CHR with curl
       run: curl -c 30 -S --fail http://admin@localhost:9180/rest/ip/address
 
     - name: Setup Bun Runtime
@@ -86,6 +86,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: 18
+
+    - name: Get let of pacakges from REST API to CHR with curl
+      run: curl -c 30 -S --fail http://admin@localhost:9180/rest/system/package | jq '.[] | .name' 
+
 
     - name: Test Bun Connection to RouterOS    
       id: connection-check
@@ -104,7 +108,12 @@ jobs:
     - name: Validate RAML 1.0 using webapi-parse library
       run: |
         npm install webapi-parser
-        node validraml.cjs ros-rest*.raml
+        node validraml.cjs ros-rest*.raml 
+
+    - name: Convert RAML 1.0 to OAS 2.0 using webapi-parse library
+      run: |
+        npm install webapi-parser
+        node raml2oas.cjs ros-rest*.raml 
 
     - name: Move Built File to /docs
       id: publish-to-docs
@@ -118,6 +127,8 @@ jobs:
         cp index.html $DOCS_PATH/docs
         cp ros-rest*.raml $DOCS_PATH/schema.raml
         cp ros-inspect*.json $DOCS_PATH/inspect.json
+        cp ros-oas2*.json $DOCS_PATH/oas2.json
+        # cp ros-oas3*.json $DOCS_PATH/oas3.json
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
         ls -r
 
