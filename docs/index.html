@@ -20,7 +20,7 @@
         rel="stylesheet">
 
     <!-- Plausable -->
-    <script defer data-domain="tikoci.github.io/restraml" src="https://plausible.io/js/script.js"></script>
+    <script defer data-domain="tikoci.github.io/restraml" src="https://plausible.io/js/script.tagged-events.js"></script>
 
     <!-- Highlight.JS (for diff) -->
     <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
@@ -142,7 +142,7 @@
 
                 </div>
                 <div id="inspect2">
-                    <select id="compare2" required>
+                    <select class="plausible-event-name=Diff+Hit" id="compare2" required>
                         <option selected disabled value="">
                             ...against this version
                         </option>
