@@ -21,6 +21,7 @@
 
     <!-- Plausable -->
     <script defer data-domain="tikoci.github.io/restraml" src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 
     <!-- Highlight.JS (for diff) -->
     <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
@@ -124,7 +125,7 @@
 
             <fieldset class="grid">
                 <div id="inspect1">
-                    <select id="compare1" required>
+                    <select class="plausible-event-name=Diff+Hit" id="compare1" required>
                         <option selected disabled value="">
                             Version to compare...
                         </option>
@@ -424,6 +425,8 @@
                 compare1.disabled = false
                 compare2.disabled = false
                 diffextra.disabled = false
+
+                plausible("Diff Run", { props: { compareLeft: compare1.value, compareRight: compare2.value}})
 
                 console.debug("Diff done.  JSON diff stats:", jsonDiffStats(files[0], files[1]))
             }
