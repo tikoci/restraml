@@ -1,0 +1,709 @@
+#%RAML 1.0
+title: RouterOS REST Schema v7.12.1 (ip+address)
+version: v7.12.1
+protocols:
+  - https
+  - http
+mediaType:
+  - application/json
+securitySchemes:
+  basic:
+    description: |
+      Mikrotik REST API only supports Basic Authentication, secured by HTTPS
+    type: Basic Authentication
+securedBy:
+  - basic
+baseUri: https://{host}:{port}/rest
+baseUriParameters:
+  host:
+    description: RouterOS device IP or host name
+    default: 192.168.88.1
+  port:
+    description: RouterOS https port to use
+    default: '443'
+documentation:
+  - title: RouterOS RAML Schema for REST API
+    content: |
+      Schema is generated using `/console/inspect` from a RouterOS device, and
+      interpreted into a schema based on the rules in
+      [Mikrotik REST documentation](https://help.mikrotik.com)
+/ip:
+  /address:
+    get:
+      queryParameters:
+        as-string:
+          type: any
+          required: false
+        as-string-value:
+          type: any
+          required: false
+        number:
+          type: any
+          required: false
+        value-name:
+          type: any
+          required: false
+      responses:
+        '200':
+          description: Success
+          body:
+            application/json:
+              type: array
+        '400':
+          description: Bad command or error
+          body:
+            application/json:
+              type: object
+        '401':
+          description: Unauthorized
+          body:
+            application/json:
+              type: object
+    /add:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              address:
+                type: any
+                required: false
+              broadcast:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              copy-from:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              interface:
+                type: any
+                required: false
+              netmask:
+                type: any
+                required: false
+              network:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    put:
+      body:
+        application/json:
+          type: object
+          properties:
+            address:
+              type: any
+              required: false
+            broadcast:
+              type: any
+              required: false
+            comment:
+              type: any
+              required: false
+            copy-from:
+              type: any
+              required: false
+            disabled:
+              type: any
+              required: false
+            interface:
+              type: any
+              required: false
+            netmask:
+              type: any
+              required: false
+            network:
+              type: any
+              required: false
+      responses:
+        '200':
+          description: Success
+          body:
+            application/json:
+              type: any
+        '400':
+          description: Bad command or error
+          body:
+            application/json:
+              type: object
+        '401':
+          description: Unauthorized
+          body:
+            application/json:
+              type: object
+    /comment:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              comment:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /disable:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /edit:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              number:
+                type: any
+                required: false
+              value-name:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /enable:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /export:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              compact:
+                type: any
+                required: false
+              file:
+                type: any
+                required: false
+              hide-sensitive:
+                type: any
+                required: false
+              show-sensitive:
+                type: any
+                required: false
+              terse:
+                type: any
+                required: false
+              verbose:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /find:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              where:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /get:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              as-string:
+                type: any
+                required: false
+              as-string-value:
+                type: any
+                required: false
+              number:
+                type: any
+                required: false
+              value-name:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /{id}:
+      get:
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+      uriParameters:
+        id:
+          type: string
+      delete:
+        body:
+          application/json:
+            type: object
+            properties:
+              numbers:
+                type: any
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+      patch:
+        body:
+          application/json:
+            type: object
+            properties:
+              address:
+                type: any
+                required: false
+              broadcast:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              interface:
+                type: any
+                required: false
+              netmask:
+                type: any
+                required: false
+              network:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /print:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              append:
+                type: any
+                required: false
+              as-value:
+                type: any
+                required: false
+              brief:
+                type: any
+                required: false
+              count-only:
+                type: any
+                required: false
+              detail:
+                type: any
+                required: false
+              file:
+                type: any
+                required: false
+              follow:
+                type: any
+                required: false
+              follow-only:
+                type: any
+                required: false
+              follow-strict:
+                type: any
+                required: false
+              from:
+                type: any
+                required: false
+              interval:
+                type: any
+                required: false
+              proplist:
+                type: any
+                required: false
+              show-ids:
+                type: any
+                required: false
+              terse:
+                type: any
+                required: false
+              value-list:
+                type: any
+                required: false
+              where:
+                type: any
+                required: false
+              without-paging:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /remove:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /reset:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              address:
+                type: any
+                required: false
+              broadcast:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              interface:
+                type: any
+                required: false
+              netmask:
+                type: any
+                required: false
+              network:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
+    /set:
+      post:
+        body:
+          application/json:
+            type: object
+            properties:
+              address:
+                type: any
+                required: false
+              broadcast:
+                type: any
+                required: false
+              comment:
+                type: any
+                required: false
+              disabled:
+                type: any
+                required: false
+              interface:
+                type: any
+                required: false
+              netmask:
+                type: any
+                required: false
+              network:
+                type: any
+                required: false
+              numbers:
+                type: any
+                required: false
+              .proplist:
+                type: any
+                required: false
+              .query:
+                type: array
+                required: false
+        responses:
+          '200':
+            description: Success
+            body:
+              application/json:
+                type: any
+          '400':
+            description: Bad command or error
+            body:
+              application/json:
+                type: object
+          '401':
+            description: Unauthorized
+            body:
+              application/json:
+                type: object
