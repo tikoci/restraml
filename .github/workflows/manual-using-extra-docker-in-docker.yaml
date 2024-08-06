@@ -23,8 +23,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Docker Compose
+    - name: Set up Docker
       uses: docker/setup-buildx-action@v1
+
+    - name: Install Docker Compose
+      run: sudo apt install docker-compose
 
     - name: Allow `git`
       run: |
@@ -39,6 +42,7 @@ jobs:
         echo $ROUTEROS_VERSION
         echo $ROUTEROS_IMAGE
         echo $ROUTEROS_PATH
+        echo `which docker-compose`
 
         echo "version: '3'
         services:
