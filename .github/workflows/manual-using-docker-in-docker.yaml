@@ -99,8 +99,7 @@ jobs:
       id: connection-check
       run: |
         BUNROSVER=$(bun rest2raml.js --version)
-        echo "rosver=$BUNROSVER" >> "$GITHUB_OUTPUT"
-        echo $BUNROSVER
+        echo "rosver=$BUNROSVER" | xargs >> "$GITHUB_OUTPUT"
 
     - name: Run RAML Generator Code with Bun
       run: |
