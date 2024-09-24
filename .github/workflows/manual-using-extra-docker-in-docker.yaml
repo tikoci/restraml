@@ -128,9 +128,11 @@ jobs:
     - name: Test Bun Connection to RouterOS    
       id: connection-check
       run: |
-        ROUTEROS_VER=$(bun rest2raml.js --version)
-        echo $ROUTEROS_VER
-        echo "rosver=$ROUTEROS_VER" >> $GITHUB_OUTPUT
+        # ROUTEROS_VER=$(bun rest2raml.js --version)
+        # echo $ROUTEROS_VER
+        # echo "rosver=$ROUTEROS_VER" >> $GITHUB_OUTPUT
+        echo "rosver=$(bun rest2raml.js --version)" >> ${GITHUB_OUTPUT}
+        echo ${GITHUB_OUTPUT}
 
     - name: Run RAML Generator Code with Bun
       run: |
