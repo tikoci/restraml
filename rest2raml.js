@@ -166,9 +166,7 @@ async function fetchVersion() {
     "value-name": "version",
   }
   let resp = await fetchPost(resturl, body)
-  console.log(`got version: ${resp.ret}\n`)
   return resp.ret.split(" ")[0] 
-
 }
 
 async function fetchInspect(what, path, input = "") {
