@@ -493,7 +493,8 @@
     <script>
         function jsonDiffStats(oldJson, newJson) {
             // Generate the diff
-            const differences = DeepDiff(oldJson, newJson);
+            const differences = new DeepDiff(oldJson, newJson);
+            console.debug(differences)
 
             // Schema for results
             const stats = {
