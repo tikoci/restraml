@@ -20,8 +20,9 @@
         rel="stylesheet">
 
     <!-- Plausable -->
-    <script defer data-domain="tikoci.github.io/restraml" src="https://plausible.io/js/script.tagged-events.js"></script>
-    <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+    <script defer data-domain="tikoci.github.io/restraml"
+        src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 
     <!-- Highlight.JS (for diff) -->
     <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
@@ -189,17 +190,17 @@
         <br><br>
 
         <section>
-            <section>
-                <h3>
-                    <mark>NEW</mark>
-                    Convert
-                    <code>curl</code>
-                    request to
-                    <code>/tool/fetch</code>
-                </h3>
-                <p>To convert a <code>curl</code> command into a command that works with RouterOS's <code>/tool/fetch</code> scripting command:</p>
-                <a href="https://tikoci.github.io/postman-code-generators/" role="button" class="plausible-event-name=curl2rsc" >Visit <code>curl2rsc</code></a>
-            </section>
+            <h3>
+                <mark>NEW</mark>
+                Convert
+                <code>curl</code>
+                request to
+                <code>/tool/fetch</code>
+            </h3>
+            <p>To convert <i>most</i> <code>curl</code> command into a RouterOS's <code>/tool/fetch</code> scripting
+                command:</p>
+            <a href="https://tikoci.github.io/postman-code-generators/" role="button"
+                class="plausible-event-name=curl2rsc">Visit <code>curl2rsc</code></a>
         </section>
 
         <br><br>
@@ -234,19 +235,33 @@
                     <style>
                         .cell-vername {
                             vertical-align: middle;
+
                             a:link {
                                 text-decoration: none;
-                            };
+                            }
+
+                            ;
+
                             a:visited {
                                 text-decoration: none;
-                            };
+                            }
+
+                            ;
+
                             a:hover {
                                 text-decoration: underline;
-                            };
+                            }
+
+                            ;
+
                             a:active {
                                 text-decoration: underline;
-                            };
-                        };
+                            }
+
+                            ;
+                        }
+
+                        ;
                     </style>
                     <template id="_verrow">
                         <tr class="row-ver">
@@ -442,7 +457,7 @@
                 compare2.disabled = false
                 diffextra.disabled = false
 
-                plausible("Diff Run", { props: { compareLeft: compare1.value, compareRight: compare2.value}})
+                plausible("Diff Run", { props: { compareLeft: compare1.value, compareRight: compare2.value } })
 
                 console.debug("Diff done.  JSON diff stats:", jsonDiffStats(files[0], files[1]))
             }
