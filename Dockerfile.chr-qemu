@@ -32,6 +32,6 @@ RUN wget "$ROUTEROS_PATH" -O "/routeros_source/${ROUTEROS_IMAGE}.zip" && \
     rm -f "/routeros_source/${ROUTEROS_IMAGE}.zip"
 
 # Copy script to routeros folder
-COPY --from=evilfreelancer/docker-routeros /routeros_sources /routeros_sources
+COPY --from=evilfreelancer/docker-routeros /routeros_source /routeros_source
 
 ENTRYPOINT ["/routeros_source/entrypoint.sh"]
