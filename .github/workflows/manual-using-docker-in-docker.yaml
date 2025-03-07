@@ -61,7 +61,7 @@ jobs:
             ports:
               - '9180:80' 
               - '9122:22'" > docker-compose.yml
-        docker-compose up -d
+        docker-compose up -d --build
 
     - name: Wait For `curl` to CHR
       run: |
