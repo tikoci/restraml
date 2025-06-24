@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouterOS Schemas Tools</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+
+    <script defer data-domain="tikoci.github.io/restraml"
+        src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+
+    <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/diff.min.js"></script>
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/json.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/deep-diff@1/dist/deep-diff.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonpath/1.1.1/jsonpath.min.js"
+        integrity="sha512-fdudyA6TY0Kv3vTiHyZj6wkhDbmZFCflZmxtiC/lR5xRNQJaF7ODChpx0ajIIeFBBtaucDolRB1qG0r/U7eYSg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+    </style>
+
+    <style>
+        header nav li a svg {
+            width: var(--font-size);
+            height: var(--font-size);
+            color: var(--contrast);
+        }
+    </style>
+
+    <style>
+        .diff-line-added {
+            background-color: #e6ffed; /* Light green */
+            color: #24292e;
+            display: block; /* Important for full line background */
+        }
+        .diff-line-removed {
+            background-color: #ffeef0; /* Light red */
+            color: #24292e;
+            display: block; /* Important for full line background */
+        }
+        .diff-line-common {
+            display: block; /* For common lines to take full width and for background */
+        }
+        .diff-line-empty {
+            min-height: 1.5em; /* Adjust based on your line-height to maintain alignment */
+            display: block;
+        }
+        .diff-container {
+            display: flex;
+            gap: 10px; /* Space between the two diff panes */
+        }
+        .diff-panel {
+            flex: 1; /* Each panel takes equal width */
+            min-width: 0; /* Allow panels to shrink within flex container */
+        }
+        #diffcodeLeft, #diffcodeRight {
+            white-space: pre;
+            font-family: var(--pico-font-family-monospace);
+            font-size: small;
+            line-height: 1.5; /* Ensure consistent line height */
+            padding: 1rem;
+            background-color: var(--pico-code-background-color); /* Use Pico's code background variable */
+            border: 1px solid var(--pico-border-color);
+            border-radius: var(--pico-border-radius);
+            overflow-x: auto; /* Allow horizontal scrolling if lines are long */
+            min-width: 0; /* Important for flexbox to shrink correctly */
+        }
+        .diff-separator {
+            text-align: center;
+            font-weight: bold;
+            color: var(--pico-secondary-text-color);
+            background-color: var(--pico-background-color);
+            padding: 0.5rem 0;
+            border-top: 1px dashed var(--pico-border-color);
+            border-bottom: 1px dashed var(--pico-border-color);
+            margin: 1rem 0; /* Space above and below separator */
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg">
+            </ul>
+            <ul>
+            </ul>
+            <ul>
+                <li>
+                    <a id="theme_switcher" href="#"></a>
+                </li>
+            </ul>
+        </nav>
+        <h1><mark>Unofficial</mark> RouterOS API Schema Tools</h1>
+    </header>
+
+    <main class="container">
+        <section>
+            <h5>
+                <p>See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a> for
+                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
+                    <br>
+                    Problems? Create an <a href="https://github.com/tikoci/restraml/issues/new/choose">issue</a>
+                    using GitHub.
+                    <br>
+                </p>
+            </h5>
+        </section>
+        <br><br>
+
+        <section>
+            <nav>
+                <ul>
+                    <h3>
+
+                        </name><code>diff</code> RouterOS Commands
+                    </h3>
+                </ul>
+                <ul>
+                    <div>
+                        <label>
+                            <input id="diffextra" type="checkbox" role="switch" checked />
+                            <i>with</i> <code>extra-packages</code>
+                        </label>
+                    </div>
+                </ul>
+            </nav>
+
+            <fieldset class="grid">
+                <div id="inspect1">
+                    <select class="plausible-event-name=Diff+Hit" id="compare1" required>
+                        <option selected disabled value="">
+                            Version to compare...
+                        </option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div>
+                                <b><span name="cmd">0</span></b> commands
+                            </div>
+                            <div>
+                                <b><span name="arg">0</span></b> attributes
+                            </div>
+                        </div>
+                    </small>
+
+                </div>
+                <div id="inspect2">
+                    <select class="plausible-event-name=Diff+Hit" id="compare2" required>
+                        <option selected disabled value="">
+                            ...against this version
+                        </option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div>
+                                <b><span name="cmd">0</span></b> commands
+                            </div>
+                            <div>
+                                <b><span name="arg">0</span></b> attributes
+                            </div>
+                        </div>
+                    </small>
+
+                </div>
+
+            </fieldset>
+
+            <details id=diffcodedetails open hidden>
+                <summary>
+                    <div class="grid">
+                        <div>
+                            <h4><code>diff</code>&nbsp;Output</h4>
+                        </div>
+                        <div class="grid">
+                            <div><b><span class="cmddiff"></span></b> commands</div>
+                            <div><b><span class="argdiff"></span></b> attributes</div>
+                        </div>
+                    </div>
+                </summary>
+                <div class="diff-container">
+                    <div class="diff-panel">
+                        <h5>Old Version</h5>
+                        <pre><code id="diffcodeLeft" class="language-json"></code></pre>
+                    </div>
+                    <div class="diff-panel">
+                        <h5>New Version</h5>
+                        <pre><code id="diffcodeRight" class="language-json"></code></pre>
+                    </div>
+                </div>
+            </details>
+
+        </section>
+
+        <br><br>
+
+        <section>
+            <h3>
+                <mark>NEW</mark>
+                Convert
+                <code>curl</code>
+                request to
+                <code>/tool/fetch</code>
+            </h3>
+            <p>To convert <i>most</i> <code>curl</code> command into a RouterOS's <code>/tool/fetch</code> scripting
+                command:</p>
+            <a href="https://tikoci.github.io/postman-code-generators/" role="button"
+                class="plausible-event-name=curl2rsc">Visit <code>curl2rsc</code></a>
+        </section>
+
+        <br><br>
+
+        <section>
+            <h3>Schema Downloads</h3>
+            <article>
+                <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
+                </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
+                    <code>extra-packages.zip</code> available for X86.</i>
+            </article>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Version</th>
+                        <td colspan="2">REST Schema</td>
+                        <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
+                        <td>API Docs</td>
+                        <td>SNMP MIB</td>
+                    </tr>
+                </thead>
+                <tbody id="filerows" style="vertical-align: text-top;">
+                    <template id="_vercellextra">
+                        <small>
+                            <span><mark>XXXX</mark></span>
+                            <div><a class="ver-base" href="#">base</a>
+                                <a class="ver-extra" href="#">+extra</a>
+                            </div>
+
+                        </small>
+                    </template>
+                    <style>
+                        .cell-vername {
+                            vertical-align: middle;
+
+                            a:link {
+                                text-decoration: none;
+                            }
+
+                            ;
+
+                            a:visited {
+                                text-decoration: none;
+                            }
+
+                            ;
+
+                            a:hover {
+                                text-decoration: underline;
+                            }
+
+                            ;
+
+                            a:active {
+                                text-decoration: underline;
+                            }
+
+                            ;
+                        }
+
+                        ;
+                    </style>
+                    <template id="_verrow">
+                        <tr class="row-ver">
+                            <th class="cell-vername"><a href="#"></a></th>
+                            <td class="cell-raml"></td>
+                            <td class="cell-oas2"></td>
+                            <td class="cell-json"></td>
+                            <td class="cell-html"></td>
+                            <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
+                        </tr>
+                    </template>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><small>
+                                <a
+                                    href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                            </small></td>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+
+        <br><br>
+
+        <section>
+            <blockquote>
+                <h5>* Disclaimer</h5>
+                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
+                    connected
+                    with <a href="https://mikrotik.com">Mikrotik</a>.
+                    All product and company names are trademarks™ or registered® trademarks of their respective holders.
+                    Use
+                    of them does not imply any affiliation with or endorsement by them.</small>
+            </blockquote>
+        </section>
+    </main>
+
+    <script>
+        // GH project info to find used to find available version
+        const owner = 'tikoci';
+        const repo = 'restraml';
+        const path = 'docs';
+        const pagesUrl = `https://${owner}.github.io/${repo}`
+
+        // Context lines for diff (how many common lines before/after a change)
+        const CONTEXT_LINES = 3; 
+
+        // version table
+        const filerows = document.getElementById("filerows");
+
+        // version table rows
+        document.addEventListener("builddir", e => {
+            const file = e.detail
+
+            // create a new version row
+            const verrow = document.getElementById("_verrow").content.cloneNode(true)
+
+            // set version row label
+            const cellver = verrow.querySelector(".cell-vername a")
+            cellver.href = `https://download.mikrotik.com/routeros/${file.name}/CHANGELOG`
+            cellver.textContent = file.name
+
+            // set RAML, HTML, and inspect.json - which deal with extra-pacakges
+            function makeVerCellExtra(schematype = "raml", schemafile = "schema.raml", opts = { base: true }) {
+                const filepart = schemafile //extension ? `${schemafile}.${schematype}` : schemafile
+                const cell = verrow.querySelector(`.cell-${schematype}`)
+                cell.appendChild(document.getElementById("_vercellextra").content.cloneNode(true))
+                cell.querySelector("mark").textContent = schematype.toUpperCase()
+                const verbase = cell.querySelector(".ver-base")
+                opts.base ?
+                    verbase.href = `${file.name}/${filepart}` :
+                    verbase.hidden = true
+                cell.querySelector(".ver-extra").href = `${file.name}/extra/${filepart}`
+            }
+            makeVerCellExtra("raml", "schema.raml",)
+            makeVerCellExtra("oas2", "oas2.json", { base: false })
+            makeVerCellExtra("html", "docs",)
+            makeVerCellExtra("json", "inspect.json")
+
+            // set version row label
+            const cellmib = verrow.querySelector(".cell-mib a")
+            cellmib.href = `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`
+
+            // add version row to table
+            filerows.appendChild(verrow)
+        })
+
+
+        // version diff inputs
+        const compare1 = document.getElementById('compare1')
+        const compare2 = document.getElementById('compare2')
+        const diffextra = document.getElementById('diffextra')
+
+        // verison diff output
+        const diffcodeLeft = document.getElementById('diffcodeLeft')
+        const diffcodeRight = document.getElementById('diffcodeRight')
+        const diffcodedetails = document.getElementById('diffcodedetails')
+        const ecmddiff = diffcodedetails.querySelector(".cmddiff")
+        const eargdiff = diffcodedetails.querySelector(".argdiff")
+
+        // version diff UI logic
+        compare1.addEventListener("change", e => {
+            if (compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+        compare2.addEventListener("change", e => {
+            if (compare1.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+        diffextra.addEventListener("change", e => {
+            if (compare1.value && compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        })
+
+        // add version to diff dropdowns
+        document.addEventListener("builddir", e => {
+            const file = e.detail
+            compare1.appendChild(new Option(file.name, file.name))
+            compare2.appendChild(new Option(file.name, file.name))
+        })
+
+        // Helper function to escape HTML for safe insertion
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Function to generate contextual diff lines
+        function generateContextualDiff(diffParts, contextLines) {
+            let blocks = [];
+            let lastCommonLineIndex = -1;
+
+            diffParts.forEach((part, i) => {
+                const isChanged = part.added || part.removed;
+                const isCommon = !isChanged;
+
+                if (isChanged) {
+                    // Start a new block or extend the last one
+                    if (blocks.length === 0 || i > lastCommonLineIndex + contextLines) {
+                        blocks.push({ start: i, end: i + 1 });
+                    } else {
+                        blocks[blocks.length - 1].end = i + 1;
+                    }
+                    lastCommonLineIndex = -1; // Reset as we are in a change block
+                } else { // isCommon
+                    if (blocks.length > 0) {
+                        // Extend the end of the last block to include context lines
+                        blocks[blocks.length - 1].end = Math.max(blocks[blocks.length - 1].end, i + 1);
+                        lastCommonLineIndex = i;
+                    }
+                }
+            });
+
+            // Adjust start of each block to include context lines and merge overlaps
+            let finalBlocks = [];
+            blocks.forEach(block => {
+                const adjustedStart = Math.max(0, block.start - contextLines);
+                const adjustedEnd = Math.min(diffParts.length, block.end + contextLines);
+
+                if (finalBlocks.length === 0 || adjustedStart > finalBlocks[finalBlocks.length - 1].end) {
+                    finalBlocks.push({ start: adjustedStart, end: adjustedEnd });
+                } else {
+                    // Merge with the last block if they overlap or touch
+                    finalBlocks[finalBlocks.length - 1].end = Math.max(finalBlocks[finalBlocks.length - 1].end, adjustedEnd);
+                }
+            });
+
+            return finalBlocks.flatMap((block, blockIndex) => {
+                const linesInBlock = diffParts.slice(block.start, block.end);
+                if (blockIndex > 0) {
+                    // Add a separator between blocks if not the first
+                    return [{ type: 'separator' }].concat(linesInBlock);
+                }
+                return linesInBlock;
+            });
+        }
+
+
+        // actual version diff
+        document.addEventListener("vercompare", e => {
+            async function onVerCompare() {
+                console.debug("Starting diff.", { compare1, compare2, diffextra, e })
+                // lock version selection while running
+                compare1.disabled = true
+                compare2.disabled = true
+                diffextra.disabled = true
+                diffcodedetails.open = false
+                diffcodedetails.hidden = true
+                document.querySelectorAll(`[name=inspectstats]`).forEach(e => e.hidden = true)
+
+                const useextra = diffextra.checked
+                const files = [
+                    await fetchInspect(compare1.value, useextra),
+                    await fetchInspect(compare2.value, useextra)
+                ]
+
+                const oldJsonStr = JSON.stringify(files[0], null, 2);
+                const newJsonStr = JSON.stringify(files[1], null, 2);
+
+                const rawDiff = Diff.diffLines(oldJsonStr, newJsonStr);
+                const contextualDiff = generateContextualDiff(rawDiff, CONTEXT_LINES);
+
+                let leftHtml = '';
+                let rightHtml = '';
+
+                contextualDiff.forEach(part => {
+                    if (part.type === 'separator') {
+                        leftHtml += `<div class="diff-separator">...</div>\n`;
+                        rightHtml += `<div class="diff-separator">...</div>\n`;
+                        return;
+                    }
+
+                    // Split by newline, filter out empty strings if they are not actual lines
+                    // Using `pop()` to remove the last element which is an empty string if the input ends with a newline.
+                    const lines = part.value.split('\n');
+                    if (lines.length > 0 && lines[lines.length - 1] === '') {
+                        lines.pop();
+                    }
+
+                    lines.forEach(line => {
+                        const escapedLine = escapeHtml(line);
+
+                        if (part.added) {
+                            // Added: line on the right, empty space on the left
+                            leftHtml += `<span class="diff-line-empty"></span>\n`;
+                            rightHtml += `<span class="diff-line-added">+ ${escapedLine}</span>\n`;
+                        } else if (part.removed) {
+                            // Removed: line on the left, empty space on the right
+                            leftHtml += `<span class="diff-line-removed">- ${escapedLine}</span>\n`;
+                            rightHtml += `<span class="diff-line-empty"></span>\n`;
+                        } else {
+                            // Common: line on both sides
+                            leftHtml += `<span class="diff-line-common">  ${escapedLine}</span>\n`;
+                            rightHtml += `<span class="diff-line-common">  ${escapedLine}</span>\n`;
+                        }
+                    });
+                });
+
+                diffcodeLeft.innerHTML = leftHtml;
+                diffcodeRight.innerHTML = rightHtml;
+
+                // Make sure to remove existing highlighting and apply new
+                diffcodeLeft.removeAttribute('data-highlighted');
+                diffcodeRight.removeAttribute('data-highlighted');
+                hljs.highlightElement(diffcodeLeft);
+                hljs.highlightElement(diffcodeRight);
+
+                diffcodedetails.hidden = false
+                diffcodedetails.open = true
+
+                // show diff stats
+                const ncmd1 = document.querySelector(`#inspect1 [name=cmd]`).textContent
+                const narg1 = document.querySelector(`#inspect1 [name=arg]`).textContent
+                const ncmd2 = document.querySelector(`#inspect2 [name=cmd]`).textContent
+                const narg2 = document.querySelector(`#inspect2 [name=arg]`).textContent
+                const ncmddiff = ncmd2 - ncmd1
+                const nargdiff = narg2 - narg1
+                ecmddiff.textContent = `${ncmddiff > 0 ? "+" : ""}${ncmddiff}`
+                eargdiff.textContent = `${nargdiff > 0 ? "+" : ""}${nargdiff}`
+                ecmddiff.style = `color: ${ncmddiff > 0 ? "green" : "red"}`
+                eargdiff.style = `color: ${nargdiff > 0 ? "green" : "red"}`
+
+
+                // re-enable controls
+                compare1.disabled = false
+                compare2.disabled = false
+                diffextra.disabled = false
+
+                plausible("Diff Run", { props: { compareLeft: compare1.value, compareRight: compare2.value } })
+
+                console.debug("Diff done.  JSON diff stats:", jsonDiffStats(files[0], files[1]))
+            }
+
+            onVerCompare()
+        })
+
+        // update stats on ver diff, for each file after downloaded
+        document.addEventListener('inspectdownload', e => {
+            console.debug("inspectdownload event fired", e)
+            const ever = e.detail.ver
+            const ejson = JSON.parse(JSON.stringify(e.detail.json))
+
+            const types = (new jsonpath.JSONPath()).query(ejson, `$..*[?(@._type)]._type`)
+            const stats = { arg: 0, cmd: 0, dir: 0 }
+            types.forEach(x => stats[x]++)
+
+            let tag = document.querySelector(`#compare1`).value
+            if (tag === ever) {
+                document.querySelector(`#inspect1 [name=cmd]`).textContent = stats.cmd
+                document.querySelector(`#inspect1 [name=arg]`).textContent = stats.arg
+                document.querySelector(`#inspect1 [name=inspectstats]`).hidden = false
+            }
+            tag = document.querySelector(`#compare2`).value
+            if (tag === ever) {
+                document.querySelector(`#inspect2 [name=cmd]`).textContent = stats.cmd
+                document.querySelector(`#inspect2 [name=arg]`).textContent = stats.arg
+                document.querySelector(`#inspect2 [name=inspectstats]`).hidden = false
+            }
+        })
+
+        // helper to do the fetch
+        function fetchInspect(ver, extra = false) {
+            console.debug("fetchInspect() called", { ver, extra })
+            const subdir = extra ? "/extra" : ""
+            return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
+                .then(response => response.json())
+                .then(data => {
+                    document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
+                    return data
+                })
+                .catch(error => console.error('Error fetching inspect data', ver, extra, error));
+        }
+
+
+        // "MAIN" - fetch all the version from GitHub, which triggers everything via builddir
+        fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(file => {
+                    if (file.type === "dir") {
+                        console.debug("Got file from GitHub", file)
+                        file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
+                        if (file.name !== "extra") {
+                            document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
+                        }
+                    }
+                })
+            })
+            .catch(error => console.error('Error fetching build list from GitHub:', error));
+
+    </script>
+
+    <script>
+        function jsonDiffStats(oldJson, newJson) {
+            // Generate the diff
+            const differences = new DeepDiff(oldJson, newJson);
+            console.debug(differences)
+
+            // Schema for results
+            const stats = {
+                added: 0,
+                removed: 0,
+                changed: 0,
+                elements: {
+                    added: 0,
+                    removed: 0,
+                    changed: 0
+                },
+            }
+
+            // Process DeepDiff
+            differences.forEach(diff => {
+                const path = diff.path.join('.');
+                switch (diff.kind) {
+                    case 'N': // New value
+                        stats.added++
+                        break
+                    case 'D': // Deleted value
+                        stats.removed++
+                        break
+                    case 'E': // Edited value
+                        stats.changed++
+                        break
+                    case 'A': // Array change
+                        if (diff.item.kind === 'N') {
+                            stats.elements.added++
+                        } else if (diff.item.kind === 'D') {
+                            stats.elements.removed++
+                        } else if (diff.item.kind === 'E') {
+                            stats.elements.changed++
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            return stats
+        }
+    </script>
+
+    <script>
+        /*** Dark Mode Handling ***/
+        let isLight = true
+        const html = document.documentElement
+        const switchTheme = document.getElementById('theme_switcher')
+        const sun = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
+        const moon = '<svg width="23px" height="23px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
+        const os_default = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+
+        document.addEventListener('DOMContentLoaded', () => {
+            switchTheme.innerHTML = os_default
+            html.setAttribute('data-theme', 'auto')
+        })
+        switchTheme.addEventListener('click', (e) => {
+            e.preventDefault()
+            isLight = !isLight
+            html.setAttribute('data-theme', isLight ? 'light' : 'dark')
+            switchTheme.innerHTML = isLight ? sun : moon
+        })
+    </script>
+</body>
+
+</html>
