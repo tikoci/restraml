@@ -51,7 +51,7 @@ jobs:
               context: .
               dockerfile: ./Dockerfile.chr-qemu 
               args:
-                ARG_ROUTEROS_VERSION: $ROUTEROS_VERSION
+                ARG_ROUTEROS_VERSION: 7.20
             restart: unless-stopped
             cap_add:
               - NET_ADMIN
