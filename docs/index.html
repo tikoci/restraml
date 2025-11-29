@@ -34,6 +34,127 @@
     <script>
         const module = {}
     </script>
+    <script>
+        // RouterOS Binary Downloads helper
+        // Queue early `builddir` events in case they fire before DOMContentLoaded
+        const _pendingBuildDirs = [];
+        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail); }
+        document.addEventListener('builddir', _earlyBuilddirListener);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const archSelect = document.getElementById('rosarch')
+            const verSelect = document.getElementById('rosverselect')
+            const npkLink = document.getElementById('npkLink')
+            const extraLink = document.getElementById('extraLink')
+
+            // Architectures used on mikrotik.com/download (adjusted names)
+            const architectures = ['x86', 'arm', 'arm64', 'mipsbe', 'smips', 'tile', 'powerpc']
+
+            // populate architectures
+            architectures.forEach(a => archSelect.appendChild(new Option(a, a)))
+
+            // Process any queued builddir events that fired before DOMContentLoaded
+            if (_pendingBuildDirs.length) {
+                _pendingBuildDirs.forEach(file => {
+                    if (![...verSelect.options].some(o => o.value === file.name)) {
+                        verSelect.appendChild(new Option(file.name, file.name))
+                    }
+                })
+                _pendingBuildDirs.length = 0
+            }
+
+            // register builddir listener for future events
+            document.addEventListener('builddir', e => {
+                const file = e.detail
+                // append if not already present
+                if (![...verSelect.options].some(o => o.value === file.name)) {
+                    verSelect.appendChild(new Option(file.name, file.name))
+                }
+            })
+
+            // Remove the early listener now that we've processed queued events
+            document.removeEventListener('builddir', _earlyBuilddirListener);
+
+            // NOTE: we intentionally removed the fallback GitHub API fetch here. The page
+            // already runs a single, central fetch later which dispatches `builddir` events.
+            // The separate early fetch produced 403s in some environments (rate-limited); by
+            // queueing events we avoid missing versions while also avoiding duplicate API calls.
+
+            function buildNpkUrl(arch, ver) {
+                const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
+                // x86 (legacy) typically uses routeros-<ver>.npk
+                if (arch === 'x86') return baseDir + `routeros-${ver}.npk`
+                // arm/arm64 and other arches follow routeros-<arch>-<ver>.npk
+                return baseDir + `routeros-${arch}-${ver}.npk`
+            }
+
+            function buildExtraUrl(arch, ver) {
+                const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
+                // x86 uses all_packages-x86-<ver>.zip in workflows
+                if (arch === 'x86') return baseDir + `all_packages-x86-${ver}.zip`
+                return baseDir + `all_packages-${arch}-${ver}.zip`
+            }
+
+            function computeLinks() {
+                const arch = archSelect.value
+                const ver = verSelect.value
+                const dl = document.getElementById('downloadLinks')
+                if (!arch || !ver) {
+                    if (dl) dl.style.display = 'none'
+                    return
+                }
+
+                const npkUrl = buildNpkUrl(arch, ver)
+                const extraUrl = buildExtraUrl(arch, ver)
+
+                npkLink.href = npkUrl
+                npkLink.title = npkUrl
+                npkLink.textContent = 'SYSTEM PACKAGE'
+                const npkUrlSpan = document.getElementById('npkUrl')
+                npkUrlSpan.textContent = npkUrl
+
+                extraLink.href = extraUrl
+                extraLink.title = extraUrl
+                extraLink.textContent = 'EXTRA PACKAGES'
+                const extraUrlSpan = document.getElementById('extraUrl')
+                extraUrlSpan.textContent = extraUrl
+                if (dl) dl.style.display = 'block'
+            }
+
+            function setupCopyButtons() {
+                const copyNpk = document.getElementById('copyNpk')
+                const copyExtra = document.getElementById('copyExtra')
+
+                copyNpk.addEventListener('click', async () => {
+                    const url = document.getElementById('npkUrl').textContent
+                    if (!url) return
+                    try {
+                        await navigator.clipboard.writeText(url)
+                        copyNpk.textContent = '✔'
+                        setTimeout(() => (copyNpk.textContent = '📋'), 1500)
+                    } catch (err) {
+                        console.debug('Clipboard write failed', err)
+                    }
+                })
+
+                copyExtra.addEventListener('click', async () => {
+                    const url = document.getElementById('extraUrl').textContent
+                    if (!url) return
+                    try {
+                        await navigator.clipboard.writeText(url)
+                        copyExtra.textContent = '✔'
+                        setTimeout(() => (copyExtra.textContent = '📋'), 1500)
+                    } catch (err) {
+                        console.debug('Clipboard write failed', err)
+                    }
+                })
+            }
+
+            archSelect.addEventListener('change', computeLinks)
+            verSelect.addEventListener('change', computeLinks)
+            setupCopyButtons()
+        })
+    </script>
     <script type="module">
         import { diffString, diff } from 'https://cdn.jsdelivr.net/npm/json-diff@1.0.6/+esm'
         module.diffString = diffString
@@ -189,25 +310,42 @@
 
         <br><br>
 
-        <section>
-            <h4>
-                Convert
-                <code>curl</code>
-                request to
-                <code>/tool/fetch</code>
-            </h4>
-            <h5>Retired</h5>
-            <p>At least the web interface for "curl2rsc" is being retired.  The web-based conversion used a microservice hosted by Glitch.
-            However Glitch has closed its doors in July 2025, so TIKOCI's cURL to /tool/fetch converter does not work.  Code remains, just no backend.</p>
-            <!--<p>To convert <i>most</i> <code>curl</code> command into a RouterOS's <code>/tool/fetch</code> scripting
-                command:</p>
-            <a href="https://tikoci.github.io/postman-code-generators/" role="button"
-                class="plausible-event-name=curl2rsc">Visit <code>curl2rsc</code></a>-->
-        </section>
+        
 
         <br><br>
 
         <section>
+            <h3>RouterOS Binary Downloads</h3>
+            <article>
+                <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
+                    <code>routeros.npk</code> and (when available) the <code>all_packages</code> extra archive.</p>
+                <fieldset class="grid">
+                    <div>
+                        <label for="rosarch"><b>Architecture</b></label>
+                        <select id="rosarch" aria-label="RouterOS architecture">
+                        </select>
+                    </div>
+                    <div>
+                        <label for="rosverselect"><b>Version</b></label>
+                        <select id="rosverselect" aria-label="RouterOS version">
+                            <option selected disabled value="">Select version...</option>
+                        </select>
+                    </div>
+                </fieldset>
+
+                <div id="downloadLinks" style="display:none;margin-top:0.5em">
+                    <div style="display:flex;align-items:center;gap:0.6rem">
+                        <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
+                        <span id="npkUrl" style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                        <button id="copyNpk" class="contrast" type="button" title="Copy URL" aria-label="Copy system package URL">📋</button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
+                        <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
+                        <span id="extraUrl" style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                        <button id="copyExtra" class="contrast" type="button" title="Copy URL" aria-label="Copy extra packages URL">📋</button>
+                    </div>
+                </div>
+            </article>
             <h3>Schema Downloads</h3>
             <article>
                 <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
@@ -507,8 +645,17 @@
 
         // "MAIN" - fetch all the version from GitHub, which triggers everything via builddir
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`GitHub API returned ${response.status} ${response.statusText}`)
+                }
+                return response.json()
+            })
             .then(data => {
+                if (!Array.isArray(data)) {
+                    console.error('Unexpected GitHub API payload for contents:', data)
+                    return
+                }
                 data.forEach(file => {
                     if (file.type === "dir") {
                         console.debug("Got file from GitHub", file)
