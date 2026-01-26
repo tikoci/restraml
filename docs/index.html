@@ -311,6 +311,16 @@
         <br><br>
 
         
+        <section>
+            <h3><mark>BETA</mark> Schema for /app YAML</h3>
+            <article>
+                <p>RouterOS 7.22beta introduces "custom <code>/app</code>" support that uses YAML to define a new <code>/app</code> in the RouterOS container catalog.  
+                RouterOS <code>/app</code> uses it's own YAML format.  While similar to <code>docker-compose</code>, it not the same.  
+                In order to provide validation of MikroTik-specific <code>/app</code> YAML, TIKOCI has an experimental "JSON" schema to enable validation of <code>/app</code> YAML format in editors like VSCode.
+                Since custom <code>/app</code> are still in beta, TIKOCI <code>/app</code> YAML schema has not published to https://www.schemastore.org yet - which allow tools like VSCode to <i>automatically</i> use to do YAML validation. <i>The schema is in JSON, but editors will use for YAML too.</i></p>
+                
+                <p>Download the "beta" RouterOS <code>/app</code> YAML schema: <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a> and use locally in your editor.</p>
+            </article>
 
         <br><br>
 

@@ -1,0 +1,250 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json",
+  "title": "RouterOS /app YAML",
+  "description": "Schema for MikroTik RouterOS /app YAML",
+  "type": "object",
+  "required": ["services"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique name for the /app"
+    },
+    "descr": {
+      "type": "string",
+      "description": "Description of the /app"
+    },
+    "page": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to the project homepage"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "productivity",
+        "storage",
+        "networking",
+        "development",
+        "communication",
+        "file-management",
+        "search",
+        "video",
+        "media",
+        "media-management",
+        "home-automation",
+        "monitoring",
+        "database",
+        "automation",
+        "ai",
+        "messaging",
+        "radio",
+        "security"
+      ],
+      "description": "Category classification for the /app"
+    },
+    "icon": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to the icon image (use with `show-in-webfig=yes` to display on WebFig login screen)"
+    },
+    "default-credentials": {
+      "type": "string",
+      "description": "Default login credentials in format username:password or special values"
+    },
+    "url-path": {
+      "type": "string",
+      "description": "Default URL path to append to access the /app via a browser"
+    },
+    "auto-update": {
+      "type": "boolean",
+      "description": "Whether to enable automatic updates of all containers at boot"
+    },
+    "services": {
+      "type": "object",
+      "description": "Container services definition",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image to use.  Can prepend the container registry, or the `registry-url` in `/container/config` will be assumed."
+            },
+            "container_name": {
+              "type": "string",
+              "description": "Explicit container name.  Also used in file paths."
+            },
+            "hostname": {
+              "type": "string",
+              "description": "Container hostname"
+            },
+            "command": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ],
+              "description": "Override the default command"
+            },
+            "ports": {
+              "type": "array",
+              "description": "Port mappings",
+              "items": {
+                "type": "string",
+                "pattern": "^\\d+:\\d+(\\/tcp|\\/udp)?(:[a-zA-Z0-9_-]+)?$"
+              }
+            },
+            "environment": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "patternProperties": {
+                    "^[A-Z_][A-Z0-9_]*$": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ],
+              "description": "Environment variables"
+            },
+            "volumes": {
+              "type": "array",
+              "description": "Volume mappings",
+              "items": {
+                "type": "string"
+              }
+            },
+            "configs": {
+              "type": "array",
+              "description": "Config file mappings",
+              "items": {
+                "type": "object",
+                "required": ["source", "target"],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": ["integer", "string"],
+                    "description": "File permissions in octal"
+                  }
+                }
+              }
+            },
+            "restart": {
+              "type": "string",
+              "enum": ["no", "always", "on-failure", "unless-stopped"],
+              "description": "Restart policy"
+            },
+            "depends_on": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "object"
+                }
+              ],
+              "description": "Service dependencies"
+            },
+            "user": {
+              "type": "string",
+              "description": "User to run container as"
+            },
+            "security_opt": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Security options"
+            },
+            "shm_size": {
+              "type": "string",
+              "description": "Shared memory size"
+            },
+            "stop_grace_period": {
+              "type": "string",
+              "description": "Time to wait before killing container"
+            }
+          }
+        }
+      },
+      "minProperties": 1
+    },
+    "volumes": {
+      "type": "object",
+      "description": "Named volumes definition",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": ["object", "null"]
+        }
+      }
+    },
+    "networks": {
+      "type": "object",
+      "description": "Networks configuration",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "external": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "configs": {
+      "type": "object",
+      "description": "Config files definition.  Used along with a service's `configs`, which controls placement of the contents.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Inline config file content"
+            }
+          }
+        }
+      }
+    }
+  }
+}
