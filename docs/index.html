@@ -310,135 +310,151 @@
 
         <br><br>
 
-        
+
         <section>
             <h3><mark>BETA</mark> Schema for /app YAML</h3>
             <article>
-                <p>RouterOS 7.22beta introduces "custom <code>/app</code>" support that uses YAML to define a new <code>/app</code> in the RouterOS container catalog.  
-                RouterOS <code>/app</code> uses it's own YAML format.  While similar to <code>docker-compose</code>, it not the same.  
-                In order to provide validation of MikroTik-specific <code>/app</code> YAML, TIKOCI has an experimental "JSON" schema to enable validation of <code>/app</code> YAML format in editors like VSCode.
-                Since custom <code>/app</code> are still in beta, TIKOCI <code>/app</code> YAML schema has not published to https://www.schemastore.org yet - which allow tools like VSCode to <i>automatically</i> use to do YAML validation. <i>The schema is in JSON, but editors will use for YAML too.</i></p>
-                
-                <p>Download the "beta" RouterOS <code>/app</code> YAML schema: <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a> and use locally in your editor.</p>
+                <small>
+                    <p>RouterOS 7.22beta introduces "custom <code>/app</code>" support that uses YAML to define a new
+                        <code>/app</code> in the RouterOS container catalog.
+                        RouterOS <code>/app</code> uses it's own YAML format. While similar to
+                        <code>docker-compose</code>, it not the same.
+                        In order to provide validation of MikroTik-specific <code>/app</code> YAML, TIKOCI has an
+                        experimental "JSON" schema to enable validation of <code>/app</code> YAML format in editors like
+                        VSCode.
+                        Since custom <code>/app</code> are still in beta, TIKOCI <code>/app</code> YAML schema has not
+                        published to https://www.schemastore.org yet - which allow tools like VSCode to
+                        <i>automatically</i> use to do YAML validation. <i>The schema is in JSON, but editors will use
+                            for YAML too.</i></p>
+                </small>
+
+                <p>Download the "beta" RouterOS <code>/app</code> YAML schema: <a
+                        href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
+                    and use locally in your editor.</p>
             </article>
 
-        <br><br>
+            <br><br>
 
-        <section>
-            <h3>RouterOS Binary Downloads</h3>
-            <article>
-                <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
-                    <code>routeros.npk</code> and the <code>all_packages</code> extra archive.</p>
-                <fieldset class="grid">
-                    <div>
-                        <label for="rosarch"><b>Architecture</b></label>
-                        <select id="rosarch" aria-label="RouterOS architecture">
-                        </select>
+            <section>
+                <h3>RouterOS Binary Downloads</h3>
+                <article>
+                    <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
+                        <code>routeros.npk</code> and the <code>all_packages</code> extra archive.
+                    </p>
+                    <fieldset class="grid">
+                        <div>
+                            <label for="rosarch"><b>Architecture</b></label>
+                            <select id="rosarch" aria-label="RouterOS architecture">
+                            </select>
+                        </div>
+                        <div>
+                            <label for="rosverselect"><b>Version</b></label>
+                            <select id="rosverselect" aria-label="RouterOS version">
+                                <option selected disabled value="">Select version...</option>
+                            </select>
+                        </div>
+                    </fieldset>
+
+                    <div id="downloadLinks" style="display:none;margin-top:0.5em">
+                        <div style="display:flex;align-items:center;gap:0.6rem">
+                            <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
+                            <span id="npkUrl"
+                                style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                            <button id="copyNpk" class="contrast" type="button" title="Copy URL"
+                                aria-label="Copy system package URL">📋</button>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
+                            <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
+                            <span id="extraUrl"
+                                style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                            <button id="copyExtra" class="contrast" type="button" title="Copy URL"
+                                aria-label="Copy extra packages URL">📋</button>
+                        </div>
                     </div>
-                    <div>
-                        <label for="rosverselect"><b>Version</b></label>
-                        <select id="rosverselect" aria-label="RouterOS version">
-                            <option selected disabled value="">Select version...</option>
-                        </select>
-                    </div>
-                </fieldset>
-
-                <div id="downloadLinks" style="display:none;margin-top:0.5em">
-                    <div style="display:flex;align-items:center;gap:0.6rem">
-                        <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
-                        <span id="npkUrl" style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                        <button id="copyNpk" class="contrast" type="button" title="Copy URL" aria-label="Copy system package URL">📋</button>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
-                        <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
-                        <span id="extraUrl" style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                        <button id="copyExtra" class="contrast" type="button" title="Copy URL" aria-label="Copy extra packages URL">📋</button>
-                    </div>
-                </div>
-            </article>
-            <h3>Schema Downloads</h3>
-            <article>
-                <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
-                </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
-                    <code>extra-packages.zip</code> available for X86.</i>
-            </article>
-            <table>
-                <thead>
-                    <tr>
-                        <th scope="col">Version</th>
-                        <td colspan="2">REST Schema</td>
-                        <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
-                        <td>API Docs</td>
-                        <td>SNMP MIB</td>
-                    </tr>
-                </thead>
-                <tbody id="filerows" style="vertical-align: text-top;">
-                    <template id="_vercellextra">
-                        <small>
-                            <span><mark>XXXX</mark></span>
-                            <div><a class="ver-base" href="#">base</a>
-                                <a class="ver-extra" href="#">+extra</a>
-                            </div>
-
-                        </small>
-                    </template>
-                    <style>
-                        .cell-vername {
-                            vertical-align: middle;
-
-                            a:link {
-                                text-decoration: none;
-                            }
-
-                            ;
-
-                            a:visited {
-                                text-decoration: none;
-                            }
-
-                            ;
-
-                            a:hover {
-                                text-decoration: underline;
-                            }
-
-                            ;
-
-                            a:active {
-                                text-decoration: underline;
-                            }
-
-                            ;
-                        }
-
-                        ;
-                    </style>
-                    <template id="_verrow">
-                        <tr class="row-ver">
-                            <th class="cell-vername"><a href="#"></a></th>
-                            <!--TODO: <button data-target="modal-example" onclick="toggleModal(event) />-->
-                            <td class="cell-raml"></td>
-                            <td class="cell-oas2"></td>
-                            <td class="cell-json"></td>
-                            <td class="cell-html"></td>
-                            <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
+                </article>
+                <h3>Schema Downloads</h3>
+                <article>
+                    <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
+                    </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
+                        <code>extra-packages.zip</code> available for X86.</i>
+                </article>
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Version</th>
+                            <td colspan="2">REST Schema</td>
+                            <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
+                            <td>API Docs</td>
+                            <td>SNMP MIB</td>
                         </tr>
-                    </template>
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td><small>
-                                <a
-                                    href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
-                            </small></td>
-                        <th scope="col"></th>
-                        <th scope="col"></th>
-                        <th scope="col"></th>
-                        <th scope="col"></th>
-                    </tr>
-                </tfoot>
-            </table>
-            <!--
+                    </thead>
+                    <tbody id="filerows" style="vertical-align: text-top;">
+                        <template id="_vercellextra">
+                            <small>
+                                <span><mark>XXXX</mark></span>
+                                <div><a class="ver-base" href="#">base</a>
+                                    <a class="ver-extra" href="#">+extra</a>
+                                </div>
+
+                            </small>
+                        </template>
+                        <style>
+                            .cell-vername {
+                                vertical-align: middle;
+
+                                a:link {
+                                    text-decoration: none;
+                                }
+
+                                ;
+
+                                a:visited {
+                                    text-decoration: none;
+                                }
+
+                                ;
+
+                                a:hover {
+                                    text-decoration: underline;
+                                }
+
+                                ;
+
+                                a:active {
+                                    text-decoration: underline;
+                                }
+
+                                ;
+                            }
+
+                            ;
+                        </style>
+                        <template id="_verrow">
+                            <tr class="row-ver">
+                                <th class="cell-vername"><a href="#"></a></th>
+                                <!--TODO: <button data-target="modal-example" onclick="toggleModal(event) />-->
+                                <td class="cell-raml"></td>
+                                <td class="cell-oas2"></td>
+                                <td class="cell-json"></td>
+                                <td class="cell-html"></td>
+                                <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td><small>
+                                    <a
+                                        href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                                </small></td>
+                            <th scope="col"></th>
+                            <th scope="col"></th>
+                            <th scope="col"></th>
+                            <th scope="col"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+                <!--
             <article>
                 <h5>OpenAPI Format?</h5>
                 If an OpenAPI ("OAS") schema is needed, try using the <mark>RAML</mark> schema above with
@@ -446,23 +462,24 @@
                     href="https://getpostman.com">Postman</a> can also do similar API schema conversions.
             </article>
             -->
-        </section>
+            </section>
 
-        <br><br>
+            <br><br>
 
-        <section>
-            <blockquote>
-                <h5>* Disclaimer</h5>
-                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
-                    connected
-                    with <a href="https://mikrotik.com">Mikrotik</a>.
-                    All product and company names are trademarks™ or registered® trademarks of their respective holders.
-                    Use
-                    of them does not imply any affiliation with or endorsement by them.</small>
-            </blockquote>
-        </section>
+            <section>
+                <blockquote>
+                    <h5>* Disclaimer</h5>
+                    <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
+                        connected
+                        with <a href="https://mikrotik.com">Mikrotik</a>.
+                        All product and company names are trademarks™ or registered® trademarks of their respective
+                        holders.
+                        Use
+                        of them does not imply any affiliation with or endorsement by them.</small>
+                </blockquote>
+            </section>
 
-        <!-- TODO
+            <!-- TODO
         <dialog id="modal-example">
             <article>
                 <header>
