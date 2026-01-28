@@ -1,0 +1,276 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.dev.json",
+    "title": "RouterOS /app YAML",
+    "description": "Schema for MikroTik RouterOS /app YAML",
+    "type": "object",
+    "required": [
+        "name",
+        "services"
+    ],
+    "additionalProperties": false,
+    "definitions": {
+        "namePattern": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "serviceObject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [ "image" ],
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "description": "Container image to use."
+                },
+                "container_name": {
+                    "type": "string"
+                },
+                "hostname": {
+                    "type": "string"
+                },
+                "command": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    ]
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^\\d+:\\d+(\\/tcp|\\/udp)?(:[a-zA-Z0-9_-]+)?$"
+                    }
+                },
+                "environment": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "propertyNames": {
+                                "pattern": "^[A-Z_][A-Z0-9_]*$"
+                            },
+                            "additionalProperties": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "number"
+                                    },
+                                    {
+                                        "type": "boolean"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    ]
+                },
+                "volumes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "configs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "source",
+                            "target"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "source": {
+                                "type": "string"
+                            },
+                            "target": {
+                                "type": "string"
+                            },
+                            "mode": {
+                                "type": [
+                                    "integer",
+                                    "string"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "restart": {
+                    "type": "string",
+                    "enum": [
+                        "no",
+                        "always",
+                        "on-failure",
+                        "unless-stopped"
+                    ]
+                },
+                "depends_on": {
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "type": "object"
+                        }
+                    ]
+                },
+                "user": {
+                    "type": "string"
+                },
+                "security_opt": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "shm_size": {
+                    "type": "string"
+                },
+                "stop_grace_period": {
+                    "type": "string"
+                }
+            }
+        },
+        "namedObject": {
+            "type": "object",
+            "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+            },
+            "additionalProperties": true
+        }
+    },
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "descr": {
+            "type": "string"
+        },
+        "page": {
+            "type": "string",
+            "format": "uri"
+        },
+        "category": {
+            "type": "string",
+            "enum": [
+                "productivity",
+                "storage",
+                "networking",
+                "development",
+                "communication",
+                "file-management",
+                "search",
+                "video",
+                "media",
+                "media-management",
+                "home-automation",
+                "monitoring",
+                "database",
+                "automation",
+                "ai",
+                "messaging",
+                "radio",
+                "security"
+            ]
+        },
+        "icon": {
+            "type": "string",
+            "format": "uri"
+        },
+        "default-credentials": {
+            "type": "string"
+        },
+        "url-path": {
+            "type": "string"
+        },
+        "auto-update": {
+            "type": "boolean"
+        },
+        "services": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+            },
+            "additionalProperties": {
+                "$ref": "#/definitions/serviceObject"
+            },
+            "properties": {
+                "example-service": {
+                    "$ref": "#/definitions/serviceObject"
+                }
+            }
+        },
+        "volumes": {
+            "type": "object",
+            "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+            },
+            "additionalProperties": {
+                "type": [
+                    "object",
+                    "null"
+                ]
+            },
+            "properties": {
+                "example-volume": {}
+            }
+        },
+        "networks": {
+            "type": "object",
+            "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+            },
+            "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "external": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "properties": {
+                "example-network": {}
+            }
+        },
+        "configs": {
+            "type": "object",
+            "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+            },
+            "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "content": {
+                        "type": "string"
+                    }
+                }
+            },
+            "properties": {
+                "example-config": {}
+            }
+        }
+    }
+}
