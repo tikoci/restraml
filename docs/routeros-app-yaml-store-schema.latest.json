@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "$ref": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json"
+  }
+}
