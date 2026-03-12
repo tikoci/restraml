@@ -1,0 +1,175 @@
+name: Auto-Build New RouterOS Versions
+
+# Runs daily to check for new RouterOS versions and trigger schema builds automatically.
+# Eliminates the need to manually dispatch a workflow for every new RouterOS release.
+# Follows the same pattern as tikoci/mikropkl's auto.yaml workflow.
+#
+# MikroTik publishes the latest version for each channel at:
+#   https://upgrade.mikrotik.com/routeros/NEWESTa7.<channel>
+# where <channel> is one of: stable, testing, development, long-term
+#
+# Stable releases (e.g. "7.22") are hosted on download.mikrotik.com.
+# Beta/rc/testing releases (e.g. "7.22rc2", "7.22beta4") are on cdn.mikrotik.com.
+# The Dockerfile handles both via a primary+fallback wget pattern.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions: write-all
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Check for New RouterOS Versions
+    outputs:
+      versions: ${{ steps.needs-builds.outputs.versions }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get RouterOS "stable" channel version
+        id: get-stable
+        # Stable channel typically has the highest production-ready version.
+        # Fail-fast: stable must always be available.
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.stable | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::error::Failed to get stable channel version" && exit 1
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Stable: $ROSVER"
+
+      - name: Get RouterOS "testing" channel version
+        id: get-testing
+        # Testing channel has rc/beta versions being prepared for stable release.
+        # May not always differ from stable; allow failure gracefully.
+        continue-on-error: true
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.testing | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for testing channel, skipping" && exit 0
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Testing: $ROSVER"
+
+      - name: Get RouterOS "development" channel version
+        id: get-development
+        # Development channel has the latest bleeding-edge builds (beta/nightly).
+        # May not always return a version; allow failure gracefully.
+        continue-on-error: true
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.development | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for development channel, skipping" && exit 0
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Development: $ROSVER"
+
+      - name: Get RouterOS "long-term" channel version
+        id: get-longterm
+        # Long-term channel provides older, stable releases for conservative deployments.
+        # May not always differ from stable; allow failure gracefully.
+        continue-on-error: true
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.long-term | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for long-term channel, skipping" && exit 0
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Long-term: $ROSVER"
+
+      - name: Determine which versions are missing from /docs
+        # Checks if docs/{version}/schema.raml exists for each channel version.
+        # If the schema file is missing, that version needs to be built.
+        # Deduplication is applied so the same version reported by multiple channels
+        # (e.g. stable == testing) only triggers one build.
+        id: needs-builds
+        env:
+          STABLE: ${{ steps.get-stable.outputs.version }}
+          TESTING: ${{ steps.get-testing.outputs.version }}
+          DEVELOPMENT: ${{ steps.get-development.outputs.version }}
+          LONGTERM: ${{ steps.get-longterm.outputs.version }}
+        run: |
+          VERSIONS=()
+          for VER in "$STABLE" "$TESTING" "$DEVELOPMENT" "$LONGTERM"; do
+            [ -z "$VER" ] && continue
+            # Skip duplicates — multiple channels may report the same version
+            ALREADY=false
+            for V in "${VERSIONS[@]}"; do [ "$V" = "$VER" ] && ALREADY=true && break; done
+            $ALREADY && continue
+            if [ ! -f "docs/${VER}/schema.raml" ]; then
+              echo "docs/${VER}/schema.raml not found — adding $VER to build list"
+              VERSIONS+=("$VER")
+            else
+              echo "docs/${VER}/schema.raml exists — skipping $VER"
+            fi
+          done
+          # Use jq to produce a properly-formatted JSON array
+          if [ ${#VERSIONS[@]} -eq 0 ]; then
+            JSON_ARRAY="[]"
+          else
+            JSON_ARRAY=$(printf '%s\n' "${VERSIONS[@]}" | jq -R . | jq -sc .)
+          fi
+          echo "versions=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+          echo "Versions needing build: ${JSON_ARRAY}"
+
+      - name: Summary
+        run: |
+          echo "Stable channel:      ${{ steps.get-stable.outputs.version }}"
+          echo "Testing channel:     ${{ steps.get-testing.outputs.version }}"
+          echo "Development channel: ${{ steps.get-development.outputs.version }}"
+          echo "Long-term channel:   ${{ steps.get-longterm.outputs.version }}"
+          echo "To build: ${{ steps.needs-builds.outputs.versions }}"
+
+  build-docker:
+    needs: check
+    runs-on: ubuntu-latest
+    if: ${{ fromJSON(needs.check.outputs.versions)[0] != null }}
+    strategy:
+      matrix:
+        version: ${{ fromJSON(needs.check.outputs.versions) }}
+      max-parallel: 1
+    name: Trigger schema build (base) for ${{ matrix.version }}
+    steps:
+      - name: Dispatch manual-using-docker-in-docker for ${{ matrix.version }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log(`Triggering build for RouterOS ${{ matrix.version }}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'manual-using-docker-in-docker.yaml',
+              ref: 'main',
+              inputs: {
+                rosver: '${{ matrix.version }}'
+              }
+            })
+            console.log('Dispatched successfully')
+
+  build-extra-docker:
+    needs: [check, build-docker]
+    runs-on: ubuntu-latest
+    # Run even if build-docker is skipped, but only if check succeeded and there are versions
+    if: |
+      always() &&
+      needs.check.result == 'success' &&
+      fromJSON(needs.check.outputs.versions)[0] != null
+    strategy:
+      matrix:
+        version: ${{ fromJSON(needs.check.outputs.versions) }}
+      max-parallel: 1
+    name: Trigger schema build (extra packages) for ${{ matrix.version }}
+    steps:
+      - name: Dispatch manual-using-extra-docker-in-docker for ${{ matrix.version }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log(`Triggering extra-packages build for RouterOS ${{ matrix.version }}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'manual-using-extra-docker-in-docker.yaml',
+              ref: 'main',
+              inputs: {
+                rosver: '${{ matrix.version }}'
+              }
+            })
+            console.log('Dispatched successfully')
+
