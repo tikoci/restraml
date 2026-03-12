@@ -141,6 +141,11 @@ async function main() {
     }
     apps = await resp.json()
     console.log(`Fetched ${apps.length} built-in /app entries from router`)
+
+    // Save raw /app JSON to docs/<version>/app.json for reference and debugging
+    const appJsonPath = `${docsPath}/app.json`
+    fs.writeFileSync(appJsonPath, JSON.stringify(apps, null, 2))
+    console.log(`Written: ${appJsonPath}`)
   } catch (err) {
     console.error(`::warning::Failed to fetch /app list: ${err.message}`)
     console.log("Skipping live /app YAML validation due to fetch error")
