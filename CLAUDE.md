@@ -9,7 +9,7 @@
 **restraml** generates API schema documentation for the [MikroTik RouterOS](https://mikrotik.com/) REST API.
 
 The pipeline is:
-1. Boot a RouterOS CHR (Cloud Hosted Router) in QEMU inside Docker
+1. Boot a RouterOS CHR (Cloud Hosted Router) directly in QEMU on the GitHub Actions runner
 2. Query the router's `/console/inspect` REST endpoint to extract the full command/API tree
 3. Convert that tree to [RAML 1.0](https://raml.org/) schema format
 4. Convert RAML → OpenAPI 2.0 (OAS2)
@@ -27,7 +27,9 @@ restraml/
 ├── rest2raml.js          # Main script: connects to RouterOS REST API → RAML 1.0
 ├── raml2oas.cjs          # Converts RAML 1.0 → OAS 2.0 (uses webapi-parser)
 ├── validraml.cjs         # Validates RAML 1.0 (uses webapi-parser)
-├── Dockerfile.chr-qemu   # Builds an Alpine image that runs RouterOS CHR in QEMU
+├── Dockerfile.chr-qemu   # Alpine image that runs RouterOS CHR in QEMU (for local use)
+├── scripts/
+│   └── entrypoint.sh     # QEMU launcher used by Dockerfile.chr-qemu (user-mode networking)
 ├── .env                  # Local dev env vars (URLBASE, BASICAUTH) — not committed secrets
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
 │   ├── {version}/
@@ -61,9 +63,9 @@ To check if a version is already built, check for `docs/{version}/schema.raml`.
 - **Stable releases** (e.g., `7.22`, no qualifier): only on `download.mikrotik.com`
 - **Beta/RC/testing releases** (e.g., `7.22rc2`, `7.22beta4`): on `cdn.mikrotik.com`
 
-The `Dockerfile.chr-qemu` tries `download.mikrotik.com` first, falls back to `cdn.mikrotik.com`.
-This is why versions without a qualifier (like `7.22`) previously failed — the Dockerfile only
-tried the CDN. **Do not change this order.**
+Both the CI workflows and `Dockerfile.chr-qemu` try `download.mikrotik.com` first, then fall
+back to `cdn.mikrotik.com`. This is why versions without a qualifier (like `7.22`) previously
+failed when only CDN was tried. **Do not change this order.**
 
 ### rest2raml.js — Schema Generator
 - Runs under [Bun](https://bun.sh/) (not Node.js) — uses `Bun.argv` for CLI args
@@ -80,12 +82,28 @@ tried the CDN. **Do not change this order.**
   - Extra packages are downloaded separately from `download.mikrotik.com/routeros/{ver}/all_packages-x86-{ver}.zip`
   - Uploaded to CHR root via SCP, then CHR is rebooted to activate them
 
-### Docker-in-Docker CHR Boot Pattern
-The build runs RouterOS CHR inside QEMU inside Docker (Docker-in-Docker via docker-compose):
-- Port `9180` → RouterOS HTTP (80)
-- Port `9122` → RouterOS SSH (22)
-- CHR takes several minutes to boot — wait loops poll `http://localhost:9180/` with a 5s timeout
-- The wait loop retries up to 100 times with 10s sleep (≈17 min max)
+### CHR Boot Pattern — Direct QEMU on GitHub Runner
+CI workflows run RouterOS CHR **directly in QEMU on the ubuntu-latest runner** (no Docker-in-Docker,
+no docker-compose). The key steps are:
+
+1. Install `qemu-system-x86_64` via apt
+2. Enable KVM via udev rules (`/dev/kvm` is available on GitHub hosted runners)
+3. Download the CHR `.vdi` image (primary: `download.mikrotik.com`, fallback: `cdn.mikrotik.com`)
+4. Launch QEMU in background with user-mode networking and port forwarding:
+   - host:9180 → VM:80 (RouterOS REST API)
+   - host:9122 → VM:22 (RouterOS SSH, used for SCP in extra-packages workflow)
+5. Wait up to **5 minutes** (30 × 10s) for the API to respond — fail fast if not up in time
+6. Cleanup: `kill` the QEMU PID stored in `/tmp/qemu.pid`
+
+**KVM is critical for performance** — without it CHR boots very slowly in software emulation.
+If the wait loop times out, check `/tmp/qemu.log` in the artifact or CI logs for QEMU errors.
+
+`Dockerfile.chr-qemu` + `scripts/entrypoint.sh` are provided for **local development use only**
+(not used in CI). They use the same user-mode networking approach. To run locally:
+```sh
+docker build --build-arg ARG_ROUTEROS_VERSION=7.22 -t chr-qemu -f Dockerfile.chr-qemu .
+docker run --rm -d --device /dev/kvm -p 9180:80 -p 9122:22 chr-qemu
+```
 
 ### Docs Publishing
 After schema generation, files are committed directly to `main` branch by `github-actions[bot]`.
@@ -108,9 +126,10 @@ manually, dispatch `auto.yaml` via `workflow_dispatch` with no inputs. Alternati
 ### "The build failed for version X"
 1. Check the GitHub Actions logs for the failed workflow run
 2. Common failures:
-   - **Docker build fails**: The CHR image couldn't be downloaded — check if `download.mikrotik.com`
-     and `cdn.mikrotik.com` both serve the version. The Dockerfile tries both.
-   - **Wait loop times out**: CHR didn't boot in time — likely a QEMU/KVM issue on the runner
+   - **Image download fails**: The CHR `.vdi.zip` couldn't be fetched — check if `download.mikrotik.com`
+     and `cdn.mikrotik.com` both serve the version. Workflows try both with primary+fallback.
+   - **Wait loop times out (5 min)**: CHR didn't boot — check `/tmp/qemu.log` in CI output for
+     QEMU errors. Most likely KVM is unavailable or the image is corrupt.
    - **`rosver` output is empty**: The `bun rest2raml.js --version` step's output parsing failed;
      check the `xargs` command in the `connection-check` step
    - **`cp ros-oas2*.json` fails**: `raml2oas.cjs` produces `ros-oas20.json`, not `ros-oas2*.json`
@@ -157,9 +176,9 @@ node raml2oas.cjs ros-rest-all.raml
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels, dispatches builds for new versions |
-| `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Builds base schema, commits to `/docs/{version}/` |
-| `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Builds extra schema, commits to `/docs/{version}/extra/` |
-| `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no Docker) |
+| `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
+| `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
+| `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
@@ -173,7 +192,7 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 - `webapi-parser` is installed twice in some workflows (once for validate, once for convert)
   — harmless but redundant
 - The `manual-from-secrets.yaml` workflow uses `ros-rest-generated.html` not `index.html`
-  and doesn't produce `oas2.json`, so it's not fully consistent with the Docker workflows
+  and doesn't produce `oas2.json`, so it's not fully consistent with the QEMU-based workflows
 
 ---
 
@@ -195,4 +214,4 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `raml2html` | CI workflows | Generate HTML from RAML |
 | `raml2html-slate-theme` | CI workflows | Slate theme for raml2html |
 | `webapi-parser` | `validraml.cjs`, `raml2oas.cjs` | RAML validation and OAS conversion |
-| `evilfreelancer/docker-routeros` | `Dockerfile.chr-qemu` | QEMU entrypoint script for RouterOS CHR |
+| `qemu-system-x86_64` | CI workflows (apt), `Dockerfile.chr-qemu` | Runs RouterOS CHR VM |
