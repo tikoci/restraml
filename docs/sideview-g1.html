@@ -404,11 +404,6 @@
             compare2.appendChild(new Option(file.name, file.name))
         })
 
-        // Helper function to escape HTML for safe insertion
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-        }
-
         // actual version diff
         document.addEventListener("vercompare", e => {
             async function onVerCompare() {
@@ -432,8 +427,16 @@
 
                 const diff = Diff.diffLines(oldJsonStr, newJsonStr);
 
-                let leftHtml = '';
-                let rightHtml = '';
+                const leftFrag = document.createDocumentFragment();
+                const rightFrag = document.createDocumentFragment();
+
+                function appendDiffLine(frag, className, prefix, text) {
+                    const span = document.createElement('span');
+                    span.className = className;
+                    span.textContent = prefix + text;
+                    frag.appendChild(span);
+                    frag.appendChild(document.createTextNode('\n'));
+                }
 
                 diff.forEach(part => {
                     // Split by newline, filter out empty strings if they are not actual lines
@@ -444,26 +447,24 @@
                     }
 
                     lines.forEach(line => {
-                        const escapedLine = escapeHtml(line);
-
                         if (part.added) {
                             // Added: line on the right, empty space on the left
-                            leftHtml += `<span class="diff-line-empty"></span>\n`;
-                            rightHtml += `<span class="diff-line-added">+ ${escapedLine}</span>\n`;
+                            appendDiffLine(leftFrag, 'diff-line-empty', '', '');
+                            appendDiffLine(rightFrag, 'diff-line-added', '+ ', line);
                         } else if (part.removed) {
                             // Removed: line on the left, empty space on the right
-                            leftHtml += `<span class="diff-line-removed">- ${escapedLine}</span>\n`;
-                            rightHtml += `<span class="diff-line-empty"></span>\n`;
+                            appendDiffLine(leftFrag, 'diff-line-removed', '- ', line);
+                            appendDiffLine(rightFrag, 'diff-line-empty', '', '');
                         } else {
                             // Common: line on both sides
-                            leftHtml += `<span class="diff-line-common">  ${escapedLine}</span>\n`;
-                            rightHtml += `<span class="diff-line-common">  ${escapedLine}</span>\n`;
+                            appendDiffLine(leftFrag, 'diff-line-common', '  ', line);
+                            appendDiffLine(rightFrag, 'diff-line-common', '  ', line);
                         }
                     });
                 });
 
-                diffcodeLeft.innerHTML = leftHtml;
-                diffcodeRight.innerHTML = rightHtml;
+                diffcodeLeft.replaceChildren(leftFrag);
+                diffcodeRight.replaceChildren(rightFrag);
 
                 // Make sure to remove existing highlighting and apply new
                 diffcodeLeft.removeAttribute('data-highlighted');
