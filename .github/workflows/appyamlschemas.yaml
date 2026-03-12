@@ -1,0 +1,278 @@
+name: appyamlschemas — Validate and Publish /app YAML Schemas
+
+# Validates RouterOS /app YAML schemas and all built-in /app entries against them.
+# Generates per-version schema files under docs/<version>/ and commits to main.
+#
+# Triggered manually (with rosver input) or automatically via auto.yaml on new versions.
+# Boots RouterOS CHR with extra packages (container/app feature requires them).
+#
+# Two-part validation:
+#   Part 1: JSON Schema meta-validation (schemas must be valid per json-schema.org)
+#   Part 2: Live validation of all ~80 built-in /app YAMLs from CHR against the schema
+#           If any fail, a GitHub issue is filed listing failing app names.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rosver:
+        description: 'RouterOS Version (e.g. 7.22, 7.22rc2, 7.22beta4)'
+        required: true
+        default: "7.22"
+
+permissions: write-all
+
+jobs:
+  validate-app-yaml-schemas:
+    runs-on: ubuntu-latest
+
+    env:
+      URLBASE: http://localhost:9180/rest
+      BASICAUTH: "admin:"
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure git for automated commits
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+    - name: Install QEMU
+      # qemu-system-x86 provides qemu-system-x86_64; qemu-utils provides qemu-img for disk conversion
+      run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86 qemu-utils
+
+    - name: Enable KVM
+      # GitHub hosted ubuntu-latest runners support KVM; this step makes /dev/kvm accessible.
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        ls -la /dev/kvm
+
+    - name: Download RouterOS CHR image
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        echo "Downloading RouterOS $ROUTEROS_VERSION CHR image..."
+        # Try download.mikrotik.com first (stable releases), fall back to cdn.mikrotik.com (beta/rc)
+        wget -q "https://download.mikrotik.com/routeros/${ROUTEROS_VERSION}/chr-${ROUTEROS_VERSION}.vdi.zip" \
+            -O "chr-${ROUTEROS_VERSION}.vdi.zip" \
+        || (rm -f "chr-${ROUTEROS_VERSION}.vdi.zip" && \
+            wget -q "https://cdn.mikrotik.com/routeros/${ROUTEROS_VERSION}/chr-${ROUTEROS_VERSION}.vdi.zip" \
+                -O "chr-${ROUTEROS_VERSION}.vdi.zip")
+        unzip -q "chr-${ROUTEROS_VERSION}.vdi.zip"
+        rm -f "chr-${ROUTEROS_VERSION}.vdi.zip"
+        ls -lh chr-*.vdi
+
+    - name: Convert CHR image to qcow2 for virtio disk
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        qemu-img convert -f vdi -O qcow2 \
+            "chr-${ROUTEROS_VERSION}.vdi" \
+            "chr-${ROUTEROS_VERSION}.qcow2"
+        rm -f "chr-${ROUTEROS_VERSION}.vdi"
+        ls -lh chr-*.qcow2
+
+    - name: Start RouterOS CHR in QEMU
+      # host:9180 → VM:80 (REST API), host:9122 → VM:22 (SSH for extra-packages SCP)
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        KVM_OPTS=""
+        if [ -e /dev/kvm ]; then
+          KVM_OPTS="-enable-kvm -cpu host"
+          echo "KVM available — using hardware acceleration."
+        else
+          echo "::warning::KVM not found — QEMU will run in software emulation mode (slow)."
+        fi
+        nohup qemu-system-x86_64 \
+            ${KVM_OPTS} \
+            -m 256 \
+            -nographic \
+            -drive file=chr-${ROUTEROS_VERSION}.qcow2,format=qcow2,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            &>/tmp/qemu.log &
+        QEMU_PID=$!
+        echo "QEMU started with PID: $QEMU_PID"
+        echo "$QEMU_PID" > /tmp/qemu.pid
+
+    - name: Wait for RouterOS REST API to become available
+      run: |
+        echo "Waiting for RouterOS HTTP server to start (up to 5 min)..."
+        for i in {1..30}; do
+          if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+            echo "RouterOS REST API is up after $i attempt(s)."
+            exit 0
+          fi
+          echo "Attempt $i/30: not ready yet, retrying in 10 seconds..."
+          sleep 10
+        done
+        echo "::error::RouterOS did not start within 5 minutes. QEMU log:"
+        cat /tmp/qemu.log
+        exit 1
+
+    - name: Verify REST API is responding
+      run: curl -sS --fail http://admin@localhost:9180/rest/ip/address | jq .
+
+    - name: Download and install extra packages into CHR
+      # Extra packages include container/app feature required for /app validation
+      run: |
+        mkdir extra
+        cd extra
+        # Try download.mikrotik.com first (stable), fall back to cdn.mikrotik.com (beta/rc)
+        wget -q "https://download.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip" \
+        || wget -q "https://cdn.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip"
+        unzip -q all_packages*.zip
+        rm all_packages*.zip
+        cd ..
+        scp -o 'StrictHostKeyChecking no' -P 9122 extra/* admin@localhost:/
+
+    - name: Reboot CHR to activate extra packages
+      run: |
+        if curl -sS --fail -X POST "http://admin@localhost:9180/rest/system/reboot" \
+            --header "Content-Type: application/json"; then
+          echo "Reboot initiated via REST API"
+        else
+          echo "REST API reboot failed, trying SSH..."
+          ssh -o 'StrictHostKeyChecking no' -p 9122 admin@localhost /system/reboot || true
+        fi
+
+    - name: Setup Bun Runtime
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 'latest'
+
+    - name: Wait for RouterOS to come back up after extra-packages reboot
+      run: |
+        echo "Waiting for RouterOS to restart with extra packages (up to 5 min)..."
+        for i in {1..30}; do
+          if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+            echo "RouterOS REST API is back up after $i attempt(s)."
+            exit 0
+          fi
+          echo "Attempt $i/30: not ready yet, retrying in 10 seconds..."
+          sleep 10
+        done
+        echo "::error::RouterOS did not restart within 5 minutes after extra-packages reboot. QEMU log:"
+        cat /tmp/qemu.log
+        exit 1
+
+    - name: List installed RouterOS packages (including extras)
+      run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
+
+    - name: Get RouterOS version from device
+      id: connection-check
+      run: |
+        BUNROSVER=$(bun rest2raml.js --version)
+        echo "Detected RouterOS version: $BUNROSVER"
+        echo "rosver=$BUNROSVER" | xargs >> "$GITHUB_OUTPUT"
+
+    - name: Install validation dependencies
+      run: bun install js-yaml ajv ajv-formats
+
+    - name: Run /app YAML schema validation
+      # appyamlvalidate.js:
+      #   Part 1 — validates JSON schemas against json-schema.org meta-schema
+      #   Part 2 — fetches all built-in /app YAMLs from CHR and validates each against the schema
+      # Exit code 0: all passed; 1: schema meta-validation failed; 2: /app YAML validation failed
+      id: validate
+      run: |
+        ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        bun appyamlvalidate.js "$ROSVER"
+      continue-on-error: true
+
+    - name: Create GitHub issue if /app YAML validation failed
+      # Only triggered when exit code 2 (/app YAML validation failures found).
+      # Lists each failing built-in app so developers know which apps expose schema gaps.
+      if: steps.validate.outcome == 'failure'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs')
+          const rosver = '${{ steps.connection-check.outputs.rosver }}'
+          let failureDetails = '(no details file found)'
+          try {
+            failureDetails = fs.readFileSync('/tmp/app-yaml-failures.txt', 'utf8')
+          } catch (e) {}
+
+          const body = [
+            `## RouterOS ${rosver} /app YAML Schema Validation Failures`,
+            '',
+            `RouterOS **${rosver}** built-in \`/app\` YAML entries failed validation against ` +
+            `\`docs/${rosver}/routeros-app-yaml-schema.json\`.`,
+            '',
+            'This typically means MikroTik has introduced new YAML syntax not yet covered by the schema.',
+            'The schema should be updated to allow the new syntax and re-validated.',
+            '',
+            '### Failing /app entries',
+            '',
+            failureDetails,
+            '',
+            `### Workflow run`,
+            `[View run logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+          ].join('\n')
+
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `RouterOS ${rosver}: /app YAML schema validation failures`,
+            body,
+            labels: ['bug', 'app-yaml-schema'],
+          })
+          console.log('Created GitHub issue for validation failures')
+
+    - name: Fail build if /app YAML validation failed
+      if: steps.validate.outcome == 'failure'
+      run: |
+        echo "::error::/app YAML schema validation failed — see GitHub issue created above for details"
+        exit 1
+
+    - name: Publish per-version /app YAML schemas to /docs
+      run: |
+        ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        echo "Per-version schemas written to docs/${ROSVER}/ by appyamlvalidate.js"
+        ls -lh "docs/${ROSVER}/routeros-app-yaml-schema.json" \
+                "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+
+    - name: Commit and push per-version /app YAML schemas to repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        git add "docs/${ROSVER}/routeros-app-yaml-schema.json" \
+                "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+        if git diff --cached --quiet; then
+          echo "No schema changes to commit — already up to date"
+        else
+          git commit -m "Publish ${ROSVER} /app YAML schemas [${{ github.workflow }}]"
+          # Retry push with pull --rebase to handle concurrent build conflicts.
+          for attempt in {1..5}; do
+            if git push origin main; then
+              break
+            elif [ $attempt -eq 5 ]; then
+              echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
+              exit 1
+            fi
+            echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
+            git pull --rebase
+            sleep $((RANDOM % 10 + 5))
+          done
+        fi
+
+    - name: Save validation artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: app-yaml-schema-results-${{ github.event.inputs.rosver }}
+        path: |
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-schema.json
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-store-schema.json
+
+    - name: Cleanup QEMU
+      if: always()
+      run: |
+        if [ -f /tmp/qemu.pid ]; then
+          kill "$(cat /tmp/qemu.pid)" || true
+          echo "QEMU process terminated."
+        fi
