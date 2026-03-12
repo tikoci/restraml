@@ -32,6 +32,7 @@ restraml/
 │   └── entrypoint.sh     # QEMU launcher used by Dockerfile.chr-qemu (user-mode networking)
 ├── .env                  # Local dev env vars (URLBASE, BASICAUTH) — not committed secrets
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
+│   ├── index.html        # Main SPA: version list, diff tool, download links
 │   ├── {version}/
 │   │   ├── schema.raml   # RAML 1.0 schema (presence = "this version is built")
 │   │   ├── inspect.json  # Raw /console/inspect output from RouterOS
@@ -39,11 +40,14 @@ restraml/
 │   │   └── docs/
 │   │       └── index.html  # Generated HTML documentation
 │   └── {version}/extra/  # Same files, but built with all_packages (extra features)
+├── CLAUDE.md             # Full architecture guide for AI agents
+├── AGENTS.md             # GitHub Copilot agent-specific instructions
 └── .github/
     └── workflows/
         ├── auto.yaml                            # Daily cron: detect new versions, trigger builds
         ├── manual-using-docker-in-docker.yaml   # Build: base RouterOS schema
-        └── manual-using-extra-docker-in-docker.yaml  # Build: schema with extra packages
+        ├── manual-using-extra-docker-in-docker.yaml  # Build: schema with extra packages
+        └── manual-from-secrets.yaml             # Build: using a real RouterOS device (secrets)
 ```
 
 ---
@@ -124,9 +128,128 @@ docs/{rosver}/docs/index.html
 docs/{rosver}/extra/{schema.raml,...}   # extra-packages build only
 ```
 
+### Concurrent Build Push — Retry Pattern
+Multiple workflows (base + extra, multiple RouterOS versions) can run at the same time. All push
+to `main`, so a simple `git push` will fail if another job committed first. The fix used in all
+build workflows is to **commit first, then retry the push with `git pull --rebase`** on rejection:
+
+```bash
+git add docs/${ROSVER}/
+git commit -m "Publish ${ROSVER} ..."
+# Retry up to 5 times with rebase on push rejection
+for attempt in {1..5}; do
+  if git push origin main; then break; fi
+  echo "::warning::Push attempt $attempt/5 failed, rebasing and retrying..."
+  git pull --rebase
+  sleep $((RANDOM % 10 + 5))
+done
+```
+
+This is safe because each build writes to its own `docs/{version}/` directory — there are no
+real file conflicts between concurrent jobs. **Do not revert to a simple `git pull` + `git push`
+pattern.**
+
 ---
 
-## Common Tasks for AI Agents
+## Web Pages in `docs/` — Standards and Conventions
+
+All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable conventions:
+
+### Tech Stack
+- **Pico CSS** (`@picocss/pico@2`) — the only CSS framework, loaded from CDN. No Bootstrap,
+  Tailwind, or other CSS frameworks.
+- **JetBrains Mono** — the primary font for all pages. Use it creatively: monospace weight
+  variation, italic, variable fonts, `letter-spacing`, `font-feature-settings` for ligatures, etc.
+  The font can be used for fun visual effects — the constraint is the font choice, not how it's used.
+- **Semantic HTML** — use proper `<header>`, `<main>`, `<section>`, `<nav>`, `<article>`,
+  `<details>`, `<summary>`, etc. No `<div>` soup.
+- **No web frameworks** — no React, Vue, Angular, Svelte, etc. Vanilla JS only.
+- **No build tools** — no webpack, Vite, npm scripts for the HTML page itself. Single `.html` file.
+- **Client-side SPA** — all logic runs in the browser. There is no backend. GitHub Pages serves
+  static files only. Use the **GitHub REST API** or **GitHub GraphQL API** for dynamic data
+  (version lists, file contents, etc.).
+- **Minimal dependencies** — only add a CDN library if it meaningfully solves a problem (e.g.,
+  `json-diff`, `highlight.js`, `deep-diff`, `jsonpath`). Keep the CDN dependency count low.
+
+### docs/index.html — Architecture Reference
+
+`docs/index.html` is the primary SPA. Key patterns future agents should follow:
+
+- **GitHub API for content**: fetches `https://api.github.com/repos/{owner}/{repo}/contents/docs`
+  to get the list of built versions, then dispatches a custom `builddir` event for each directory.
+  Custom events (`builddir`, `inspectdownload`) decouple data fetching from UI updates.
+- **Early-event queue**: a `_pendingBuildDirs` array queues `builddir` events that fire before
+  `DOMContentLoaded`. Process the queue in `DOMContentLoaded` to avoid missing events.
+- **Pico CSS data-theme**: dark/light mode via `html[data-theme=dark|light|auto]`. The theme
+  switcher cycles through OS default → light → dark using SVG icons inline in JS.
+- **MikroTik logo trick**: two `<img>` tags with `data-theme="dark"` / `data-theme="light"` —
+  CSS rules `[data-theme=dark] img[data-theme=light] { display:none }` etc. swap which logo shows.
+- **Pico CSS font override**: Pico CSS uses CSS custom properties for fonts:
+  ```css
+  :root {
+    --pico-font-family: "JetBrains Mono", ...;
+    --pico-font-family-monospace: "JetBrains Mono", ...;
+  }
+  ```
+- **`inspect.json` is the data source** for diffs and stats. It's the raw RouterOS API tree.
+  Use `jsonpath` for structured queries (`$..*[?(@._type)]._type`). Use `json-diff` + `highlight.js`
+  for side-by-side textual diff. Use `deep-diff` for structured change statistics.
+- **Plausible analytics**: `plausible("Event Name", { props: { key: value } })` for tracking
+  user interactions. Always include event tracking for new interactive features.
+- **`module` shim**: because `json-diff` is ESM-only, the page uses a global `const module = {}`
+  shim before a `<script type="module">` that assigns `module.diffString = diffString`.
+
+### Custom / Derivative Pages (`docs/*.html`)
+
+Beyond `docs/index.html`, agents may be asked (via GitHub Issues) to create additional pages
+in `docs/` offering different views of the schema data. Pattern: `docs/custom-view.html`.
+
+**Rules for custom pages:**
+- Must follow all the web page conventions above (Pico CSS, JetBrains Mono, semantic HTML,
+  client-side only, minimal dependencies).
+- Use the GitHub API/GraphQL for any dynamic data — schemas, version lists, inspect JSON, etc.
+  URLs follow the pattern `https://tikoci.github.io/restraml/{version}/inspect.json` and
+  `https://tikoci.github.io/restraml/{version}/schema.raml`.
+- No server-side code, no backend, no build step.
+- Link back to `docs/index.html` for navigation.
+- Keep JavaScript in the single `.html` file (no separate `.js` files unless there is a very
+  strong reason for separation).
+- Issues requesting custom views will typically describe a desired user-facing feature (e.g.,
+  "show a visual graph of RouterOS commands", "compare two versions side by side"). Interpret
+  the request creatively — the font and aesthetic constraint is intentional.
+
+**Example inspiration** (from GitHub Issues by `fischerdouglas` and others):
+- A visual tree/graph of the RouterOS command hierarchy
+- A filterable/searchable table of commands and arguments
+- A changelog-style page showing what changed between versions
+- A diff page highlighting only added/removed commands between two versions
+
+---
+
+## Agentic AI — GitHub Copilot in GitHub Actions
+
+This repository uses GitHub Copilot coding agents (running Claude Sonnet) triggered from GitHub
+Issues and PRs. The following notes apply to any AI agent working on this repo:
+
+### AGENTS.md
+An `AGENTS.md` file exists at the repo root. It provides instructions specific to Copilot agents:
+- Technology stack and constraints for this repo
+- PR conventions
+- Specific areas where agent work is expected
+
+### Agent Work Patterns
+- **Schema build fixes**: changes to `.github/workflows/*.yaml` to fix or improve the CI pipeline
+- **Custom web views**: creating new `docs/*.html` pages based on GitHub Issue requests
+- **CLAUDE.md / AGENTS.md updates**: keep these files current with any architectural changes
+
+### GitHub Actions + Agent Interaction
+- Agents commit to a branch and open PRs; the human reviews and merges.
+- Build workflows are triggered by `auto.yaml` (daily cron) or `workflow_dispatch`.
+- Agents must not break existing build workflows. Always validate YAML syntax before committing.
+- The `GITHUB_TOKEN` available in Actions has write access to push to `main`; agents must not
+  hardcode or leak this token.
+
+---
 
 ### "A new RouterOS version was released, build it"
 The `auto.yaml` workflow runs daily and handles this automatically. If you need to trigger it
