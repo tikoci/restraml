@@ -1,42 +1,37 @@
 FROM alpine:3.21.3
 
-### Adapted from https://github.com/EvilFreelancer/docker-routeros/blob/master/Dockerfile 
-### Added support to get RouterOS version at build time as ARG 
+# Runs RouterOS CHR in QEMU using simple user-mode networking (no tap/bridge needed).
+# Build with: docker build --build-arg ARG_ROUTEROS_VERSION=7.22 -t chr-qemu -f Dockerfile.chr-qemu .
+# Run with:   docker run --rm -d --device /dev/kvm -p 9180:80 -p 9122:22 chr-qemu
 
 # Get RouterOS as argument for build
 ARG ARG_ROUTEROS_VERSION="7.14.3"
 
-# Expose Ports of RouterOS
-EXPOSE 1194 1701 1723 1812/udp 1813/udp 21 22 23 443 4500/udp 50 500/udp 51 2021 2022 2023 2027 5900 80 8080 8291 8728 8729 8900
+# Expose RouterOS ports (Docker -p maps these to host ports)
+EXPOSE 80 22 23 443 8728 8729 8291 5900 1194 1701 1723 1812/udp 1813/udp 4500/udp 500/udp 21 8080 8900
 
-# Change work dir (will create is not exist)
+# Change work dir (will create if not exist)
 WORKDIR /routeros
 
-RUN mkdir -p  /routeros_source
+# Install only what we need: QEMU, unzip, bash
+RUN apk add --no-cache qemu-system-x86_64 unzip bash
 
-# Install dependencies
-RUN set -xe \
-    && apk add --no-cache --update \
-    netcat-openbsd qemu-x86_64 qemu-system-x86_64 \
-    busybox-extras iproute2 iputils \
-    bridge-utils iptables jq bash python3
-
-# Environments which may be change
+# Environments which may be changed
 ENV ROUTEROS_VERSION="${ARG_ROUTEROS_VERSION}"
-ENV ROUTEROS_IMAGE="chr-${ROUTEROS_VERSION}.vdi"
+ENV ROUTEROS_IMAGE="chr-${ARG_ROUTEROS_VERSION}.vdi"
 
-# Download VDI image - try download.mikrotik.com first (used for stable releases like "7.22"),
-# then fall back to cdn.mikrotik.com (used for beta/rc/testing like "7.22rc2" or "7.22beta4").
+# Download VDI image - try download.mikrotik.com first (stable releases like "7.22"),
+# then fall back to cdn.mikrotik.com (beta/rc/testing like "7.22rc2" or "7.22beta4").
 # Versions without qualifiers (e.g. "7.22") are only on download.mikrotik.com.
-RUN wget --quiet "https://download.mikrotik.com/routeros/${ROUTEROS_VERSION}/${ROUTEROS_IMAGE}.zip" \
-        -O "/routeros_source/${ROUTEROS_IMAGE}.zip" \
-    || (rm -f "/routeros_source/${ROUTEROS_IMAGE}.zip" && \
-        wget --quiet "https://cdn.mikrotik.com/routeros/${ROUTEROS_VERSION}/${ROUTEROS_IMAGE}.zip" \
-            -O "/routeros_source/${ROUTEROS_IMAGE}.zip")
-RUN unzip -q "/routeros_source/${ROUTEROS_IMAGE}.zip" -d "/routeros_source" && \
-    rm -f "/routeros_source/${ROUTEROS_IMAGE}.zip"
+RUN wget -q "https://download.mikrotik.com/routeros/${ROUTEROS_VERSION}/${ROUTEROS_IMAGE}.zip" \
+        -O "${ROUTEROS_IMAGE}.zip" \
+    || (rm -f "${ROUTEROS_IMAGE}.zip" && \
+        wget -q "https://cdn.mikrotik.com/routeros/${ROUTEROS_VERSION}/${ROUTEROS_IMAGE}.zip" \
+            -O "${ROUTEROS_IMAGE}.zip")
+RUN unzip -q "${ROUTEROS_IMAGE}.zip" && rm -f "${ROUTEROS_IMAGE}.zip"
 
-# Copy script to routeros folder
-COPY --from=evilfreelancer/docker-routeros /routeros_source /routeros_source
+# Copy entrypoint script from this repo (no external Docker image dependency)
+COPY scripts/entrypoint.sh /routeros/entrypoint.sh
+RUN chmod +x /routeros/entrypoint.sh
 
-ENTRYPOINT ["/routeros_source/entrypoint.sh"]
+ENTRYPOINT ["/routeros/entrypoint.sh"]
