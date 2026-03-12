@@ -34,7 +34,30 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 ### Schema Generation
 - `rest2raml.js` runs under **Bun** (not Node.js). Uses `Bun.argv` for CLI args.
 - `raml2oas.cjs` and `validraml.cjs` run under **Node.js 18**.
+- `appyamlvalidate.js` runs under **Bun**. Validates /app YAML schemas and live /app entries.
 - `URLBASE` and `BASICAUTH` env vars configure the RouterOS REST API connection.
+
+### /app YAML Schema Files (`docs/`)
+RouterOS 7.22+ includes `/app` — a `docker-compose`-lite YAML format for custom container apps.
+The schema files in `docs/` validate this format:
+
+- **`routeros-app-yaml-schema.latest.json`** — stable public URL, linked externally. **Do not rename.**
+- **`routeros-app-yaml-schema.dev.json`** — dev/testing version. **Do not rename.**
+- **`routeros-app-yaml-store-schema.latest.json`** — schema for `app-store-urls=` arrays. **Do not rename.**
+- **`{version}/routeros-app-yaml-schema.json`** — per-version schema (version-specific `$id`)
+- **`{version}/routeros-app-yaml-store-schema.json`** — per-version store schema
+
+Per-version schemas reference each other (store → single) using version-specific `$id` URLs.
+The `appyamlschemas.yaml` workflow generates and validates them using `appyamlvalidate.js`.
+
+**VSCode / Editor notes:**
+- The schemas work with the [RedHat YAML VSCode extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
+- Strict `pattern` regex in the schema prevents VSCode autocompletion. A future "loose" version
+  without regex patterns may be created for better editor UX (DX-friendly vs. validation-strict).
+- The schemas may be submitted to [SchemaStore](https://www.schemastore.org) — which auto-applies
+  schemas to matching filenames in editors like VSCode. Ensure `$id`, `$schema`, and `title` are
+  correct before submitting.
+- More detail on the /app YAML format: https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036/22
 
 ### Web Pages (`docs/`)
 All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
@@ -64,6 +87,14 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 4. Link back to `docs/index.html` for navigation.
 5. Keep all JS in the single HTML file.
 
+### Update /app YAML schema
+1. Edit `docs/routeros-app-yaml-schema.latest.json` for the single /app schema.
+2. Edit `docs/routeros-app-yaml-store-schema.latest.json` for the store schema.
+3. Run `bun install js-yaml ajv ajv-formats` then `bun appyamlvalidate.js <version>` to validate.
+4. If testing against a live router: `URLBASE=http://<ip>/rest BASICAUTH=admin: bun appyamlvalidate.js <version>`
+5. Per-version files (`docs/{version}/routeros-app-yaml-schema.json`) are regenerated automatically
+   by the `appyamlschemas.yaml` workflow when schemas change.
+
 ### Update schema generation
 1. Edit `rest2raml.js` — runs under Bun, not Node.js.
 2. Test locally: `URLBASE=http://192.168.88.1/rest BASICAUTH=admin: bun rest2raml.js`
@@ -91,12 +122,17 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `rest2raml.js` | Main schema generator (Bun runtime) |
 | `raml2oas.cjs` | RAML → OAS 2.0 converter (Node.js) |
 | `validraml.cjs` | RAML 1.0 validator (Node.js) |
+| `appyamlvalidate.js` | /app YAML schema validator and per-version schema generator (Bun) |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
 | `scripts/entrypoint.sh` | QEMU launcher for local Docker use |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
+| `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |
+| `docs/routeros-app-yaml-schema.dev.json` | /app YAML schema — dev/testing, do not rename |
+| `docs/routeros-app-yaml-store-schema.latest.json` | /app store schema — do not rename |
 | `.github/workflows/auto.yaml` | Daily cron: detect new RouterOS versions, trigger builds |
 | `.github/workflows/manual-using-docker-in-docker.yaml` | Build: base RouterOS schema |
 | `.github/workflows/manual-using-extra-docker-in-docker.yaml` | Build: schema + extra packages |
+| `.github/workflows/appyamlschemas.yaml` | Build: validate and publish /app YAML schemas per-version |
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `CLAUDE.md` | Full architecture guide for AI agents |
 | `AGENTS.md` | This file — Copilot agent-specific instructions |

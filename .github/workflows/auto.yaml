@@ -25,6 +25,7 @@ jobs:
     name: Check for New RouterOS Versions
     outputs:
       versions: ${{ steps.needs-builds.outputs.versions }}
+      app_schema_versions: ${{ steps.needs-builds.outputs.app_schema_versions }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -77,6 +78,7 @@ jobs:
         # If the schema file is missing, that version needs to be built.
         # Deduplication is applied so the same version reported by multiple channels
         # (e.g. stable == testing) only triggers one build.
+        # Also checks for docs/{version}/routeros-app-yaml-schema.json for app YAML schema builds.
         id: needs-builds
         env:
           STABLE: ${{ steps.get-stable.outputs.version }}
@@ -85,6 +87,7 @@ jobs:
           LONGTERM: ${{ steps.get-longterm.outputs.version }}
         run: |
           VERSIONS=()
+          APP_SCHEMA_VERSIONS=()
           for VER in "$STABLE" "$TESTING" "$DEVELOPMENT" "$LONGTERM"; do
             [ -z "$VER" ] && continue
             # Skip duplicates — multiple channels may report the same version
@@ -97,8 +100,14 @@ jobs:
             else
               echo "docs/${VER}/schema.raml exists — skipping $VER"
             fi
+            if [ ! -f "docs/${VER}/routeros-app-yaml-schema.json" ]; then
+              echo "docs/${VER}/routeros-app-yaml-schema.json not found — adding $VER to app-schema build list"
+              APP_SCHEMA_VERSIONS+=("$VER")
+            else
+              echo "docs/${VER}/routeros-app-yaml-schema.json exists — skipping $VER for app schema"
+            fi
           done
-          # Use jq to produce a properly-formatted JSON array
+          # Use jq to produce properly-formatted JSON arrays
           if [ ${#VERSIONS[@]} -eq 0 ]; then
             JSON_ARRAY="[]"
           else
@@ -106,6 +115,13 @@ jobs:
           fi
           echo "versions=${JSON_ARRAY}" >> $GITHUB_OUTPUT
           echo "Versions needing build: ${JSON_ARRAY}"
+          if [ ${#APP_SCHEMA_VERSIONS[@]} -eq 0 ]; then
+            APP_JSON_ARRAY="[]"
+          else
+            APP_JSON_ARRAY=$(printf '%s\n' "${APP_SCHEMA_VERSIONS[@]}" | jq -R . | jq -sc .)
+          fi
+          echo "app_schema_versions=${APP_JSON_ARRAY}" >> $GITHUB_OUTPUT
+          echo "Versions needing /app YAML schema build: ${APP_JSON_ARRAY}"
 
       - name: Summary
         run: |
@@ -166,6 +182,37 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'manual-using-extra-docker-in-docker.yaml',
+              ref: 'main',
+              inputs: {
+                rosver: '${{ matrix.version }}'
+              }
+            })
+            console.log('Dispatched successfully')
+
+  build-app-yaml-schemas:
+    needs: [check]
+    runs-on: ubuntu-latest
+    # Runs for all versions missing docs/{version}/routeros-app-yaml-schema.json.
+    # Runs independently of build-extra-docker — the appyamlschemas workflow boots its own CHR.
+    if: |
+      needs.check.result == 'success' &&
+      fromJSON(needs.check.outputs.app_schema_versions)[0] != null
+    strategy:
+      matrix:
+        version: ${{ fromJSON(needs.check.outputs.app_schema_versions) }}
+      max-parallel: 1
+    name: Trigger /app YAML schema build for ${{ matrix.version }}
+    steps:
+      - name: Dispatch appyamlschemas for ${{ matrix.version }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log(`Triggering /app YAML schema build for RouterOS ${{ matrix.version }}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'appyamlschemas.yaml',
               ref: 'main',
               inputs: {
                 rosver: '${{ matrix.version }}'
