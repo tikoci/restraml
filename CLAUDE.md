@@ -86,17 +86,27 @@ failed when only CDN was tried. **Do not change this order.**
 CI workflows run RouterOS CHR **directly in QEMU on the ubuntu-latest runner** (no Docker-in-Docker,
 no docker-compose). The key steps are:
 
-1. Install `qemu-system-x86_64` via apt
+1. Install `qemu-system-x86` and `qemu-utils` via apt
+   - **Note**: The Ubuntu package is `qemu-system-x86` (not `qemu-system-x86_64` — that's the binary name, not the apt package)
 2. Enable KVM via udev rules (`/dev/kvm` is available on GitHub hosted runners)
 3. Download the CHR `.vdi` image (primary: `download.mikrotik.com`, fallback: `cdn.mikrotik.com`)
-4. Launch QEMU in background with user-mode networking and port forwarding:
+4. Convert `.vdi` to `.qcow2` using `qemu-img convert -f vdi -O qcow2` (native QEMU format)
+5. Launch QEMU in background with user-mode networking and port forwarding:
    - host:9180 → VM:80 (RouterOS REST API)
    - host:9122 → VM:22 (RouterOS SSH, used for SCP in extra-packages workflow)
-5. Wait up to **5 minutes** (30 × 10s) for the API to respond — fail fast if not up in time
-6. Cleanup: `kill` the QEMU PID stored in `/tmp/qemu.pid`
+   - Disk: `-drive file=chr.qcow2,format=qcow2,if=virtio` (virtio recommended by MikroTik for CHR)
+   - Network: `-netdev user,id=net0,... -device virtio-net-pci,netdev=net0` (virtio NIC)
+6. Wait up to **5 minutes** (30 × 10s) for the API to respond — fail fast if not up in time
+7. Cleanup: `kill` the QEMU PID stored in `/tmp/qemu.pid`
 
 **KVM is critical for performance** — without it CHR boots very slowly in software emulation.
 If the wait loop times out, check `/tmp/qemu.log` in the artifact or CI logs for QEMU errors.
+
+**QEMU settings for CHR (MikroTik recommended):**
+- Disk: virtio (`if=virtio`) — confirmed to work on amd64/intel
+- Network: virtio-net-pci — use `-netdev user,id=net0,... -device virtio-net-pci,netdev=net0`
+- Memory: 256 MB is sufficient for schema generation
+- Do NOT use `-nic` shorthand (less control); use `-netdev`+`-device` instead for explicit virtio
 
 `Dockerfile.chr-qemu` + `scripts/entrypoint.sh` are provided for **local development use only**
 (not used in CI). They use the same user-mode networking approach. To run locally:
@@ -128,6 +138,8 @@ manually, dispatch `auto.yaml` via `workflow_dispatch` with no inputs. Alternati
 2. Common failures:
    - **Image download fails**: The CHR `.vdi.zip` couldn't be fetched — check if `download.mikrotik.com`
      and `cdn.mikrotik.com` both serve the version. Workflows try both with primary+fallback.
+   - **`qemu-system-x86` install fails**: On Ubuntu, the apt package is `qemu-system-x86` (not
+     `qemu-system-x86_64` — that's the binary name). Also install `qemu-utils` for `qemu-img`.
    - **Wait loop times out (5 min)**: CHR didn't boot — check `/tmp/qemu.log` in CI output for
      QEMU errors. Most likely KVM is unavailable or the image is corrupt.
    - **`rosver` output is empty**: The `bun rest2raml.js --version` step's output parsing failed;
@@ -214,4 +226,7 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `raml2html` | CI workflows | Generate HTML from RAML |
 | `raml2html-slate-theme` | CI workflows | Slate theme for raml2html |
 | `webapi-parser` | `validraml.cjs`, `raml2oas.cjs` | RAML validation and OAS conversion |
-| `qemu-system-x86_64` | CI workflows (apt), `Dockerfile.chr-qemu` | Runs RouterOS CHR VM |
+| `qemu-system-x86` | CI workflows (apt) | Runs RouterOS CHR VM (Ubuntu package; provides `qemu-system-x86_64` binary) |
+| `qemu-utils` | CI workflows (apt) | Provides `qemu-img` for VDI→qcow2 disk conversion |
+| `qemu-system-x86_64` | `Dockerfile.chr-qemu` (Alpine apk) | Runs RouterOS CHR VM in local Docker |
+| `qemu-img` | `Dockerfile.chr-qemu` (Alpine apk) | Provides `qemu-img` for VDI→qcow2 conversion |
