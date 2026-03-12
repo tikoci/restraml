@@ -165,10 +165,24 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git pull
         git add docs/${{ steps.connection-check.outputs.rosver }}/
         git commit -m "Publish ${{ steps.connection-check.outputs.rosver }} ${{ steps.publish-to-docs.outputs.subpath }} [${{ github.workflow }}]"
-        git push origin main
+        # Retry push with pull --rebase to handle concurrent build conflicts.
+        # Multiple builds (base + extra, multiple versions) can run simultaneously and all
+        # push to main. If another job commits first the push is rejected; rebasing our commit
+        # on top of the new remote state is safe because each build writes to its own
+        # docs/{version}/ directory — there are no real file conflicts to resolve.
+        for attempt in {1..5}; do
+          if git push origin main; then
+            break
+          elif [ $attempt -eq 5 ]; then
+            echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
+            exit 1
+          fi
+          echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
+          git pull --rebase
+          sleep $((RANDOM % 10 + 5))
+        done
 
     - name: Save build artifacts
       uses: actions/upload-artifact@v4
