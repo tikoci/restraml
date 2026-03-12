@@ -100,7 +100,8 @@
               "description": "Port mappings",
               "items": {
                 "type": "string",
-                "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:)?\\d+:\\d+(\\/tcp|\\/udp)?(:[a-zA-Z0-9_-]+)?$"
+                "$comment": "Format: [ip-or-placeholder:]host-port:container-port[/tcp|/udp][:label]. RouterOS placeholders like [accessIP], [accessPort] are allowed in the host binding and port positions.",
+                "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[a-zA-Z0-9_-]+)?$"
               }
             },
             "environment": {

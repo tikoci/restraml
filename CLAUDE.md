@@ -41,6 +41,7 @@ restraml/
 │   │   ├── schema.raml                          # RAML 1.0 schema (presence = "this version is built")
 │   │   ├── inspect.json                         # Raw /console/inspect output from RouterOS
 │   │   ├── oas2.json                            # OpenAPI 2.0 schema
+│   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
 │   │   ├── routeros-app-yaml-store-schema.json  # /app store schema for this version
 │   │   └── docs/

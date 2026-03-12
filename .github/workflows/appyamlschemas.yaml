@@ -235,6 +235,10 @@ jobs:
         echo "Per-version schemas written to docs/${ROSVER}/ by appyamlvalidate.js"
         ls -lh "docs/${ROSVER}/routeros-app-yaml-schema.json" \
                 "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+        if [ -f "docs/${ROSVER}/app.json" ]; then
+          echo "Built-in /app YAML data written to docs/${ROSVER}/app.json"
+          ls -lh "docs/${ROSVER}/app.json"
+        fi
 
     - name: Commit and push per-version /app YAML schemas to repository
       env:
@@ -243,6 +247,10 @@ jobs:
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
         git add "docs/${ROSVER}/routeros-app-yaml-schema.json" \
                 "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+        # Also commit app.json (built-in /app YAMLs from router) if present
+        if [ -f "docs/${ROSVER}/app.json" ]; then
+          git add "docs/${ROSVER}/app.json"
+        fi
         if git diff --cached --quiet; then
           echo "No schema changes to commit — already up to date"
         else
@@ -269,6 +277,7 @@ jobs:
         path: |
           docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-schema.json
           docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-store-schema.json
+          docs/${{ steps.connection-check.outputs.rosver }}/app.json
 
     - name: Cleanup QEMU
       if: always()
