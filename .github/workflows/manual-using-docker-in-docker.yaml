@@ -29,7 +29,8 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
     - name: Install QEMU
-      run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86_64
+      # qemu-system-x86 provides qemu-system-x86_64; qemu-utils provides qemu-img for disk conversion
+      run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86 qemu-utils
 
     - name: Enable KVM
       # GitHub hosted ubuntu-latest runners support KVM; this step makes /dev/kvm accessible.
@@ -54,9 +55,21 @@ jobs:
         rm -f "chr-${ROUTEROS_VERSION}.vdi.zip"
         ls -lh chr-*.vdi
 
+    - name: Convert CHR image to qcow2 for virtio disk
+      # qcow2 is the native QEMU format and works well with virtio drivers supported by CHR.
+      # Converting from VDI here avoids any VirtualBox-format quirks with QEMU.
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        qemu-img convert -f vdi -O qcow2 \
+            "chr-${ROUTEROS_VERSION}.vdi" \
+            "chr-${ROUTEROS_VERSION}.qcow2"
+        rm -f "chr-${ROUTEROS_VERSION}.vdi"
+        ls -lh chr-*.qcow2
+
     - name: Start RouterOS CHR in QEMU
       # Run QEMU directly on the runner using user-mode networking with port forwarding.
       # host:9180 → VM:80 (REST API), host:9122 → VM:22 (SSH)
+      # Uses virtio disk (qcow2) and virtio-net — both supported by MikroTik CHR on x86.
       # KVM is used when available; falls back to software emulation automatically.
       run: |
         ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
@@ -71,8 +84,9 @@ jobs:
             ${KVM_OPTS} \
             -m 256 \
             -nographic \
-            -hda "chr-${ROUTEROS_VERSION}.vdi" \
-            -nic user,model=e1000,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -drive file=chr-${ROUTEROS_VERSION}.qcow2,format=qcow2,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -device virtio-net-pci,netdev=net0 \
             &>/tmp/qemu.log &
         QEMU_PID=$!
         echo "QEMU started with PID: $QEMU_PID"
