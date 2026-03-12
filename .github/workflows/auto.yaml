@@ -3,6 +3,14 @@ name: Auto-Build New RouterOS Versions
 # Runs daily to check for new RouterOS versions and trigger schema builds automatically.
 # Eliminates the need to manually dispatch a workflow for every new RouterOS release.
 # Follows the same pattern as tikoci/mikropkl's auto.yaml workflow.
+#
+# MikroTik publishes the latest version for each channel at:
+#   https://upgrade.mikrotik.com/routeros/NEWESTa7.<channel>
+# where <channel> is one of: stable, testing, development, long-term
+#
+# Stable releases (e.g. "7.22") are hosted on download.mikrotik.com.
+# Beta/rc/testing releases (e.g. "7.22rc2", "7.22beta4") are on cdn.mikrotik.com.
+# The Dockerfile handles both via a primary+fallback wget pattern.
 
 on:
   workflow_dispatch:
@@ -23,6 +31,8 @@ jobs:
 
       - name: Get RouterOS "stable" channel version
         id: get-stable
+        # Stable channel typically has the highest production-ready version.
+        # Fail-fast: stable must always be available.
         run: |
           ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.stable | awk '{print $1}')
           [ -z "$ROSVER" ] && echo "::error::Failed to get stable channel version" && exit 1
@@ -31,24 +41,53 @@ jobs:
 
       - name: Get RouterOS "testing" channel version
         id: get-testing
+        # Testing channel has rc/beta versions being prepared for stable release.
+        # May not always differ from stable; allow failure gracefully.
+        continue-on-error: true
         run: |
           ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.testing | awk '{print $1}')
-          [ -z "$ROSVER" ] && echo "::error::Failed to get testing channel version" && exit 1
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for testing channel, skipping" && exit 0
           echo "version=$ROSVER" >> $GITHUB_OUTPUT
           echo "Testing: $ROSVER"
+
+      - name: Get RouterOS "development" channel version
+        id: get-development
+        # Development channel has the latest bleeding-edge builds (beta/nightly).
+        # May not always return a version; allow failure gracefully.
+        continue-on-error: true
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.development | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for development channel, skipping" && exit 0
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Development: $ROSVER"
+
+      - name: Get RouterOS "long-term" channel version
+        id: get-longterm
+        # Long-term channel provides older, stable releases for conservative deployments.
+        # May not always differ from stable; allow failure gracefully.
+        continue-on-error: true
+        run: |
+          ROSVER=$(curl -sS --max-time 10 --fail https://upgrade.mikrotik.com/routeros/NEWESTa7.long-term | awk '{print $1}')
+          [ -z "$ROSVER" ] && echo "::warning::No version returned for long-term channel, skipping" && exit 0
+          echo "version=$ROSVER" >> $GITHUB_OUTPUT
+          echo "Long-term: $ROSVER"
 
       - name: Determine which versions are missing from /docs
         # Checks if docs/{version}/schema.raml exists for each channel version.
         # If the schema file is missing, that version needs to be built.
+        # Deduplication is applied so the same version reported by multiple channels
+        # (e.g. stable == testing) only triggers one build.
         id: needs-builds
         env:
           STABLE: ${{ steps.get-stable.outputs.version }}
           TESTING: ${{ steps.get-testing.outputs.version }}
+          DEVELOPMENT: ${{ steps.get-development.outputs.version }}
+          LONGTERM: ${{ steps.get-longterm.outputs.version }}
         run: |
           VERSIONS=()
-          for VER in "$STABLE" "$TESTING"; do
+          for VER in "$STABLE" "$TESTING" "$DEVELOPMENT" "$LONGTERM"; do
             [ -z "$VER" ] && continue
-            # Skip duplicates — stable and testing may report the same version
+            # Skip duplicates — multiple channels may report the same version
             ALREADY=false
             for V in "${VERSIONS[@]}"; do [ "$V" = "$VER" ] && ALREADY=true && break; done
             $ALREADY && continue
@@ -70,8 +109,10 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Stable channel:  ${{ steps.get-stable.outputs.version }}"
-          echo "Testing channel: ${{ steps.get-testing.outputs.version }}"
+          echo "Stable channel:      ${{ steps.get-stable.outputs.version }}"
+          echo "Testing channel:     ${{ steps.get-testing.outputs.version }}"
+          echo "Development channel: ${{ steps.get-development.outputs.version }}"
+          echo "Long-term channel:   ${{ steps.get-longterm.outputs.version }}"
           echo "To build: ${{ steps.needs-builds.outputs.versions }}"
 
   build-docker:
@@ -131,3 +172,4 @@ jobs:
               }
             })
             console.log('Dispatched successfully')
+
