@@ -384,49 +384,56 @@
                 diffstatus.hidden = false
                 document.querySelectorAll('[name=inspectstats]').forEach(e => e.hidden = true)
 
-                const useextra = diffextra.checked
-                const [json1, json2] = await Promise.all([
-                    fetchInspect(compare1.value, useextra),
-                    fetchInspect(compare2.value, useextra),
-                ])
+                try {
+                    const useextra = diffextra.checked
+                    const [json1, json2] = await Promise.all([
+                        fetchInspect(compare1.value, useextra),
+                        fetchInspect(compare2.value, useextra),
+                    ])
 
-                const text1 = inspectToRosLines(json1).join('\n') + '\n'
-                const text2 = inspectToRosLines(json2).join('\n') + '\n'
+                    const text1 = inspectToRosLines(json1).join('\n') + '\n'
+                    const text2 = inspectToRosLines(json2).join('\n') + '\n'
 
-                // Generate unified diff patch via jsdiff
-                const patch = Diff.createPatch(
-                    'RouterOS API Schema',
-                    text1,
-                    text2,
-                    compare1.value,
-                    compare2.value
-                )
+                    // Generate unified diff patch via jsdiff
+                    const patch = Diff.createPatch(
+                        'RouterOS API Schema',
+                        text1,
+                        text2,
+                        compare1.value,
+                        compare2.value
+                    )
 
-                renderDiff(patch)
+                    renderDiff(patch)
 
-                // Compute and display command/attribute diff stats
-                function getStatCount(inspectId, statName) {
-                    return parseInt(document.querySelector('#' + inspectId + ' [name=' + statName + ']').textContent, 10) || 0
+                    // Compute and display command/attribute diff stats
+                    function getStatCount(inspectId, statName) {
+                        return parseInt(document.querySelector('#' + inspectId + ' [name=' + statName + ']').textContent, 10) || 0
+                    }
+                    const ncmd1 = getStatCount('inspect1', 'cmd')
+                    const narg1 = getStatCount('inspect1', 'arg')
+                    const ncmd2 = getStatCount('inspect2', 'cmd')
+                    const narg2 = getStatCount('inspect2', 'arg')
+                    const ncmddiff = ncmd2 - ncmd1
+                    const nargdiff = narg2 - narg1
+                    ecmddiff.textContent = (ncmddiff > 0 ? '+' : '') + ncmddiff
+                    eargdiff.textContent = (nargdiff > 0 ? '+' : '') + nargdiff
+                    ecmddiff.style.color = ncmddiff > 0 ? 'green' : (ncmddiff < 0 ? 'red' : '')
+                    eargdiff.style.color = nargdiff > 0 ? 'green' : (nargdiff < 0 ? 'red' : '')
+
+                    diffstatus.hidden = true
+                    diffcodedetails.hidden = false
+
+                    plausible('SideBySideDiff', { props: { left: compare1.value, right: compare2.value } })
+                } catch (error) {
+                    console.error('Failed to compare RouterOS schemas', error)
+                    diffstatus.hidden = false
+                    diffstatus.textContent = 'Error: Failed to compare RouterOS schemas. ' + (error && error.message ? error.message : '')
+                    diffcodedetails.hidden = true
+                } finally {
+                    compare1.disabled = false
+                    compare2.disabled = false
+                    diffextra.disabled = false
                 }
-                const ncmd1 = getStatCount('inspect1', 'cmd')
-                const narg1 = getStatCount('inspect1', 'arg')
-                const ncmd2 = getStatCount('inspect2', 'cmd')
-                const narg2 = getStatCount('inspect2', 'arg')
-                const ncmddiff = ncmd2 - ncmd1
-                const nargdiff = narg2 - narg1
-                ecmddiff.textContent = (ncmddiff > 0 ? '+' : '') + ncmddiff
-                eargdiff.textContent = (nargdiff > 0 ? '+' : '') + nargdiff
-                ecmddiff.style.color = ncmddiff > 0 ? 'green' : (ncmddiff < 0 ? 'red' : '')
-                eargdiff.style.color = nargdiff > 0 ? 'green' : (nargdiff < 0 ? 'red' : '')
-
-                diffstatus.hidden = true
-                diffcodedetails.hidden = false
-
-                compare1.disabled = false
-                compare2.disabled = false
-                diffextra.disabled = false
-
-                plausible('SideBySideDiff', { props: { left: compare1.value, right: compare2.value } })
             })()
         })
 
