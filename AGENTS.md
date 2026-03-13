@@ -64,6 +64,9 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **JetBrains Mono** — required font. Can be used creatively for visual effects.
 - **Semantic HTML** — use proper elements (`<header>`, `<main>`, `<section>`, etc.).
 - **No web frameworks** — no React, Vue, Svelte, etc. Vanilla JavaScript only.
+- **Avoid submit buttons** — use JS event listeners (`input`, `change`, `keydown`) instead of
+  explicit submit/lookup buttons. Debounce text input (~400 ms); fire immediately on `change`
+  events for checkboxes and selects. See `docs/lookup.html` for the canonical example.
 - **Client-side SPA** — no backend, no server-side code. GitHub Pages is static hosting only.
 - **GitHub API/GraphQL** — use for dynamic data (version lists, schema contents, inspect JSON).
 - **Single `.html` file** — keep JS inline unless there is a very strong reason for separation.
@@ -124,6 +127,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
 | `scripts/entrypoint.sh` | QEMU launcher for local Docker use |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
+| `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
 | `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |
 | `docs/routeros-app-yaml-schema.dev.json` | /app YAML schema — dev/testing, do not rename |
 | `docs/routeros-app-yaml-store-schema.latest.json` | /app store schema — do not rename |
