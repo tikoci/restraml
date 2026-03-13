@@ -465,8 +465,14 @@
             if (_inspectCache[key]) {
                 return Promise.resolve(_inspectCache[key])
             }
-            return fetch(pagesUrl + '/' + ver + subdir + '/inspect.json')
-                .then(r => r.json())
+            const url = pagesUrl + '/' + ver + subdir + '/inspect.json'
+            return fetch(url)
+                .then(r => {
+                    if (!r.ok) {
+                        throw new Error('Failed to fetch inspect.json: ' + r.status + ' ' + r.statusText + ' (' + url + ')')
+                    }
+                    return r.json()
+                })
                 .then(data => {
                     _inspectCache[key] = data
                     document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
