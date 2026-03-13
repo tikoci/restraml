@@ -69,9 +69,6 @@
     "services": {
       "type": "object",
       "description": "Container services definition",
-      "propertyNames": {
-        "pattern": "^[a-zA-Z0-9_-]+$"
-      },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -231,9 +228,6 @@
   "volumes": {
     "type": "object",
     "description": "Named volumes definition",
-    "propertyNames": {
-      "pattern": "^[a-zA-Z0-9_-]+$"
-    },
     "additionalProperties": {
       "type": [
         "object",
@@ -244,9 +238,6 @@
   "networks": {
     "type": "object",
     "description": "Networks configuration",
-    "propertyNames": {
-      "pattern": "^[a-zA-Z0-9_-]+$"
-    },
     "additionalProperties": {
       "type": "object",
       "additionalProperties": false,
@@ -263,9 +254,6 @@
   "configs": {
     "type": "object",
     "description": "Config files definition.  Used along with a service's `configs`, which controls placement of the contents.",
-    "propertyNames": {
-      "pattern": "^[a-zA-Z0-9_-]+$"
-    },
     "additionalProperties": {
       "type": "object",
       "additionalProperties": false,

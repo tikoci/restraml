@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "RouterOS /app Store",
-  "description": "Schema for collection of MikroTik RouterOS /app YAML for use with \"app-store-urls\"",
+  "description": "Schema for collection of MikroTik RouterOS /app YAML for use with \"app-store-urls\"\nFor use in editors like VSCode to enable command completion, but less accurate for validation.",
   "type": "array",
   "items": {
     "$ref": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.relaxed.json"
