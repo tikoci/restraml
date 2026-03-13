@@ -2,9 +2,9 @@
 
 > **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, and a command lookup tool for the MikroTik RouterOS REST API. No install needed, runs in your browser.
 >
-> For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — setup details below.
+> For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — [setup details below](#using-the-app-yaml-schema-in-vscode).
 
-Unofficial, auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API.
+Auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API, built automatically by [GitHub Actions](https://github.com/tikoci/restraml/actions) — you can watch the sausage being made.
 
 [![RouterOS diff tool screenshot](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
 
@@ -14,11 +14,11 @@ Pre-built schema files for the RouterOS REST API are available at
 <https://tikoci.github.io/restraml>
 
 > [!TIP]
-> Missing a version? Need a feature? Spot a bug? [Open an issue](https://github.com/tikoci/restraml/issues/new/choose) — builds run automatically for new RouterOS releases, and requests are welcome.
+> Missing a version? Need a feature? Spot a bug? [Open an issue](https://github.com/tikoci/restraml/issues/new/choose) — builds run automatically for new RouterOS releases via [GitHub Actions](https://github.com/tikoci/restraml/actions), and requests are welcome.
 
 Each RouterOS version includes:
 
-* **RAML** — RAML 1.0 schema, usable in Postman, MuleSoft, and other API tools
+* **RAML** — RAML 1.0 schema, usable in [Postman](#usage-with-postman), MuleSoft, and other API tools
 * **HTML** — human-readable API documentation generated from the schema
 * **JSON** — raw `/console/inspect` output from RouterOS, useful for data analysis and diffs
 * **MIB** — link to the official MikroTik MIB for SNMP
@@ -90,13 +90,13 @@ For an **app store** file (array of `/app` definitions, used with `app-store-url
 
 #### Option 2: VSCode settings (automatic for matching filenames)
 
-Add to your `.vscode/settings.json` to apply the schema automatically to files matching a pattern:
+Add to your `.vscode/settings.json` to apply the schema automatically to any file whose name matches the glob pattern. **Files must be named using the configured ending** (e.g. `my-app.tikapp.yaml` for a single `/app` definition, or `my-store.tikappstore.yaml` for a store file):
 
 ```json
 {
   "yaml.schemas": {
-    "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json": "*.routeros-app.yaml",
-    "https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json": "*.routeros-app-store.yaml"
+    "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json": "*.tikapp.yaml",
+    "https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json": "*.tikappstore.yaml"
   }
 }
 ```
@@ -108,7 +108,7 @@ Add to your `.vscode/settings.json` to apply the schema automatically to files m
 
 ## Usage with Postman
 
-The RAML 1.0 schema can be imported into [Postman](https://www.postman.com/) to explore the RouterOS REST API:
+The RAML 1.0 schema can be imported into [Postman](https://www.postman.com/) ([download here](https://www.postman.com/downloads/)) to explore the RouterOS REST API:
 
 1. Copy the URL of the version-specific RAML file from the [Schema Downloads](https://tikoci.github.io/restraml/#section-schema-downloads) table (right-click the **base** or **+extra** link under RAML)
 2. In Postman, go to **File** → **Import** and paste the URL
@@ -142,28 +142,6 @@ restraml/
     ├── manual-using-extra-docker-in-docker.yaml
     ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
     └── manual-from-secrets.yaml
-```
-
----
-
-## Building Locally
-
-### Generating the RAML schema
-
-1. Install [Bun](https://bun.sh/)
-2. Clone this repository
-3. `bun install js-yaml`
-4. Run `rest2raml.js` against a RouterOS device:
-
-   ```sh
-   URLBASE=https://192.168.88.1/rest BASICAUTH=admin:password bun rest2raml.js
-   ```
-
-### Generating HTML documentation
-
-```sh
-bun install raml2html raml2html-slate-theme
-./node_modules/.bin/raml2html --theme raml2html-slate-theme ros-rest*.raml > docs.html
 ```
 
 ---

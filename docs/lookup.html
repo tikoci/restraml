@@ -45,6 +45,12 @@
             :root:not([data-theme=light]) img[data-theme=light] { display: none; }
         }
 
+        /* MikroTik logo sizing */
+        header nav img[data-theme] {
+            height: 2rem;
+            width: auto;
+        }
+
         #results-table td:first-child,
         #results-table th:first-child {
             white-space: nowrap;
@@ -101,7 +107,7 @@
                 </li>
             </ul>
         </nav>
-        <h1><mark>RouterOS</mark> Command Lookup</h1>
+        <h1>RouterOS <mark>Command Lookup</mark></h1>
     </header>
 
     <main class="container">
@@ -113,6 +119,7 @@
                 See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                 for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
             </p>
+            <p><small>⚠️ <em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small></p>
         </section>
 
         <!-- Search Form -->

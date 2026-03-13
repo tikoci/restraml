@@ -117,11 +117,12 @@ in the filename since the parent directory already implies the version.
 
 **VSCode / Editor Integration:**
 The /app YAML schemas work with the [RedHat YAML VSCode extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
-Add to VSCode settings or `.vscode/settings.json`:
+Add to VSCode settings or `.vscode/settings.json`. **Files must be named using the configured ending** (e.g. `my-app.tikapp.yaml` for a single app, `my-store.tikappstore.yaml` for a store):
 ```json
 {
   "yaml.schemas": {
-    "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json": "*.routeros-app.yaml"
+    "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json": "*.tikapp.yaml",
+    "https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json": "*.tikappstore.yaml"
   }
 }
 ```
