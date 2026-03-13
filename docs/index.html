@@ -63,12 +63,15 @@
             color: var(--contrast);
         }
 
-        /* MikroTik logo: swap dark/light based on data-theme */
+        /* MikroTik logo: always left-aligned; default shows light logo only.
+           Dark logo appears only in explicit dark or OS-dark auto mode. */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
         [data-theme=dark] img[data-theme=light] { display: none; }
         [data-theme=light] img[data-theme=dark] { display: none; }
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
             :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
         }
 
         /* Version table link styles */
@@ -100,6 +103,9 @@
             <ul></ul>
             <ul>
                 <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+                <li>
                     <details class="dropdown">
                         <summary>Tools</summary>
                         <ul dir="rtl">
@@ -108,9 +114,6 @@
                             <li><a href="diff.html">Schema Diff</a></li>
                         </ul>
                     </details>
-                </li>
-                <li>
-                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
             </ul>
         </nav>
@@ -197,14 +200,11 @@
             <h3>Schema for <code>/app</code> YAML</h3>
             <article>
                 <p>
+                    Validate RouterOS <code>/app</code> container YAML in editors like VSCode using
                     <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
-                    &mdash; single <code>/app</code> definition
+                    (or the <a href="https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json"><code>app-store-urls=</code> array variant</a>)
+                    — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#routeros-app-yaml-schema">README.md</a> for setup details.
                 </p>
-                <p>
-                    <a href="https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json">routeros-app-yaml-store-schema.latest.json</a>
-                    &mdash; app store format (for <code>app-store-urls=</code>)
-                </p>
-                <small>See <a href="https://github.com/tikoci/restraml/blob/main/README.md#routeros-app-yaml-schema">README.md</a> for VSCode setup and usage details.</small>
             </article>
         </section>
 

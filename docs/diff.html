@@ -44,12 +44,15 @@
             color: var(--contrast);
         }
 
-        /* MikroTik logo: swap dark/light based on data-theme */
+        /* MikroTik logo: always left-aligned; default shows light logo only.
+           Dark logo appears only in explicit dark or OS-dark auto mode. */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
         [data-theme=dark] img[data-theme=light] { display: none; }
         [data-theme=light] img[data-theme=dark] { display: none; }
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
             :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
         }
 
         /* diff2html font overrides */
@@ -86,54 +89,58 @@
             padding-bottom: 1px;
         }
 
-        /* GitHub-style diff colors via CSS custom properties.
-           Dark mode: pure CSS — activated by (a) explicit [data-theme=dark] or (b) auto + OS dark.
-           No JS class toggling needed; works correctly with Pico CSS auto theme. */
-        #diffoutput {
-            --d2h-file-bg: #f6f8fa;  --d2h-file-border: #d0d7de;   --d2h-file-color: #24292f;
-            --d2h-ln-bg:   #f6f8fa;  --d2h-ln-color:    #57606a;
-            --d2h-del-bg:  #ffebe9;  --d2h-del-color:   inherit;    --d2h-del-ln-bg: #ffd7d5; --d2h-del-ln-color: #82071e;
-            --d2h-ins-bg:  #e6ffec;  --d2h-ins-color:   inherit;    --d2h-ins-ln-bg: #ccffd8; --d2h-ins-ln-color: #116329;
-            --d2h-info-bg: #ddf4ff;  --d2h-info-color:  #0550ae;
-            --d2h-empty:   #f6f8fa;
-            --d2h-ins-mark: #acf2bd; --d2h-del-mark: #ffc8c3;
-        }
+        /* Override diff2html's own CSS custom properties for dark mode.
+           diff2html defines --d2h-* variables at :root; overriding them here ensures
+           every element that uses those variables (cells, tags, placeholders, etc.)
+           automatically gets the right dark colors — no element enumeration needed. */
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) #diffoutput {
-                --d2h-file-bg: #161b22;  --d2h-file-border: #30363d; --d2h-file-color: #8b949e;
-                --d2h-ln-bg:   #0d1117;  --d2h-ln-color:    #484f58;
-                --d2h-del-bg:  #3d0e0e;  --d2h-del-color:   #ffa198;  --d2h-del-ln-bg: #58191a; --d2h-del-ln-color: #ff7b72;
-                --d2h-ins-bg:  #0d2a16;  --d2h-ins-color:   #7ee787;  --d2h-ins-ln-bg: #1b4428; --d2h-ins-ln-color: #3fb950;
-                --d2h-info-bg: #0c2d6b;  --d2h-info-color:  #79c0ff;
-                --d2h-empty:   #010409;
-                --d2h-ins-mark: rgba(46,160,67,0.4); --d2h-del-mark: rgba(248,81,73,0.4);
+            :root:not([data-theme=light]) {
+                --d2h-bg-color: #0d1117;              --d2h-border-color: #30363d;
+                --d2h-dim-color: #6e7681;             --d2h-line-border-color: #21262d;
+                --d2h-file-header-bg-color: #161b22;  --d2h-file-header-border-color: #30363d;
+                --d2h-empty-placeholder-bg-color: #010409; --d2h-empty-placeholder-border-color: #30363d;
+                --d2h-del-bg-color: #3d0e0e;          --d2h-del-border-color: #58191a;
+                --d2h-del-highlight-bg-color: rgba(248,81,73,0.4); --d2h-del-label-color: #ff7b72;
+                --d2h-ins-bg-color: #0d2a16;          --d2h-ins-border-color: #1b4428;
+                --d2h-ins-highlight-bg-color: rgba(46,160,67,0.4); --d2h-ins-label-color: #3fb950;
+                --d2h-info-bg-color: #0c2d6b;         --d2h-info-border-color: rgba(56,139,253,0.4);
+                --d2h-change-del-color: rgba(210,153,34,0.2); --d2h-change-ins-color: rgba(46,160,67,0.25);
             }
         }
-        [data-theme=dark] #diffoutput {
-            --d2h-file-bg: #161b22;  --d2h-file-border: #30363d; --d2h-file-color: #8b949e;
-            --d2h-ln-bg:   #0d1117;  --d2h-ln-color:    #484f58;
-            --d2h-del-bg:  #3d0e0e;  --d2h-del-color:   #ffa198;  --d2h-del-ln-bg: #58191a; --d2h-del-ln-color: #ff7b72;
-            --d2h-ins-bg:  #0d2a16;  --d2h-ins-color:   #7ee787;  --d2h-ins-ln-bg: #1b4428; --d2h-ins-ln-color: #3fb950;
-            --d2h-info-bg: #0c2d6b;  --d2h-info-color:  #79c0ff;
-            --d2h-empty:   #010409;
-            --d2h-ins-mark: rgba(46,160,67,0.4); --d2h-del-mark: rgba(248,81,73,0.4);
+        [data-theme=dark] {
+            --d2h-bg-color: #0d1117;              --d2h-border-color: #30363d;
+            --d2h-dim-color: #6e7681;             --d2h-line-border-color: #21262d;
+            --d2h-file-header-bg-color: #161b22;  --d2h-file-header-border-color: #30363d;
+            --d2h-empty-placeholder-bg-color: #010409; --d2h-empty-placeholder-border-color: #30363d;
+            --d2h-del-bg-color: #3d0e0e;          --d2h-del-border-color: #58191a;
+            --d2h-del-highlight-bg-color: rgba(248,81,73,0.4); --d2h-del-label-color: #ff7b72;
+            --d2h-ins-bg-color: #0d2a16;          --d2h-ins-border-color: #1b4428;
+            --d2h-ins-highlight-bg-color: rgba(46,160,67,0.4); --d2h-ins-label-color: #3fb950;
+            --d2h-info-bg-color: #0c2d6b;         --d2h-info-border-color: rgba(56,139,253,0.4);
+            --d2h-change-del-color: rgba(210,153,34,0.2); --d2h-change-ins-color: rgba(46,160,67,0.25);
         }
-        /* Apply variables — rules appear after reset so equal-specificity wins via cascade order */
-        #diffoutput .d2h-file-header { background-color: var(--d2h-file-bg); border-color: var(--d2h-file-border); color: var(--d2h-file-color); }
-        #diffoutput td.d2h-cntx.d2h-code-linenumber,
-        #diffoutput td.d2h-cntx.d2h-code-side-linenumber { background-color: var(--d2h-ln-bg); color: var(--d2h-ln-color); }
-        #diffoutput td.d2h-del { background-color: var(--d2h-del-bg); color: var(--d2h-del-color); }
+        /* Re-apply diff2html's native variables after Pico CSS td reset.
+           #diffoutput prefix gives higher specificity than Pico's [data-theme] selectors. */
+        #diffoutput .d2h-file-header { background-color: var(--d2h-file-header-bg-color); border-color: var(--d2h-file-header-border-color); }
+        #diffoutput td.d2h-code-linenumber,
+        #diffoutput td.d2h-code-side-linenumber { background-color: var(--d2h-bg-color); color: var(--d2h-dim-color); border-color: var(--d2h-line-border-color); }
+        #diffoutput td.d2h-del { background-color: var(--d2h-del-bg-color); border-color: var(--d2h-del-border-color); }
         #diffoutput td.d2h-del.d2h-code-linenumber,
-        #diffoutput td.d2h-del.d2h-code-side-linenumber { background-color: var(--d2h-del-ln-bg); color: var(--d2h-del-ln-color); }
-        #diffoutput td.d2h-ins { background-color: var(--d2h-ins-bg); color: var(--d2h-ins-color); }
+        #diffoutput td.d2h-del.d2h-code-side-linenumber { background-color: var(--d2h-del-border-color); color: var(--d2h-del-label-color); }
+        #diffoutput td.d2h-ins { background-color: var(--d2h-ins-bg-color); border-color: var(--d2h-ins-border-color); }
         #diffoutput td.d2h-ins.d2h-code-linenumber,
-        #diffoutput td.d2h-ins.d2h-code-side-linenumber { background-color: var(--d2h-ins-ln-bg); color: var(--d2h-ins-ln-color); }
-        #diffoutput td.d2h-info { background-color: var(--d2h-info-bg); color: var(--d2h-info-color); }
-        #diffoutput td.d2h-code-side-emptyblock { background-color: var(--d2h-empty); }
+        #diffoutput td.d2h-ins.d2h-code-side-linenumber { background-color: var(--d2h-ins-border-color); color: var(--d2h-ins-label-color); }
+        #diffoutput td.d2h-info { background-color: var(--d2h-info-bg-color); color: var(--d2h-dim-color); border-color: var(--d2h-info-border-color); }
+        #diffoutput td.d2h-info.d2h-code-linenumber,
+        #diffoutput td.d2h-info.d2h-code-side-linenumber { background-color: var(--d2h-info-bg-color); }
+        #diffoutput td.d2h-code-side-emptyblock { background-color: var(--d2h-empty-placeholder-bg-color); }
         #diffoutput .d2h-code-side-line ins,
-        #diffoutput .d2h-code-line ins { background-color: var(--d2h-ins-mark); border-radius: 2px; }
+        #diffoutput .d2h-code-line ins { background-color: var(--d2h-ins-highlight-bg-color); border-radius: 2px; }
         #diffoutput .d2h-code-side-line del,
-        #diffoutput .d2h-code-line del { background-color: var(--d2h-del-mark); border-radius: 2px; text-decoration: none; }
+        #diffoutput .d2h-code-line del { background-color: var(--d2h-del-highlight-bg-color); border-radius: 2px; text-decoration: none; }
+
+        /* Hide @@ patch marker rows when .hide-markers is active (default) */
+        #diffoutput.hide-markers tr:has(td.d2h-info) { display: none; }
 
         /* Wider diff output — override Pico container padding */
         #diffoutput {
@@ -161,6 +168,9 @@
             <ul></ul>
             <ul>
                 <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+                <li>
                     <details class="dropdown">
                         <summary>Tools</summary>
                         <ul dir="rtl">
@@ -169,9 +179,6 @@
                             <li><a href="diff.html" aria-current="page">Schema Diff</a></li>
                         </ul>
                     </details>
-                </li>
-                <li>
-                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
             </ul>
         </nav>
@@ -245,7 +252,10 @@
                         <option value="3">+/- 3 lines</option>
                         <option value="9999">all</option>
                     </select>
-                    context
+                    context, and
+                    <label style="display:inline; margin:0">
+                        <input id="showMarkers" type="checkbox"> showing <code>@@</code> hunk markers
+                    </label>
                 </small>
             </div>
 
@@ -361,6 +371,9 @@
         document.getElementById('diffContext').addEventListener('change', () => {
             if (_lastText1) rerenderFromCache()
         })
+        document.getElementById('showMarkers').addEventListener('change', () => {
+            diffoutput.classList.toggle('hide-markers', !document.getElementById('showMarkers').checked)
+        })
 
         // All collected versions for diff dropdowns (sorted at insertion time)
         const _diffVersions = []
@@ -465,6 +478,8 @@
                 matching: 'lines',
                 outputFormat: getDiffFormat(),
             })
+            const showMarkers = document.getElementById('showMarkers')
+            diffoutput.classList.toggle('hide-markers', !showMarkers.checked)
         }
 
         function rerenderFromCache() {

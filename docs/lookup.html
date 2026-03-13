@@ -34,12 +34,15 @@
             color: var(--contrast);
         }
 
-        /* MikroTik logo: swap dark/light based on data-theme */
+        /* MikroTik logo: always left-aligned; default shows light logo only.
+           Dark logo appears only in explicit dark or OS-dark auto mode. */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
         [data-theme=dark] img[data-theme=light] { display: none; }
         [data-theme=light] img[data-theme=dark] { display: none; }
         @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
             :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
         }
 
         #results-table td:first-child,
@@ -84,6 +87,9 @@
             <ul></ul>
             <ul>
                 <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+                <li>
                     <details class="dropdown">
                         <summary>Tools</summary>
                         <ul dir="rtl">
@@ -92,9 +98,6 @@
                             <li><a href="diff.html">Schema Diff</a></li>
                         </ul>
                     </details>
-                </li>
-                <li>
-                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
             </ul>
         </nav>
