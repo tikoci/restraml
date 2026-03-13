@@ -119,22 +119,21 @@
                 See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                 for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
             </p>
-            <p><small>⚠️ <em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small></p>
         </section>
 
         <!-- Search Form -->
         <section>
             <h3>Lookup RouterOS Command</h3>
 
-            <div class="grid">
+            <div class="grid" style="grid-template-columns: 2fr 1fr">
                 <label>
-                    Path / Command
+                    CLI Path <small>(with <em>optional</em> command)</small>
                     <input type="text" id="input-cmdpath" placeholder="/ip/address/set" value="/ip/address/set"
                         aria-label="RouterOS path and command, e.g. /ip/address/set">
                 </label>
                 <label>
                     Attribute <small>(optional)</small>
-                    <input type="text" id="input-attr" placeholder="optional"
+                    <input type="text" id="input-attr"
                         aria-label="RouterOS attribute name (optional)">
                 </label>
             </div>
@@ -201,6 +200,10 @@
         </section>
 
     </main>
+
+    <footer class="container">
+        <small><em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small>
+    </footer>
 
     <!-- Share modal -->
     <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">

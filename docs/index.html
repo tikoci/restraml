@@ -123,7 +123,7 @@
                 </li>
             </ul>
         </nav>
-        <h1>RouterOS API <mark>Schema Downloads</mark></h1>
+        <h1>RouterOS <mark>Schema Downloads</mark></h1>
     </header>
 
     <main class="container">
@@ -141,7 +141,6 @@
                 Everything is tracked on GitHub —
                 <a href="https://github.com/tikoci/restraml/issues/new/choose">open an issue</a>.</small>
             </article>
-            <p><small>⚠️ <em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small></p>
         </section>
 
         <!-- Diff Tool -->
@@ -201,7 +200,7 @@
                 </summary>
                 <pre><code id="diffcode" class="language-diff"></code></pre>
             </details>
-            <p><small>🔀 For side-by-side view, context lines, and shareable links — try <a href="diff.html">Schema Diff →</a></small></p>
+            <p id="diff-tool-link-p" hidden><small><a id="diff-tool-link" href="diff.html">View in new RouterOS <code>diff</code> — <em>with new style diffs and better views</em></a></small></p>
         </section>
 
         <!-- /app YAML Schema callout -->
@@ -275,6 +274,10 @@
         </section>
 
     </main>
+
+    <footer class="container">
+        <small><em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small>
+    </footer>
 
     <!--
         ========================================================================
@@ -593,6 +596,20 @@
                 diffextra.disabled = false
 
                 writeQueryParams()
+
+                // Show and update the "View in diff tool" link with current params
+                const diffToolLinkP = document.getElementById('diff-tool-link-p')
+                const diffToolLink = document.getElementById('diff-tool-link')
+                if (diffToolLinkP && diffToolLink) {
+                    const dparams = new URLSearchParams()
+                    if (compare1.value) dparams.set('compare1', compare1.value)
+                    if (compare2.value) dparams.set('compare2', compare2.value)
+                    if (!diffextra.checked) dparams.set('extra', 'false')
+                    if (_diffShowAll) dparams.set('testing', 'true')
+                    diffToolLink.href = 'diff.html?' + dparams.toString()
+                    diffToolLinkP.hidden = false
+                }
+
                 plausible('Diff Run', { props: { compareLeft: compare1.value, compareRight: compare2.value } })
             })()
         })
