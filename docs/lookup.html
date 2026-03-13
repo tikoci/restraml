@@ -56,6 +56,10 @@
             background: var(--pico-color-red-100, #f8d7da);
             color: var(--pico-color-red-700, #721c24);
         }
+
+        #results-table td:last-child small {
+            word-break: break-word;
+        }
     </style>
 </head>
 
@@ -96,22 +100,14 @@
 
             <div class="grid">
                 <label>
-                    Path
-                    <input type="text" id="input-path" placeholder="/ip/address" value="/ip/address"
-                        aria-label="RouterOS path, e.g. /ip/address">
-                    <small>e.g. <code>/ip/address</code> or <code>ip address</code></small>
-                </label>
-                <label>
-                    Command
-                    <input type="text" id="input-cmd" placeholder="get" value="get"
-                        aria-label="RouterOS command, e.g. get, print, add">
-                    <small>e.g. <code>get</code>, <code>print</code>, <code>add</code></small>
+                    Path / Command
+                    <input type="text" id="input-cmdpath" placeholder="/ip/address/set" value="/ip/address/set"
+                        aria-label="RouterOS path and command, e.g. /ip/address/set">
                 </label>
                 <label>
                     Attribute <small>(optional)</small>
-                    <input type="text" id="input-attr" placeholder="address" value="address"
+                    <input type="text" id="input-attr" placeholder="optional"
                         aria-label="RouterOS attribute name (optional)">
-                    <small>e.g. <code>address</code>, <code>pvid</code></small>
                 </label>
             </div>
 
@@ -138,14 +134,12 @@
                     </li>
                 </ul>
             </nav>
-
-            <button id="lookup-btn" type="button">Lookup</button>
         </section>
 
         <!-- Results -->
         <section id="results-section" hidden>
             <h3>Results</h3>
-            <div id="results-summary"></div>
+            <div id="results-summary" aria-live="polite"></div>
             <div style="overflow-x:auto">
                 <table id="results-table">
                     <thead>
@@ -225,10 +219,20 @@
         // All discovered version names, newest first
         let allVersions = []
 
+        // Cache of fetched inspect.json data keyed by version string
+        const inspectCache = {}
+
+        // Cancellation counter — incremented on each new lookup run
+        let runLookupId = 0
+
+        // Debounce timer handle
+        let debounceTimer = null
+
+        const cmdPathInput = document.getElementById('input-cmdpath')
+        const attrInput = document.getElementById('input-attr')
         const versionSelect = document.getElementById('version-select')
         const checkAllVersions = document.getElementById('checkAllVersions')
         const includeTesting = document.getElementById('includeTesting')
-        const lookupBtn = document.getElementById('lookup-btn')
         const resultsSection = document.getElementById('results-section')
         const resultsSummary = document.getElementById('results-summary')
         const resultsBody = document.getElementById('results-body')
@@ -254,56 +258,80 @@
         }
 
         // -----------------------------------------------------------------
-        // Parse a RouterOS path string into an array of segments
-        // Handles: "/ip/address", "ip address", "/ip address"
+        // Parse a combined RouterOS path+cmd string into segments
+        // Handles: "/ip/address/set", "ip address set", "/ip address/set"
         // -----------------------------------------------------------------
-        function parsePath(pathStr) {
+        function parseCombinedPath(pathStr) {
             return pathStr.trim().replace(/^\/+/, '').split(/[\/\s]+/).filter(Boolean)
         }
 
         // -----------------------------------------------------------------
-        // Navigate inspect.json to find a path+cmd+attr combination
-        // Returns { found: bool, detail: string }
+        // Navigate inspect.json to find a combined path+cmd+attr
+        // Returns { found: bool, detail: string, error?: string }
+        //
+        // Behavior based on terminal node _type:
+        //   "cmd"  + no attr  → comma-sep list of arg children
+        //   "cmd"  + attr     → desc of that arg (empty string if no desc)
+        //   "dir"/"path"      → comma-sep list of child cmd names
+        //   not found         → found:false with detail explaining why
         // -----------------------------------------------------------------
-        function lookupInInspect(json, pathSegments, cmd, attr) {
+        function lookupInInspect(json, segments, attr) {
             let node = json
-            // Walk down the path
-            for (const seg of pathSegments) {
-                if (!node || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, seg)) {
-                    return { found: false, detail: `path segment "${seg}" not found` }
+            for (const seg of segments) {
+                if (!node || typeof node !== 'object' ||
+                    !Object.prototype.hasOwnProperty.call(node, seg)) {
+                    return { found: false, detail: `"${seg}" not found` }
                 }
                 node = node[seg]
             }
             if (!node || typeof node !== 'object') {
                 return { found: false, detail: 'path does not point to a valid node' }
             }
-            // Check command
-            if (cmd) {
-                if (!Object.prototype.hasOwnProperty.call(node, cmd)) {
-                    return { found: false, detail: `command "${cmd}" not found at path` }
-                }
-                const cmdNode = node[cmd]
-                // Check optional attribute
+
+            const nodeType = node._type
+
+            if (nodeType === 'cmd') {
+                const args = Object.keys(node).filter(k => !k.startsWith('_'))
                 if (attr) {
-                    if (!cmdNode || typeof cmdNode !== 'object' ||
-                        !Object.prototype.hasOwnProperty.call(cmdNode, attr)) {
-                        return { found: false, detail: `attribute "${attr}" not found in "${cmd}"` }
+                    if (!Object.prototype.hasOwnProperty.call(node, attr)) {
+                        return { found: false, detail: `attribute "${attr}" not found in command` }
                     }
-                    return { found: true, detail: `path / cmd "${cmd}" / attr "${attr}" found` }
+                    const argNode = node[attr]
+                    const desc = (argNode && typeof argNode === 'object' && argNode.desc)
+                        ? String(argNode.desc)
+                        : ''
+                    return { found: true, detail: desc }
                 }
-                return { found: true, detail: `path / cmd "${cmd}" found` }
+                return { found: true, detail: args.join(', ') }
             }
-            return { found: true, detail: 'path found' }
+
+            if (nodeType === 'dir' || nodeType === 'path') {
+                const cmds = Object.keys(node).filter(
+                    k => !k.startsWith('_') && node[k] && node[k]._type === 'cmd'
+                )
+                const detail = cmds.length > 0
+                    ? cmds.join(', ')
+                    : Object.keys(node).filter(k => !k.startsWith('_')).join(', ')
+                return { found: true, detail }
+            }
+
+            // Fallback: just report found
+            return { found: true, detail: nodeType || '' }
         }
 
         // -----------------------------------------------------------------
-        // Fetch inspect.json for a version
+        // Fetch (and cache) inspect.json for a version
         // -----------------------------------------------------------------
-        function fetchInspectJson(ver) {
+        function loadInspectJson(ver) {
+            if (inspectCache[ver]) return Promise.resolve(inspectCache[ver])
             return fetch(`${pagesUrl}/${ver}/inspect.json`)
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`)
                     return r.json()
+                })
+                .then(data => {
+                    inspectCache[ver] = data
+                    return data
                 })
         }
 
@@ -337,11 +365,15 @@
             tdStatus.appendChild(badge)
             tr.appendChild(tdStatus)
 
-            // Detail cell
+            // Detail cell — errors and not-found in italics; found detail plain
             const tdDetail = document.createElement('td')
-            tdDetail.innerHTML = `<small>${result.error
-                ? `<em>Error: ${result.error}</em>`
-                : result.detail}</small>`
+            if (result.error) {
+                tdDetail.innerHTML = `<small><em>${result.error}</em></small>`
+            } else if (!result.found) {
+                tdDetail.innerHTML = `<small><em>${result.detail}</em></small>`
+            } else if (result.detail) {
+                tdDetail.innerHTML = `<small>${result.detail}</small>`
+            }
             tr.appendChild(tdDetail)
 
             resultsBody.appendChild(tr)
@@ -351,17 +383,17 @@
         // Run the lookup for one or all versions
         // -----------------------------------------------------------------
         async function runLookup() {
-            const pathStr = document.getElementById('input-path').value.trim()
-            const cmdStr = document.getElementById('input-cmd').value.trim()
-            const attrStr = document.getElementById('input-attr').value.trim()
+            const thisId = ++runLookupId
 
-            if (!pathStr || !cmdStr) {
-                resultsSummary.innerHTML = '<p><em>Please enter at least a path and a command.</em></p>'
-                resultsSection.hidden = false
+            const pathStr = cmdPathInput.value.trim()
+            const attrStr = attrInput.value.trim()
+
+            if (!pathStr) {
+                resultsSection.hidden = true
                 return
             }
 
-            const pathSegments = parsePath(pathStr)
+            const segments = parseCombinedPath(pathStr)
             const lookAll = checkAllVersions.checked
             const showTesting = includeTesting.checked
 
@@ -370,34 +402,31 @@
                 ? allVersions.filter(v => showTesting || !isPreRelease(v))
                 : [versionSelect.value].filter(Boolean)
 
-            if (versionsToCheck.length === 0) {
-                resultsSummary.innerHTML = '<p><em>No version selected.</em></p>'
-                resultsSection.hidden = false
-                return
-            }
+            if (versionsToCheck.length === 0) return
 
             // Clear previous results and show section
             resultsBody.innerHTML = ''
             resultsSummary.innerHTML = ''
             resultsSection.hidden = false
 
-            // Show loading indicator
-            const normalizedPath = '/' + pathSegments.join('/')
+            const normalizedPath = '/' + segments.join('/')
             const attrPart = attrStr ? ` / <code>${attrStr}</code>` : ''
             resultsSummary.innerHTML =
-                `<p>Checking <code>${normalizedPath}</code> &rarr; <code>${cmdStr}</code>${attrPart} &hellip;</p>`
+                `<p>Checking <code>${normalizedPath}</code>${attrPart} &hellip;</p>`
 
-            lookupBtn.disabled = true
-            versionSelect.disabled = true
+            versionSelect.disabled = checkAllVersions.checked
 
             let foundCount = 0
             let checkedCount = 0
 
             for (const ver of versionsToCheck) {
+                if (thisId !== runLookupId) return // cancelled by a newer run
+
                 let result
                 try {
-                    const json = await fetchInspectJson(ver)
-                    result = lookupInInspect(json, pathSegments, cmdStr, attrStr)
+                    const json = await loadInspectJson(ver)
+                    if (thisId !== runLookupId) return // cancelled after fetch
+                    result = lookupInInspect(json, segments, attrStr)
                 } catch (err) {
                     result = { found: false, error: String(err), detail: '' }
                 }
@@ -406,18 +435,17 @@
                 appendResultRow(ver, result)
             }
 
-            // Update summary
+            if (thisId !== runLookupId) return // cancelled during last iteration
+
             resultsSummary.innerHTML =
                 `<p>Found in <strong>${foundCount}</strong> of <strong>${checkedCount}</strong> version(s) checked &mdash; ` +
-                `<code>${normalizedPath}</code> &rarr; <code>${cmdStr}</code>${attrPart}</p>`
+                `<code>${normalizedPath}</code>${attrPart}</p>`
 
-            lookupBtn.disabled = false
             versionSelect.disabled = checkAllVersions.checked
 
             plausible('Lookup Run', {
                 props: {
                     path: normalizedPath,
-                    cmd: cmdStr,
                     attr: attrStr || '(none)',
                     allVersions: String(lookAll),
                     foundCount: String(foundCount),
@@ -427,25 +455,53 @@
         }
 
         // -----------------------------------------------------------------
-        // Event wiring
+        // Debounced trigger — avoids running lookup on every keystroke
         // -----------------------------------------------------------------
-        lookupBtn.addEventListener('click', runLookup)
+        function triggerLookup(immediate) {
+            clearTimeout(debounceTimer)
+            if (immediate) {
+                runLookup()
+            } else {
+                debounceTimer = setTimeout(runLookup, 400)
+            }
+        }
 
-        // Allow Enter key in inputs to trigger lookup
-        document.querySelectorAll('#input-path, #input-cmd, #input-attr').forEach(el => {
-            el.addEventListener('keydown', e => { if (e.key === 'Enter') runLookup() })
+        // -----------------------------------------------------------------
+        // Event wiring — no buttons; all interactions are event-driven
+        // -----------------------------------------------------------------
+
+        // Typing in path/command field → debounced lookup
+        cmdPathInput.addEventListener('input', () => triggerLookup(false))
+
+        // Typing in attribute field → debounced lookup
+        attrInput.addEventListener('input', () => triggerLookup(false))
+
+        // Enter key in either input → immediate lookup
+        ;[cmdPathInput, attrInput].forEach(el => {
+            el.addEventListener('keydown', e => { if (e.key === 'Enter') triggerLookup(true) })
         })
 
+        // Version select change → immediate single-version lookup
+        versionSelect.addEventListener('change', () => triggerLookup(true))
+
+        // "Check all versions" toggle → update disabled state, immediate lookup
         checkAllVersions.addEventListener('change', () => {
             versionSelect.disabled = checkAllVersions.checked
+            triggerLookup(true)
         })
 
+        // "Include testing" toggle → imply "all versions", rebuild list, immediate lookup
         includeTesting.addEventListener('change', () => {
+            if (includeTesting.checked && !checkAllVersions.checked) {
+                checkAllVersions.checked = true
+                versionSelect.disabled = true
+            }
             rebuildVersionSelect()
+            triggerLookup(true)
         })
 
         // -----------------------------------------------------------------
-        // Bootstrap: fetch version list from GitHub API
+        // Bootstrap: fetch version list from GitHub API, then run initial lookup
         // -----------------------------------------------------------------
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${docsPath}`)
             .then(r => {
@@ -459,8 +515,8 @@
                     .map(f => f.name)
                     .sort(compareVersions)
                 rebuildVersionSelect()
-                // Auto-run with default pre-populated values on first load
-                runLookup()
+                // Run initial lookup with the default pre-populated path
+                triggerLookup(true)
             })
             .catch(err => {
                 versionSelect.innerHTML = '<option value="" disabled selected>Failed to load versions</option>'

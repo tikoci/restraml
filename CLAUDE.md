@@ -32,6 +32,7 @@ restraml/
 ├── .env                  # Local dev env vars (URLBASE, BASICAUTH) — not committed secrets
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
 │   ├── index.html        # Main SPA: version list, diff tool, download links
+│   ├── lookup.html       # RouterOS command search tool (fully event-driven, no buttons)
 │   ├── routeros-app-yaml-schema.latest.json       # /app YAML schema (stable, public URL)
 │   ├── routeros-app-yaml-schema.dev.json          # /app YAML schema (dev/testing)
 │   ├── routeros-app-yaml-store-schema.latest.json # /app store schema (array of /app YAMLs)
@@ -232,6 +233,10 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   `<details>`, `<summary>`, etc. No `<div>` soup.
 - **No web frameworks** — no React, Vue, Angular, Svelte, etc. Vanilla JS only.
 - **No build tools** — no webpack, Vite, npm scripts for the HTML page itself. Single `.html` file.
+- **Avoid submit buttons** — prefer JS event listeners (`input`, `change`, `keydown`) over explicit
+  submit/lookup buttons. Use debouncing (~400 ms) for text inputs; fire immediately on `change`
+  events for checkboxes and `<select>` elements. Cancellation tokens (incrementing counter compared
+  before and after each `await`) prevent stale results from racing async fetches.
 - **Client-side SPA** — all logic runs in the browser. There is no backend. GitHub Pages serves
   static files only. Use the **GitHub REST API** or **GitHub GraphQL API** for dynamic data
   (version lists, file contents, etc.).
@@ -265,6 +270,28 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   user interactions. Always include event tracking for new interactive features.
 - **`module` shim**: because `json-diff` is ESM-only, the page uses a global `const module = {}`
   shim before a `<script type="module">` that assigns `module.diffString = diffString`.
+
+### docs/lookup.html — RouterOS Command Search Tool
+
+`docs/lookup.html` is a fully event-driven command search tool. Key patterns:
+
+- **Combined path+cmd input**: a single text field accepts the full RouterOS path including the
+  command as the last segment (e.g. `/ip/address/set`). No separate path and command inputs.
+- **Dynamic, no submit button**: results update as the user types (400 ms debounce on the text
+  input, immediate on `change` events for `<select>` and checkboxes). The "Lookup" button was
+  intentionally removed — events drive all interactions.
+- **inspect.json cache**: fetched inspect JSON is cached per version in memory (`inspectCache`
+  object) so repeated lookups against the same version are instant.
+- **Cancellation tokens**: `runLookupId` counter is incremented at the start of each run and
+  checked after each `await`; stale runs exit early without updating the DOM.
+- **Checkbox implied behaviour**: toggling "include testing" automatically enables "check all
+  versions" (since testing implies checking all). Toggling "check all versions" triggers an
+  immediate lookup.
+- **`lookupInInspect` detail levels** (based on terminal node `_type`):
+  - `"dir"` / `"path"`: detail = comma-separated list of child `cmd` names
+  - `"cmd"` + no attribute: detail = comma-separated list of `arg` names
+  - `"cmd"` + attribute match: detail = the `desc` field of that arg (empty if absent)
+  - not found: detail shown in `<em>` italics; errors likewise in italics
 
 ### Custom / Derivative Pages (`docs/*.html`)
 
