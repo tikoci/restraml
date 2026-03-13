@@ -478,7 +478,10 @@
                     document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
                     return data
                 })
-                .catch(err => console.error('Error fetching inspect.json', ver, extra, err))
+                .catch(err => {
+                    console.error('Error fetching inspect.json', ver, extra, err)
+                    throw err
+                })
         }
 
         // Fetch version list from GitHub API and dispatch builddir events
