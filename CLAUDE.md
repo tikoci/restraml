@@ -242,6 +242,21 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   (version lists, file contents, etc.).
 - **Minimal dependencies** — only add a CDN library if it meaningfully solves a problem (e.g.,
   `json-diff`, `highlight.js`, `deep-diff`, `jsonpath`). Keep the CDN dependency count low.
+- **Shareable URLs — query string pattern**: All tool pages support query strings that populate
+  controls and trigger results on load. Use `history.replaceState()` to update the URL as the user
+  interacts (not `pushState` — no new history entries). Read params after the async version list loads
+  so `<select>` options exist before being set. Invalid/unknown params are silently ignored.
+  Parameter names per page:
+  - `index.html`: `compare1`, `compare2`, `extra` (false to disable), `testing` (true to enable)
+  - `diff.html`: `compare1`, `compare2`, `extra`, `testing`, `format` (side-by-side|line-by-line),
+    `context` (0|3), `hunks` (showing|hiding)
+  - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
+    `testing` (true), `extra` (true)
+- **Share modal — `<dialog>` pattern**: `diff.html` and `lookup.html` include a "Share" link
+  below results that opens a `<dialog>` modal showing the current URL with a "Copy to clipboard"
+  button. Use `dialog.showModal()` / `dialog.close()`. Clicking the backdrop (`e.target === dialog`)
+  also closes it. Use `navigator.clipboard.writeText()` for copying (works on HTTPS).
+  Call `writeQueryParams()` before showing the modal in `diff.html` to ensure the URL is current.
 
 ### docs/index.html — Architecture Reference
 
@@ -269,6 +284,9 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 - **`inspect.json` is the data source** for diffs and stats. It's the raw RouterOS API tree.
   Use `jsonpath` for structured queries (`$..*[?(@._type)]._type`). Use `json-diff` + `highlight.js`
   for side-by-side textual diff. Use `deep-diff` for structured change statistics.
+- **Diff output defaults to closed**: After a comparison on `index.html`, the `<details id="diffcodedetails">`
+  element stays closed (`open = false`). The `<summary>` shows "Show JSON Diff" / "Hide JSON Diff"
+  toggled by a `toggle` event listener on the `<details>` element.
 - **Plausible analytics**: `plausible("Event Name", { props: { key: value } })` for tracking
   user interactions. Always include event tracking for new interactive features.
 - **`module` shim**: because `json-diff` is ESM-only, the page uses a global `const module = {}`
