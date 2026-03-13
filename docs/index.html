@@ -74,6 +74,12 @@
             :root:not([data-theme=light]) img[data-theme=light] { display: none; }
         }
 
+        /* MikroTik logo sizing */
+        header nav img[data-theme] {
+            height: 2rem;
+            width: auto;
+        }
+
         /* Version table link styles */
         .cell-vername a:link,
         .cell-vername a:visited {
@@ -117,7 +123,7 @@
                 </li>
             </ul>
         </nav>
-        <h1><mark>Unofficial</mark> RouterOS API Schema Tools</h1>
+        <h1>RouterOS API <mark>Schema Downloads</mark></h1>
     </header>
 
     <main class="container">
@@ -133,9 +139,9 @@
             <article>
                 <small>💬 <strong>Found a bug? Want a feature? Need a specific version built?</strong>
                 Everything is tracked on GitHub —
-                <a href="https://github.com/tikoci/restraml/issues/new/choose">open an issue</a>
-                and it'll get done.</small>
+                <a href="https://github.com/tikoci/restraml/issues/new/choose">open an issue</a>.</small>
             </article>
+            <p><small>⚠️ <em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small></p>
         </section>
 
         <!-- Diff Tool -->
@@ -194,22 +200,19 @@
                     </div>
                 </summary>
                 <pre><code id="diffcode" class="language-diff"></code></pre>
-                <p><small>For side-by-side view, context lines, and shareable links — try <a href="diff.html">Schema Diff →</a></small></p>
             </details>
+            <p><small>🔀 For side-by-side view, context lines, and shareable links — try <a href="diff.html">Schema Diff →</a></small></p>
         </section>
 
-        <!-- /app YAML Schema -->
-        <section id="section-app-yaml">
-            <h3>Schema for <code>/app</code> YAML</h3>
-            <article>
-                <p>
-                    Validate RouterOS <code>/app</code> container YAML in editors like VSCode using
-                    <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
-                    (or the <a href="https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json"><code>app-store-urls=</code> array variant</a>)
-                    — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#routeros-app-yaml-schema">README.md</a> for setup details.
-                </p>
-            </article>
-        </section>
+        <!-- /app YAML Schema callout -->
+        <article id="section-app-yaml">
+            <small>📦 <strong>Schema for <code>/app</code> YAML</strong> (RouterOS 7.22+) —
+                Validate RouterOS <code>/app</code> container YAML in editors like VSCode using
+                <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
+                (or the <a href="https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json"><code>app-store-urls=</code> array variant</a>)
+                — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#routeros-app-yaml-schema">README.md</a> for setup details.
+            </small>
+        </article>
 
         <!-- Schema Downloads Table -->
         <section id="section-schema-downloads">
@@ -227,7 +230,8 @@
             <article>
                 <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
                 </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
-                    <code>extra-packages.zip</code> available for X86.</i>
+                    <code>extra-packages.zip</code> available for X86.</i><br>
+                <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> to explore the RouterOS REST API — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small>
             </article>
             <table>
                 <thead>
@@ -268,17 +272,6 @@
                     </tr>
                 </tfoot>
             </table>
-        </section>
-
-        <!-- Disclaimer -->
-        <section>
-            <blockquote>
-                <h5>* Disclaimer</h5>
-                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
-                    connected with <a href="https://mikrotik.com">Mikrotik</a>.
-                    All product and company names are trademarks™ or registered® trademarks of their respective
-                    holders. Use of them does not imply any affiliation with or endorsement by them.</small>
-            </blockquote>
         </section>
 
     </main>
