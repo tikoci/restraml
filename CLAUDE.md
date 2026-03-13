@@ -252,8 +252,11 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   Custom events (`builddir`, `inspectdownload`) decouple data fetching from UI updates.
 - **Early-event queue**: a `_pendingBuildDirs` array queues `builddir` events that fire before
   `DOMContentLoaded`. Process the queue in `DOMContentLoaded` to avoid missing events.
-- **Pico CSS data-theme**: dark/light mode via `html[data-theme=dark|light|auto]`. The theme
+- **Pico CSS data-theme**: dark/light mode via `html[data-theme=dark|light]`. The theme
   switcher cycles through OS default → light → dark using SVG icons inline in JS.
+  **Critical**: `data-theme='auto'` is NOT a valid Pico v2 value — it silently forces light mode.
+  For OS-following (auto) state, use `html.removeAttribute('data-theme')` so Pico's
+  `@media (prefers-color-scheme: dark)` rules apply natively. Never `setAttribute('data-theme', 'auto')`.
 - **MikroTik logo trick**: two `<img>` tags with `data-theme="dark"` / `data-theme="light"` —
   CSS rules `[data-theme=dark] img[data-theme=light] { display:none }` etc. swap which logo shows.
 - **Pico CSS font override**: Pico CSS uses CSS custom properties for fonts:
@@ -317,6 +320,89 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
 - A filterable/searchable table of commands and arguments
 - A changelog-style page showing what changed between versions
 - A diff page highlighting only added/removed commands between two versions
+
+### Dark Mode — Correct Pattern for All `docs/` Pages
+
+All pages support three states: explicit light, explicit dark, and auto (follow OS).
+
+**Critical Pico v2 gotcha**: `data-theme='auto'` is **not** a valid Pico CSS v2 value. Setting it
+silently forces light mode. The correct approach for the "auto" state is to **remove the attribute**:
+
+```javascript
+// Theme switcher — three-state cycle: auto → light → dark → auto
+let themeState = 'auto'
+// On DOMContentLoaded: do NOT set data-theme at all (leave unset = auto)
+switchTheme.addEventListener('click', (e) => {
+    e.preventDefault()
+    if (themeState === 'auto') {
+        themeState = 'light'; html.setAttribute('data-theme', 'light')
+    } else if (themeState === 'light') {
+        themeState = 'dark'; html.setAttribute('data-theme', 'dark')
+    } else {
+        themeState = 'auto'; html.removeAttribute('data-theme')  // ← NOT setAttribute('auto')
+    }
+})
+```
+
+**CSS pattern for third-party components in dark mode** (covers auto+OS-dark AND explicit dark):
+```css
+/* Light defaults */
+#mycomponent { --color-bg: #ffffff; --color-text: #24292f; }
+
+/* Auto mode + OS dark */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) #mycomponent {
+        --color-bg: #0d1117; --color-text: #c9d1d9;
+    }
+}
+/* Explicit dark */
+[data-theme=dark] #mycomponent {
+    --color-bg: #0d1117; --color-text: #c9d1d9;
+}
+```
+Use CSS custom properties + `var()` to avoid duplicating property rules in both dark selectors.
+Use an `#id` prefix on all overrides to guarantee higher specificity than Pico's attribute selectors.
+
+### diff2html Integration — Gotchas and Patterns
+
+`docs/diff.html` uses [diff2html](https://diff2html.xyz/) with [jsdiff](https://github.com/kpdecker/jsdiff).
+
+**Key gotchas:**
+
+1. **`colorScheme` option is a no-op in `Diff2Html.html()`** — only works with `Diff2HtmlUI`.
+   Dark mode _must_ be handled via CSS, not via the `colorScheme` option.
+
+2. **Classes are on `<td>` directly, not on `<tr>`** — correct selectors are `td.d2h-del`,
+   `td.d2h-ins`, `td.d2h-cntx`, `td.d2h-info`. Not `.d2h-del > td` or `.d2h-del td`.
+
+3. **diff2html CDN CSS sets `table { background-color: #fff }`** — transparent `td` cells still
+   appear white because the parent `table` has an opaque background. Reset with:
+   ```css
+   #diffoutput .d2h-wrapper table { background-color: unset; }
+   ```
+
+4. **Pico CSS v2 overrides all `td`/`th`** with padding, border, background-color, and color.
+   Reset within the diff container using an ID prefix for specificity:
+   ```css
+   #diffoutput .d2h-wrapper td,
+   #diffoutput .d2h-wrapper th {
+       padding: 0; border: none; background-color: unset; color: unset; line-height: 1.35;
+   }
+   #diffoutput .d2h-wrapper .d2h-code-line,
+   #diffoutput .d2h-wrapper .d2h-code-side-line {
+       padding-top: 1px; padding-bottom: 1px;
+   }
+   ```
+
+5. **Context lines are a jsdiff option (patch level), not a diff2html option (render level).**
+   Changing context requires regenerating the patch via
+   `Diff.createPatch(name, old, new, h1, h2, { context: N })`, not re-rendering the same patch.
+   Cache `_lastText1`/`_lastText2` to allow context re-renders without re-fetching data;
+   cache `_lastPatch` for format-only re-renders.
+
+6. **GitHub-style diff color palette** (use these for a familiar, accessible look):
+   - Light: del `#ffebe9` / `#ffd7d5`, ins `#e6ffec` / `#ccffd8`, info `#ddf4ff`
+   - Dark: del `#3d0e0e` / `#58191a`, ins `#0d2a16` / `#1b4428`, info `#0c2d6b`
 
 ---
 

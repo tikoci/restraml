@@ -60,6 +60,10 @@ The `appyamlschemas.yaml` workflow generates and validates them using `appyamlva
 
 ### Web Pages (`docs/`)
 All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
+
+> **Dark mode and diff2html gotchas are documented in `CLAUDE.md`** under
+> "Dark Mode — Correct Pattern for All `docs/` Pages" and "diff2html Integration".
+> Read those sections before touching dark mode logic or adding diff rendering to any page.
 - **Pico CSS** (`@picocss/pico@2`) — only CSS framework allowed.
 - **JetBrains Mono** — required font. Can be used creatively for visual effects.
 - **Semantic HTML** — use proper elements (`<header>`, `<main>`, `<section>`, etc.).
