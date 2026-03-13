@@ -118,7 +118,9 @@ jobs:
       run: |
         mkdir extra
         cd extra
-        wget -q "https://download.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip"
+        # Try download.mikrotik.com first (stable), fall back to cdn.mikrotik.com (beta/rc)
+        wget -q "https://download.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip" \
+        || wget -q "https://cdn.mikrotik.com/routeros/${{ github.event.inputs.rosver }}/all_packages-x86-${{ github.event.inputs.rosver }}.zip"
         unzip -q all_packages*.zip
         rm all_packages*.zip
         cd ..

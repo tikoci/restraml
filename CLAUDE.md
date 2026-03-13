@@ -399,6 +399,15 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
   — harmless but redundant
 - The `manual-from-secrets.yaml` workflow uses `ros-rest-generated.html` not `index.html`
   and doesn't produce `oas2.json`, so it's not fully consistent with the QEMU-based workflows
+- The `manual-from-secrets.yaml` workflow uses outdated `actions/checkout@v3` and
+  `oven-sh/setup-bun@v1` — should be updated to v4 and v2 respectively
+- `manual-using-extra-docker-in-docker.yaml` is missing the `cdn.mikrotik.com` fallback for
+  the extra packages download — beta/rc builds will fail to download extra packages. Compare
+  with `appyamlschemas.yaml` which correctly falls back to CDN
+- Stale files in `docs/` root: `routeros-openapi3.json` (12MB), `routeros.raml`,
+  `routeros.7.13.raml`, `routeros.7.14.raml`, `routeros.7.14.3.html`, `sideview-g1.html`,
+  `sideview-g2.html` — these are from before the versioned directory structure and could be
+  cleaned up
 
 ---
 

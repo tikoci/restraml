@@ -1,103 +1,185 @@
 # RouterOS API Schema Tools
 
-## <mark>NEW!</mark>&nbsp;&nbsp;&nbsp;`diff` RouterOS Commands
+Unofficial, auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API — published at **<https://tikoci.github.io/restraml>**
 
-The project web site has an [`diff` tool](https://tikoci.github.io/restraml) that compares the output of `/console/inspect` between RouterOS Versions.
-
-[![](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
+[![RouterOS diff tool screenshot](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
 
 ## Download Schemas
 
-Pre-build schema files for RouterOS REST API are available on this project's website at
-https://tikoci.github.io/restraml
+Pre-built schema files for the RouterOS REST API are available at
+<https://tikoci.github.io/restraml>
 
 > [!TIP]
-> File an issue in this project, if you'd like a specific version built.
+> File an [issue](https://github.com/tikoci/restraml/issues/new/choose) if you'd like a specific version built.
 
-Included are three files:
- * `RAML` - schema in RAML 1.0 format, used in tools like Postman
- * `HTML` - documentation, generated from the schema
- * `OAS2` - OpenAPI 2.0 format, converted from RAML
- * `JSON` - intermediate raw data from RouterOS's `/console/inspect` in JSON format, for use with data analytics
- * `MIB` - link to official Mikrotik MIB for SNMP
+Each RouterOS version includes:
 
-There may be a _base_ and _+extra_ schema download links.
-* The **_base_** schema is just the `routeros.npk` package 
-* The **_+extra_** schema contains all X86 packages, including _base_, plus "_extra_-packages": `routeros, dude, container, rose-storage, gps, lora, calea, user-manager, routeros, ups, iot, wifiwave2, tr069-client`
+* **RAML** — RAML 1.0 schema, usable in Postman, MuleSoft, and other API tools
+* **OAS2** — OpenAPI 2.0, converted from RAML
+* **HTML** — human-readable API documentation generated from the schema
+* **JSON** — raw `/console/inspect` output from RouterOS, useful for data analysis and diffs
+* **MIB** — link to the official MikroTik MIB for SNMP
+
+There may be a _base_ and _+extra_ download for each version:
+
+* **base** — just the `routeros.npk` system package
+* **+extra** — all x86 packages: `routeros`, `dude`, `container`, `rose-storage`, `gps`, `lora`, `calea`, `user-manager`, `ups`, `iot`, `wifiwave2`, `tr069-client`
+
+### `diff` RouterOS Commands
+
+The [project website](https://tikoci.github.io/restraml) includes a **diff tool** that compares the `/console/inspect` output between any two RouterOS versions — useful for tracking new commands, removed attributes, and API changes across releases.
+
+---
+
+## RouterOS `/app` YAML Schema
+
+RouterOS 7.22+ includes [`/app`](https://help.mikrotik.com/docs/spaces/ROS/pages/268664833/) — a YAML format (similar to `docker-compose` but RouterOS-specific) for defining custom container applications. This project provides **JSON Schema** files to validate `/app` YAML in editors like VSCode.
+
+### Schema URLs
+
+| Schema | URL | Purpose |
+| --- | --- | --- |
+| Single `/app` | [`routeros-app-yaml-schema.latest.json`](https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json) | Validates a single `/app` YAML definition |
+| App Store | [`routeros-app-yaml-store-schema.latest.json`](https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json) | Validates the array format used by `/app/settings`'s `app-store-urls=` |
+| Per-version | `https://tikoci.github.io/restraml/{version}/routeros-app-yaml-schema.json` | Version-specific schema (available for 7.22+) |
+
+Per-version schemas are automatically validated against MikroTik's built-in `/app` entries for each new RouterOS release to verify accuracy.
+
+> [!NOTE]
+> Each schema build boots a RouterOS CHR in QEMU directly on a GitHub Actions runner (with KVM acceleration), installs extra packages, then validates all ~80 built-in `/app` YAMLs from the live router against the schema. See [appyamlschemas.yaml](.github/workflows/appyamlschemas.yaml) for the workflow.
+
+### Using the `/app` YAML Schema in VSCode
+
+Install the [Red Hat YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) for VSCode, then use either approach:
+
+#### Option 1: Inline schema comment (per-file)
+
+Add a `yaml-language-server` comment at the top of your YAML file. The YAML extension will detect it automatically — no settings changes needed.
+
+For a **single `/app` definition**:
+
+```yaml
+# yaml-language-server: $schema=https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json
+
+name: my-app
+descr: My custom RouterOS app
+services:
+  server:
+    image: myimage:latest
+    ports:
+      - 8080:80:web
+```
+
+For an **app store** file (array of `/app` definitions, used with `app-store-urls=`):
+
+```yaml
+# yaml-language-server: $schema=https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json
+
+- name: app-one
+  services:
+    server:
+      image: app1:latest
+- name: app-two
+  services:
+    server:
+      image: app2:latest
+```
+
+#### Option 2: VSCode settings (automatic for matching filenames)
+
+Add to your `.vscode/settings.json` to apply the schema automatically to files matching a pattern:
+
+```json
+{
+  "yaml.schemas": {
+    "https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json": "*.routeros-app.yaml",
+    "https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json": "*.routeros-app-store.yaml"
+  }
+}
+```
+
+> [!TIP]
+> You can also use a version-specific schema URL (e.g., `.../7.22/routeros-app-yaml-schema.json`) if you need validation matched to a particular RouterOS release.
+
+---
 
 ## Usage with Postman
-For detailed instructions on using the RAML schema with Postman, see this forum article:
-https://forum.mikrotik.com/viewtopic.php?p=1041886
 
-> [!WARNING]
->
-> Ironically, the RouterOS schema uncovered a bug in the most recent version of Postman that does not allow **directly** importing a RAML schema. Postman is working on a fix. Any existing loaded schema still works. Postman version 11.0.12 _and below_ work fine. 
->
-To import this schema into Postman App 11.1.14 _or greater_, the RAML schema must be **indirectly** as an "API", and then from API creating a collection from the API - rather than directly importing the RAML, see [raml1-to-postman issue #84](
-https://github.com/postmanlabs/raml1-to-postman/issues/84#issuecomment-2125114449)
-showing the process, including a video of the process.
+The RAML 1.0 schema can be imported into [Postman](https://www.postman.com/) to explore the RouterOS REST API:
+
+1. Download the `schema.raml` file for your RouterOS version from the [schema downloads](https://tikoci.github.io/restraml)
+2. In Postman, go to **APIs** → **Import** (or **File** → **Import**)
+3. Select the `.raml` file — Postman will parse it and create an API definition
+4. From the imported API, click **Generate Collection** to create a usable request collection
 
 ### What about OpenAPI?
-OpenAPI 2.0 schema RouterOS REST API is available on [Downloads](https://tikoci.github.io/restraml) tagged as `OAS2`.   The OpenAPI schema is generated from the RAML schema.  Only _+extra_ schema version is available.  
 
-Should OpenAPI 3.0 (`OAS3`) be needed, this can be done using MuleSoft's online converter here:
- https://mulesoft.github.io/oas-raml-converter
- However, the `OAS3` produced does not validate using `webapi-parser` tool, but will load in Postman. 
+OpenAPI 2.0 (`OAS2`) schemas are also available on the [downloads page](https://tikoci.github.io/restraml). The OpenAPI schema is converted from RAML, so the RAML version is more complete.
+
+If OpenAPI 3.0 is needed, use MuleSoft's [RAML to OAS Converter](https://mulesoft.github.io/oas-raml-converter). Note: the OAS3 output has known validation issues but will load in most tools.
+
 > [!TIP]
->
-> Generally, if a RAML schema is supported by your tool, use RAML schema as other formats may be further losy.
+> If your tool supports RAML, prefer the RAML schema — other formats lose some fidelity in conversion.
 
+> [!WARNING]
+> The generated schema is more for convenience than strict validation. Generation is limited to the data available from `/console/inspect`. For example, all parameters are marked as optional in the schema even though some are required in practice.
 
-## Build
-### Generating the RAML file
+---
+
+## Repository Layout
+
+```text
+restraml/
+├── rest2raml.js              # Main script: RouterOS REST API → RAML 1.0
+├── raml2oas.cjs              # RAML 1.0 → OpenAPI 2.0 converter
+├── validraml.cjs             # RAML 1.0 validator
+├── appyamlvalidate.js        # /app YAML schema validator (Bun)
+├── Dockerfile.chr-qemu       # Local dev: RouterOS CHR in QEMU via Docker
+├── scripts/
+│   └── entrypoint.sh         # QEMU launcher for local Docker use
+├── docs/                     # GitHub Pages root (one subdirectory per version)
+│   ├── index.html            # Main website: version list, diff tool, downloads
+│   ├── routeros-app-yaml-schema.latest.json
+│   ├── routeros-app-yaml-store-schema.latest.json
+│   └── {version}/            # Per-version schemas and docs
+├── CLAUDE.md                 # Full architecture guide for AI agents
+├── AGENTS.md                 # GitHub Copilot agent instructions
+└── .github/workflows/
+    ├── auto.yaml             # Daily cron: detect new versions, trigger builds
+    ├── manual-using-docker-in-docker.yaml
+    ├── manual-using-extra-docker-in-docker.yaml
+    ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
+    └── manual-from-secrets.yaml
+```
+-->
+
+---
+
+## Building Locally
+
+### Generating the RAML schema
 
 1. Install [Bun](https://bun.sh/)
 2. Clone this repository
-3. Install `js-yaml`: 
- `bun install js-yaml`
-4. Run `rest2raml.js` like so:
- ```sh
- URLBASE=https://<IP or DNS name>/rest BASICAUTH=<user>:<pass> bun rest2raml.js
- # Example:
- URLBASE=https://192.168.88.1/rest BASICAUTH=admin:h3llow0rld bun rest2raml.js
- ```
- Wait a while for this code to run. It could take as long as an hour to process the entire schema.
-5. Open a pull request to add the RAML file to this repository if it's missing 😉
+3. `bun install js-yaml`
+4. Run `rest2raml.js` against a RouterOS device:
 
-### Generating the HTML page
+   ```sh
+   URLBASE=https://192.168.88.1/rest BASICAUTH=admin:password bun rest2raml.js
+   ```
 
-1. Follow steps 1-2 above, or 1-4 if this repository doesn't currently contain a RAML file for your RouterOS version.
-2. Install `raml2html` and `raml2html-slate-theme`: 
- `bun install raml2html raml2html-slate-theme`
-3. Generate the HTML page with `raml2html`:
- ```sh
- raml2html --theme raml2html-slate-theme <RAML file> > <HTML file>
- # Example:
- raml2html --theme raml2html-slate-theme ros-rest-all.raml > ros-rest.all.html
- ```
+### Generating HTML documentation
 
-## Implementation
+```sh
+bun install raml2html raml2html-slate-theme
+./node_modules/.bin/raml2html --theme raml2html-slate-theme ros-rest*.raml > docs.html
+```
 
-### Schema Generation
-The schema generation is done via JavaScript, specifically using `bun`, in `rest2raml.js`. The code connects to RouterOS via REST API, to use the `/console/inspect` command to traverse the "AST" for RouterOS config. The results of this intermediate phase are stored in an `inspect.json`, as retrieved from the router. With the inspect.json, `rest2raml.js` then builds that data into a RAML schema for API tools. 
+---
 
-> [!WARNING]
-> **The generated schema is more for convenience than validation.** Generation is limited to the data available from `/console/inspect`, and what's reasonable to deduce. So there is not perfect fidelity between schema and API. For example, while there are _required_ and _optional_ parameters, all parameters are marked as optional in the schema. As a result, all attributes are generally shown - while using all of them is likely to be invalid. 
+## Architecture & Development
 
-### GitHub 
+For full architecture details, CI/CD pipeline documentation, and development instructions, see:
 
-#### Actions
-
-GitHub Actions is used to build the schema published on this project's website:
- * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-using-docker-in-docker.yaml) for `manual-from-docker-in-docker.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-using-docker-in-docker.yaml) - start a RouterOS CHR (via docker-compose and QEMU) **within the build**, and then `rest2raml.js` uses the "internal" CHR to generate the schema, without any external resources needed.
- * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-using-extra-docker-in-docker.yaml) for `manual-from-extra-docker-in-docker.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-using-extra-docker-in-docker.yaml) - same as above, except CHR is loaded with extra-packages prior to schema generation
- * [Builds](https://github.com/tikoci/restraml/actions/workflows/manual-from-secrets.yaml) for `manual-from-secrets.yaml` [Workflow](https://github.com/tikoci/restraml/blob/main/.github/workflows/manual-from-secrets.yaml) - uses GitHub Secret with information to connection to a RouterOS device on internet
-
-
-> [!NOTE] 
->
-> All actions use only `workflow_dispatch`, so new generation is **still manually triggered** by providing a version on the Action page in GitHub. Only the repo owner can do this. 
-
-
-#### Pages 
-The website for the project - with downloadable schemas – is from the `/docs` directory in repo.
+* [CLAUDE.md](CLAUDE.md) — comprehensive architecture guide
+* [AGENTS.md](AGENTS.md) — GitHub Copilot agent instructions

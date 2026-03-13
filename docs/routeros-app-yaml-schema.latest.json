@@ -4,7 +4,9 @@
   "title": "RouterOS /app YAML",
   "description": "Schema for MikroTik RouterOS /app YAML",
   "type": "object",
-  "required": ["services"],
+  "required": [
+    "services"
+  ],
   "additionalProperties": false,
   "properties": {
     "name": {
@@ -50,7 +52,10 @@
       "description": "URL to the icon image (use with `show-in-webfig=yes` to display on WebFig login screen)"
     },
     "default-credentials": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Default login credentials in format username:password or special values"
     },
     "url-path": {
@@ -68,6 +73,9 @@
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "image"
+          ],
           "properties": {
             "image": {
               "type": "string",
@@ -119,6 +127,9 @@
                         },
                         {
                           "type": "boolean"
+                        },
+                        {
+                          "type": "null"
                         }
                       ]
                     }
@@ -129,6 +140,9 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                {
+                  "type": "null"
                 }
               ],
               "description": "Environment variables"
@@ -145,7 +159,10 @@
               "description": "Config file mappings",
               "items": {
                 "type": "object",
-                "required": ["source", "target"],
+                "required": [
+                  "source",
+                  "target"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "source": {
@@ -155,7 +172,10 @@
                     "type": "string"
                   },
                   "mode": {
-                    "type": ["integer", "string"],
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
                     "description": "File permissions in octal"
                   }
                 }
@@ -163,7 +183,12 @@
             },
             "restart": {
               "type": "string",
-              "enum": ["no", "always", "on-failure", "unless-stopped"],
+              "enum": [
+                "no",
+                "always",
+                "on-failure",
+                "unless-stopped"
+              ],
               "description": "Restart policy"
             },
             "depends_on": {
@@ -209,7 +234,10 @@
       "description": "Named volumes definition",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
-          "type": ["object", "null"]
+          "type": [
+            "object",
+            "null"
+          ]
         }
       }
     },

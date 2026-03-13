@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RouterOS Schemas Tools</title>
+    <title>RouterOS Schema Tools</title>
 
-    <!-- Pico CCS -->
+    <!-- Pico CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
 
-    <!-- Mikrotik Fonts/Graphics -->
+    <!-- Fonts and favicon -->
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,27 +19,357 @@
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
         rel="stylesheet">
 
-    <!-- Plausable -->
+    <!-- Plausible analytics -->
     <script defer data-domain="tikoci.github.io/restraml"
         src="https://plausible.io/js/script.tagged-events.js"></script>
     <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 
-    <!-- Highlight.JS (for diff) -->
+    <!-- Highlight.js (for diff output) -->
     <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
     <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
     <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/diff.min.js"></script>
     <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/json.min.js"></script>
 
-    <!-- json diff *modules*-->
+    <!-- json-diff (ESM module, shimmed via global `module` object) -->
     <script>
         const module = {}
     </script>
+    <script type="module">
+        import { diffString, diff } from 'https://cdn.jsdelivr.net/npm/json-diff@1.0.6/+esm'
+        module.diffString = diffString
+        module.diff = diff
+    </script>
+
+    <!-- DeepDiff for structured diff statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/deep-diff@1/dist/deep-diff.min.js"></script>
+
+    <!-- JsonPath for querying inspect.json -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonpath/1.1.1/jsonpath.min.js"
+        integrity="sha512-fdudyA6TY0Kv3vTiHyZj6wkhDbmZFCflZmxtiC/lR5xRNQJaF7ODChpx0ajIIeFBBtaucDolRB1qG0r/U7eYSg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- Font overrides for Pico CSS -->
+    <style>
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+
+        /* Dark mode theme switcher icon sizing */
+        header nav li a svg {
+            width: var(--font-size);
+            height: var(--font-size);
+            color: var(--contrast);
+        }
+
+        /* Version table link styles */
+        .cell-vername a:link,
+        .cell-vername a:visited {
+            text-decoration: none;
+        }
+        .cell-vername a:hover,
+        .cell-vername a:active {
+            text-decoration: underline;
+        }
+        .cell-vername {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <!-- MikroTik logos: swap visibility based on data-theme -->
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg"
+                    alt="MikroTik logo">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg"
+                    alt="MikroTik logo">
+            </ul>
+            <ul></ul>
+            <ul>
+                <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+            </ul>
+        </nav>
+        <h1><mark>Unofficial</mark> RouterOS API Schema Tools</h1>
+    </header>
+
+    <main class="container">
+
+        <!-- Intro -->
+        <section>
+            <p>
+                See <a
+                    href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
+                for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
+                <br>
+                Problems? Create an <a
+                    href="https://github.com/tikoci/restraml/issues/new/choose">issue</a> using GitHub.
+            </p>
+        </section>
+
+        <!-- Diff Tool -->
+        <section id="section-diff">
+            <nav>
+                <ul>
+                    <h3><code>diff</code> RouterOS Commands</h3>
+                </ul>
+                <ul>
+                    <label>
+                        <input id="diffextra" type="checkbox" role="switch" checked>
+                        <i>with</i> <code>extra-packages</code>
+                    </label>
+                    <label style="margin-left:1rem">
+                        <input id="diffShowAll" type="checkbox" role="switch">
+                        Show all versions
+                    </label>
+                </ul>
+            </nav>
+
+            <fieldset class="grid">
+                <div id="inspect1">
+                    <select class="plausible-event-name=Diff+Hit" id="compare1" required>
+                        <option selected disabled value="">Version to compare...</option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div><b><span name="cmd">0</span></b> commands</div>
+                            <div><b><span name="arg">0</span></b> attributes</div>
+                        </div>
+                    </small>
+                </div>
+                <div id="inspect2">
+                    <select class="plausible-event-name=Diff+Hit" id="compare2" required>
+                        <option selected disabled value="">...against this version</option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" class="grid" hidden>
+                            <div><b><span name="cmd">0</span></b> commands</div>
+                            <div><b><span name="arg">0</span></b> attributes</div>
+                        </div>
+                    </small>
+                </div>
+            </fieldset>
+
+            <details id="diffcodedetails" open hidden>
+                <summary>
+                    <div class="grid">
+                        <div>
+                            <h4><code>diff</code>&nbsp;Output</h4>
+                        </div>
+                        <div class="grid">
+                            <div><b><span class="cmddiff"></span></b> commands</div>
+                            <div><b><span class="argdiff"></span></b> attributes</div>
+                        </div>
+                    </div>
+                </summary>
+                <pre><code id="diffcode" class="language-diff"></code></pre>
+            </details>
+        </section>
+
+        <!-- /app YAML Schema -->
+        <section id="section-app-yaml">
+            <h3>Schema for <code>/app</code> YAML</h3>
+            <article>
+                <small>
+                    <p>RouterOS 7.22+ includes custom <code>/app</code> support using YAML to define
+                        container applications. While similar to <code>docker-compose</code>, the format is
+                        RouterOS-specific. This project provides a JSON Schema to validate <code>/app</code>
+                        YAML in editors like VSCode with the
+                        <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">Red Hat
+                            YAML extension</a>.
+                    </p>
+                </small>
+                <p>Download the RouterOS <code>/app</code> YAML schema:
+                    <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
+                </p>
+            </article>
+        </section>
+
+        <!-- RouterOS Binary Downloads -->
+        <section id="section-binary-downloads">
+            <h3>RouterOS Binary Downloads</h3>
+            <article>
+                <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
+                    <code>routeros.npk</code> and the <code>all_packages</code> extra archive.
+                </p>
+                <fieldset class="grid">
+                    <div>
+                        <label for="rosarch"><b>Architecture</b></label>
+                        <select id="rosarch" aria-label="RouterOS architecture"></select>
+                    </div>
+                    <div>
+                        <label for="rosverselect"><b>Version</b></label>
+                        <select id="rosverselect" aria-label="RouterOS version">
+                            <option selected disabled value="">Select version...</option>
+                        </select>
+                    </div>
+                </fieldset>
+
+                <div id="downloadLinks" style="display:none;margin-top:0.5em">
+                    <div style="display:flex;align-items:center;gap:0.6rem">
+                        <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
+                        <span id="npkUrl"
+                            style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                        <button id="copyNpk" class="contrast" type="button" title="Copy URL"
+                            aria-label="Copy system package URL">📋</button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
+                        <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
+                        <span id="extraUrl"
+                            style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
+                        <button id="copyExtra" class="contrast" type="button" title="Copy URL"
+                            aria-label="Copy extra packages URL">📋</button>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Schema Downloads Table -->
+        <section id="section-schema-downloads">
+            <nav>
+                <ul>
+                    <h3>Schema Downloads</h3>
+                </ul>
+                <ul>
+                    <label>
+                        <input id="schemaShowAll" type="checkbox" role="switch">
+                        Show all versions
+                    </label>
+                </ul>
+            </nav>
+            <article>
+                <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
+                </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
+                    <code>extra-packages.zip</code> available for X86.</i>
+            </article>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Version</th>
+                        <td colspan="2">REST Schema</td>
+                        <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
+                        <td>API Docs</td>
+                        <td>SNMP MIB</td>
+                    </tr>
+                </thead>
+                <tbody id="filerows" style="vertical-align: text-top;">
+                    <template id="_vercellextra">
+                        <small>
+                            <span><mark>XXXX</mark></span>
+                            <div>
+                                <a class="ver-base" href="#">base</a>
+                                <a class="ver-extra" href="#">+extra</a>
+                            </div>
+                        </small>
+                    </template>
+                    <template id="_verrow">
+                        <tr class="row-ver">
+                            <th class="cell-vername"><a href="#"></a></th>
+                            <td class="cell-raml"></td>
+                            <td class="cell-oas2"></td>
+                            <td class="cell-json"></td>
+                            <td class="cell-html"></td>
+                            <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
+                        </tr>
+                    </template>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><small>
+                                <a href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
+                            </small></td>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+
+        <!-- Disclaimer -->
+        <section>
+            <blockquote>
+                <h5>* Disclaimer</h5>
+                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
+                    connected with <a href="https://mikrotik.com">Mikrotik</a>.
+                    All product and company names are trademarks™ or registered® trademarks of their respective
+                    holders. Use of them does not imply any affiliation with or endorsement by them.</small>
+            </blockquote>
+        </section>
+
+    </main>
+
+    <!--
+        ========================================================================
+        SCRIPTS
+        ========================================================================
+    -->
+
     <script>
+        // =====================================================================
+        // Version parsing and sorting utilities
+        // =====================================================================
+
+        /**
+         * Parse a RouterOS version string into a comparable structure.
+         * Examples: "7.22" -> {major:7, minor:22, patch:0, pre:"", preNum:Infinity}
+         *           "7.22rc2" -> {major:7, minor:22, patch:0, pre:"rc", preNum:2}
+         *           "7.21beta11" -> {major:7, minor:21, patch:0, pre:"beta", preNum:11}
+         *           "7.15.3" -> {major:7, minor:15, patch:3, pre:"", preNum:Infinity}
+         */
+        function parseVersion(str) {
+            const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
+            if (!m) return null
+            return {
+                major: parseInt(m[1], 10),
+                minor: parseInt(m[2], 10),
+                patch: parseInt(m[3] || '0', 10),
+                pre: m[4] || '',
+                preNum: m[5] ? parseInt(m[5], 10) : (m[4] ? 0 : Infinity)
+            }
+        }
+
+        /**
+         * Compare two version strings for sorting (descending: newest first).
+         */
+        function compareVersions(a, b) {
+            const va = parseVersion(a)
+            const vb = parseVersion(b)
+            if (!va && !vb) return a.localeCompare(b)
+            if (!va) return 1
+            if (!vb) return -1
+            if (va.major !== vb.major) return vb.major - va.major
+            if (va.minor !== vb.minor) return vb.minor - va.minor
+            if (va.patch !== vb.patch) return vb.patch - va.patch
+            // Stable (preNum=Infinity) sorts before pre-releases
+            if (va.preNum !== vb.preNum) return vb.preNum - va.preNum
+            return 0
+        }
+
+        /**
+         * Returns true if the version is a pre-release (beta or rc).
+         */
+        function isPreRelease(name) {
+            return /(?:beta|rc)\d*$/.test(name)
+        }
+    </script>
+
+    <script>
+        // =====================================================================
         // RouterOS Binary Downloads helper
+        // =====================================================================
+
         // Queue early `builddir` events in case they fire before DOMContentLoaded
-        const _pendingBuildDirs = [];
-        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail); }
-        document.addEventListener('builddir', _earlyBuilddirListener);
+        const _pendingBuildDirs = []
+        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail) }
+        document.addEventListener('builddir', _earlyBuilddirListener)
 
         document.addEventListener('DOMContentLoaded', function () {
             const archSelect = document.getElementById('rosarch')
@@ -47,10 +377,7 @@
             const npkLink = document.getElementById('npkLink')
             const extraLink = document.getElementById('extraLink')
 
-            // Architectures used on mikrotik.com/download (adjusted names)
             const architectures = ['x86', 'arm', 'arm64', 'mipsbe', 'smips', 'tile', 'powerpc']
-
-            // populate architectures
             architectures.forEach(a => archSelect.appendChild(new Option(a, a)))
 
             // Process any queued builddir events that fired before DOMContentLoaded
@@ -63,34 +390,25 @@
                 _pendingBuildDirs.length = 0
             }
 
-            // register builddir listener for future events
+            // Register builddir listener for future events
             document.addEventListener('builddir', e => {
                 const file = e.detail
-                // append if not already present
                 if (![...verSelect.options].some(o => o.value === file.name)) {
                     verSelect.appendChild(new Option(file.name, file.name))
                 }
             })
 
             // Remove the early listener now that we've processed queued events
-            document.removeEventListener('builddir', _earlyBuilddirListener);
-
-            // NOTE: we intentionally removed the fallback GitHub API fetch here. The page
-            // already runs a single, central fetch later which dispatches `builddir` events.
-            // The separate early fetch produced 403s in some environments (rate-limited); by
-            // queueing events we avoid missing versions while also avoiding duplicate API calls.
+            document.removeEventListener('builddir', _earlyBuilddirListener)
 
             function buildNpkUrl(arch, ver) {
                 const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
-                // x86 (legacy) typically uses routeros-<ver>.npk
                 if (arch === 'x86') return baseDir + `routeros-${ver}.npk`
-                // arm/arm64 and other arches follow routeros-<arch>-<ver>.npk
                 return baseDir + `routeros-${arch}-${ver}.npk`
             }
 
             function buildExtraUrl(arch, ver) {
                 const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
-                // x86 uses all_packages-x86-<ver>.zip in workflows
                 if (arch === 'x86') return baseDir + `all_packages-x86-${ver}.zip`
                 return baseDir + `all_packages-${arch}-${ver}.zip`
             }
@@ -110,40 +428,25 @@
                 npkLink.href = npkUrl
                 npkLink.title = npkUrl
                 npkLink.textContent = 'SYSTEM PACKAGE'
-                const npkUrlSpan = document.getElementById('npkUrl')
-                npkUrlSpan.textContent = npkUrl
+                document.getElementById('npkUrl').textContent = npkUrl
 
                 extraLink.href = extraUrl
                 extraLink.title = extraUrl
                 extraLink.textContent = 'EXTRA PACKAGES'
-                const extraUrlSpan = document.getElementById('extraUrl')
-                extraUrlSpan.textContent = extraUrl
+                document.getElementById('extraUrl').textContent = extraUrl
+
                 if (dl) dl.style.display = 'block'
             }
 
-            function setupCopyButtons() {
-                const copyNpk = document.getElementById('copyNpk')
-                const copyExtra = document.getElementById('copyExtra')
-
-                copyNpk.addEventListener('click', async () => {
-                    const url = document.getElementById('npkUrl').textContent
+            function setupCopyButton(btnId, urlId) {
+                document.getElementById(btnId).addEventListener('click', async () => {
+                    const url = document.getElementById(urlId).textContent
                     if (!url) return
                     try {
                         await navigator.clipboard.writeText(url)
-                        copyNpk.textContent = '✔'
-                        setTimeout(() => (copyNpk.textContent = '📋'), 1500)
-                    } catch (err) {
-                        console.debug('Clipboard write failed', err)
-                    }
-                })
-
-                copyExtra.addEventListener('click', async () => {
-                    const url = document.getElementById('extraUrl').textContent
-                    if (!url) return
-                    try {
-                        await navigator.clipboard.writeText(url)
-                        copyExtra.textContent = '✔'
-                        setTimeout(() => (copyExtra.textContent = '📋'), 1500)
+                        const btn = document.getElementById(btnId)
+                        btn.textContent = '✔'
+                        setTimeout(() => (btn.textContent = '📋'), 1500)
                     } catch (err) {
                         console.debug('Clipboard write failed', err)
                     }
@@ -152,445 +455,156 @@
 
             archSelect.addEventListener('change', computeLinks)
             verSelect.addEventListener('change', computeLinks)
-            setupCopyButtons()
+            setupCopyButton('copyNpk', 'npkUrl')
+            setupCopyButton('copyExtra', 'extraUrl')
         })
     </script>
-    <script type="module">
-        import { diffString, diff } from 'https://cdn.jsdelivr.net/npm/json-diff@1.0.6/+esm'
-        module.diffString = diffString
-        module.diff = diff
-    </script>
-
-    <!-- DeepDiff for stats -->
-    <script src="https://cdn.jsdelivr.net/npm/deep-diff@1/dist/deep-diff.min.js"></script>
-
-    <!-- JsonPath to search inspect JSON for stats -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonpath/1.1.1/jsonpath.min.js"
-        integrity="sha512-fdudyA6TY0Kv3vTiHyZj6wkhDbmZFCflZmxtiC/lR5xRNQJaF7ODChpx0ajIIeFBBtaucDolRB1qG0r/U7eYSg=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-    <!-- Override CSS to use Mikrotik fonts-->
-    <style>
-        :root {
-            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
-            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
-            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
-        }
-    </style>
-
-    <!-- Dark Mode Support -->
-    <style>
-        header nav li a svg {
-            width: var(--font-size);
-            height: var(--font-size);
-            color: var(--contrast);
-        }
-    </style>
-</head>
-
-<body>
-
-    <header class="container">
-        <nav>
-            <ul>
-                <!-- using the **unauthorized** logo image to highlight that fact 
-                <div style="background-image: url(https://mikrotik.com/logo/assets/donot-bgpattern3-OTvv-Xcl.jpg)">
-                    <img src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" />
-                </div>
-                -->
-                <!-- just cheat for dark/light mode - i.e. it moves... -->
-                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg">
-                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg">
-            </ul>
-            <ul>
-            </ul>
-            <ul>
-                <li>
-                    <a id="theme_switcher" href="#"></a>
-                </li>
-            </ul>
-        </nav>
-        <h1><mark>Unofficial</mark> RouterOS API Schema Tools</h1>
-    </header>
-
-    <main class="container">
-        <section>
-            <h5>
-                <p>See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a> for
-                    <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
-                    <br>
-                    Problems? Create an <a href="https://github.com/tikoci/restraml/issues/new/choose">issue</a>
-                    using GitHub.
-                    <br>
-                </p>
-            </h5>
-        </section>
-        <br><br>
-
-        <section>
-            <nav>
-                <ul>
-                    <h3>
-
-                        </name><code>diff</code> RouterOS Commands
-                    </h3>
-                </ul>
-                <ul>
-                    <div>
-                        <label>
-                            <input id="diffextra" type="checkbox" role="switch" checked />
-                            <i>with</i> <code>extra-packages</code>
-                        </label>
-                    </div>
-                </ul>
-            </nav>
-
-            <fieldset class="grid">
-                <div id="inspect1">
-                    <select class="plausible-event-name=Diff+Hit" id="compare1" required>
-                        <option selected disabled value="">
-                            Version to compare...
-                        </option>
-                    </select>
-                    <small>
-                        <div name="inspectstats" class="grid" hidden>
-                            <div>
-                                <b><span name="cmd">0</span></b> commands
-                            </div>
-                            <div>
-                                <b><span name="arg">0</span></b> attributes
-                            </div>
-                        </div>
-                    </small>
-
-                </div>
-                <div id="inspect2">
-                    <select class="plausible-event-name=Diff+Hit" id="compare2" required>
-                        <option selected disabled value="">
-                            ...against this version
-                        </option>
-                    </select>
-                    <small>
-                        <div name="inspectstats" class="grid" hidden>
-                            <div>
-                                <b><span name="cmd">0</span></b> commands
-                            </div>
-                            <div>
-                                <b><span name="arg">0</span></b> attributes
-                            </div>
-                        </div>
-                    </small>
-
-                </div>
-
-            </fieldset>
-
-            <!-- For Debug Use -->
-            <!-- <details open>
-                <summary>Metadata</summary>
-                <pre><code id="diffmeta" class="language-json"></code></pre>
-            </details> -->
-
-            <details id=diffcodedetails open hidden>
-                <summary>
-                    <div class="grid">
-                        <div>
-                            <h4><code>diff</code>&nbsp;Output</h4>
-                        </div>
-                        <div class="grid">
-                            <div><b><span class="cmddiff"></span></b> commands</div>
-                            <div><b><span class="argdiff"></span></b> attributes</div>
-                        </div>
-                    </div>
-                </summary>
-                <pre><code id="diffcode" class="language-diff"></code></pre>
-            </details>
-
-        </section>
-
-        <br><br>
-
-
-        <section>
-            <h3><mark>BETA</mark> Schema for /app YAML</h3>
-            <article>
-                <small>
-                    <p>RouterOS 7.22beta introduces "custom /app" support that uses YAML to define a new
-                        /app in the RouterOS container catalog.
-                        RouterOS /app uses it's own YAML format. While similar to
-                        `docker-compose`, it not the same.
-                        In order to provide validation of MikroTik-specific /app YAML, TIKOCI has an
-                        experimental "JSON" schema to enable validation of /app YAML format in editors like
-                        VSCode.
-                        Since custom /app are still in beta, TIKOCI /app YAML schema has not
-                        published to https://www.schemastore.org yet - which allow tools like VSCode to
-                        <i>automatically</i> use to do YAML validation. <i>The schema is in JSON, but editors will use
-                            for YAML too.</i></p>
-                </small>
-
-                <p>Download the "beta" RouterOS <code>/app</code> YAML schema: <a
-                        href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
-                    and use locally in your editor.</p>
-            </article>
-
-            <br><br>
-
-            <section>
-                <h3>RouterOS Binary Downloads</h3>
-                <article>
-                    <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
-                        <code>routeros.npk</code> and the <code>all_packages</code> extra archive.
-                    </p>
-                    <fieldset class="grid">
-                        <div>
-                            <label for="rosarch"><b>Architecture</b></label>
-                            <select id="rosarch" aria-label="RouterOS architecture">
-                            </select>
-                        </div>
-                        <div>
-                            <label for="rosverselect"><b>Version</b></label>
-                            <select id="rosverselect" aria-label="RouterOS version">
-                                <option selected disabled value="">Select version...</option>
-                            </select>
-                        </div>
-                    </fieldset>
-
-                    <div id="downloadLinks" style="display:none;margin-top:0.5em">
-                        <div style="display:flex;align-items:center;gap:0.6rem">
-                            <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
-                            <span id="npkUrl"
-                                style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                            <button id="copyNpk" class="contrast" type="button" title="Copy URL"
-                                aria-label="Copy system package URL">📋</button>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
-                            <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
-                            <span id="extraUrl"
-                                style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                            <button id="copyExtra" class="contrast" type="button" title="Copy URL"
-                                aria-label="Copy extra packages URL">📋</button>
-                        </div>
-                    </div>
-                </article>
-                <h3>Schema Downloads</h3>
-                <article>
-                    <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
-                    </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
-                        <code>extra-packages.zip</code> available for X86.</i>
-                </article>
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">Version</th>
-                            <td colspan="2">REST Schema</td>
-                            <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
-                            <td>API Docs</td>
-                            <td>SNMP MIB</td>
-                        </tr>
-                    </thead>
-                    <tbody id="filerows" style="vertical-align: text-top;">
-                        <template id="_vercellextra">
-                            <small>
-                                <span><mark>XXXX</mark></span>
-                                <div><a class="ver-base" href="#">base</a>
-                                    <a class="ver-extra" href="#">+extra</a>
-                                </div>
-
-                            </small>
-                        </template>
-                        <style>
-                            .cell-vername {
-                                vertical-align: middle;
-
-                                a:link {
-                                    text-decoration: none;
-                                }
-
-                                ;
-
-                                a:visited {
-                                    text-decoration: none;
-                                }
-
-                                ;
-
-                                a:hover {
-                                    text-decoration: underline;
-                                }
-
-                                ;
-
-                                a:active {
-                                    text-decoration: underline;
-                                }
-
-                                ;
-                            }
-
-                            ;
-                        </style>
-                        <template id="_verrow">
-                            <tr class="row-ver">
-                                <th class="cell-vername"><a href="#"></a></th>
-                                <!--TODO: <button data-target="modal-example" onclick="toggleModal(event) />-->
-                                <td class="cell-raml"></td>
-                                <td class="cell-oas2"></td>
-                                <td class="cell-json"></td>
-                                <td class="cell-html"></td>
-                                <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td><small>
-                                    <a
-                                        href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
-                                </small></td>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                            <th scope="col"></th>
-                        </tr>
-                    </tfoot>
-                </table>
-                <!--
-            <article>
-                <h5>OpenAPI Format?</h5>
-                If an OpenAPI ("OAS") schema is needed, try using the <mark>RAML</mark> schema above with
-                Mulesoft's <a href="https://mulesoft.github.io/oas-raml-converter/">RAML to OAS Converter</a>. Also, <a
-                    href="https://getpostman.com">Postman</a> can also do similar API schema conversions.
-            </article>
-            -->
-            </section>
-
-            <br><br>
-
-            <section>
-                <blockquote>
-                    <h5>* Disclaimer</h5>
-                    <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
-                        connected
-                        with <a href="https://mikrotik.com">Mikrotik</a>.
-                        All product and company names are trademarks™ or registered® trademarks of their respective
-                        holders.
-                        Use
-                        of them does not imply any affiliation with or endorsement by them.</small>
-                </blockquote>
-            </section>
-
-            <!-- TODO
-        <dialog id="modal-example">
-            <article>
-                <header>
-                    <button aria-label="Close" rel="prev" data-target="modal-example"
-                        onclick="toggleModal(event)"></button>
-                    <h3>Release Notes</h3>
-                </header>
-                <p>
-                <pre>// TODO: Release notes should appear in modal</pre>
-                </p>
-                <footer>
-                    <button autofocus data-target="modal-example" onclick="toggleModal(event)">
-                        Close
-                    </button>
-                </footer>
-            </article>
-        </dialog>
-        -->
-    </main>
-
-
-
 
     <script>
-        // GH project info to find used to find available version
-        const owner = 'tikoci';
-        const repo = 'restraml';
-        const path = 'docs';
+        // =====================================================================
+        // Main application: GitHub API fetch, version table, diff tool
+        // =====================================================================
+
+        const owner = 'tikoci'
+        const repo = 'restraml'
+        const path = 'docs'
         const pagesUrl = `https://${owner}.github.io/${repo}`
 
-        // version table
-        const filerows = document.getElementById("filerows");
+        const filerows = document.getElementById('filerows')
 
-        // version table rows
-        document.addEventListener("builddir", e => {
+        // -----------------------------------------------------------------
+        // Schema downloads table: build a row for each version
+        // -----------------------------------------------------------------
+        document.addEventListener('builddir', e => {
             const file = e.detail
+            const verrow = document.getElementById('_verrow').content.cloneNode(true)
 
-            // create a new version row
-            const verrow = document.getElementById("_verrow").content.cloneNode(true)
-
-            // set version row label
-            const cellver = verrow.querySelector(".cell-vername a")
+            // Version label linking to MikroTik changelog
+            const cellver = verrow.querySelector('.cell-vername a')
             cellver.href = `https://download.mikrotik.com/routeros/${file.name}/CHANGELOG`
             cellver.textContent = file.name
 
-            // set RAML, HTML, and inspect.json - which deal with extra-pacakges
-            function makeVerCellExtra(schematype = "raml", schemafile = "schema.raml", opts = { base: true }) {
-                const filepart = schemafile //extension ? `${schemafile}.${schematype}` : schemafile
+            // Helper: populate a cell with base/extra download links
+            function makeVerCellExtra(schematype, schemafile, opts = { base: true }) {
                 const cell = verrow.querySelector(`.cell-${schematype}`)
-                cell.appendChild(document.getElementById("_vercellextra").content.cloneNode(true))
-                cell.querySelector("mark").textContent = schematype.toUpperCase()
-                const verbase = cell.querySelector(".ver-base")
-                opts.base ?
-                    verbase.href = `${file.name}/${filepart}` :
+                cell.appendChild(document.getElementById('_vercellextra').content.cloneNode(true))
+                cell.querySelector('mark').textContent = schematype.toUpperCase()
+                const verbase = cell.querySelector('.ver-base')
+                if (opts.base) {
+                    verbase.href = `${file.name}/${schemafile}`
+                } else {
                     verbase.hidden = true
-                cell.querySelector(".ver-extra").href = `${file.name}/extra/${filepart}`
+                }
+                cell.querySelector('.ver-extra').href = `${file.name}/extra/${schemafile}`
             }
-            makeVerCellExtra("raml", "schema.raml",)
-            makeVerCellExtra("oas2", "oas2.json", { base: false })
-            makeVerCellExtra("html", "docs",)
-            makeVerCellExtra("json", "inspect.json")
 
-            // set version row label
-            const cellmib = verrow.querySelector(".cell-mib a")
-            cellmib.href = `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`
+            makeVerCellExtra('raml', 'schema.raml')
+            makeVerCellExtra('oas2', 'oas2.json', { base: false })
+            makeVerCellExtra('html', 'docs')
+            makeVerCellExtra('json', 'inspect.json')
 
-            // add version row to table
+            // SNMP MIB link
+            verrow.querySelector('.cell-mib a').href =
+                `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`
+
+            // Tag row with version name for filtering
+            const tr = verrow.querySelector('.row-ver')
+            tr.dataset.version = file.name
+
+            // Hide pre-release rows by default
+            if (isPreRelease(file.name)) {
+                tr.style.display = 'none'
+            }
+
             filerows.appendChild(verrow)
         })
 
+        // -----------------------------------------------------------------
+        // "Show all versions" toggle for schema downloads table
+        // -----------------------------------------------------------------
+        document.addEventListener('DOMContentLoaded', () => {
+            const schemaShowAll = document.getElementById('schemaShowAll')
+            schemaShowAll.addEventListener('change', () => {
+                const show = schemaShowAll.checked
+                document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                    if (isPreRelease(row.dataset.version)) {
+                        row.style.display = show ? '' : 'none'
+                    }
+                })
+            })
+        })
 
-        // version diff inputs 
+        // -----------------------------------------------------------------
+        // Diff tool: version selection and comparison
+        // -----------------------------------------------------------------
         const compare1 = document.getElementById('compare1')
         const compare2 = document.getElementById('compare2')
         const diffextra = document.getElementById('diffextra')
-
-        // verison diff output
         const diffcode = document.getElementById('diffcode')
         const diffcodedetails = document.getElementById('diffcodedetails')
-        const ecmddiff = diffcodedetails.querySelector(".cmddiff")
-        const eargdiff = diffcodedetails.querySelector(".argdiff")
+        const ecmddiff = diffcodedetails.querySelector('.cmddiff')
+        const eargdiff = diffcodedetails.querySelector('.argdiff')
 
-        // version diff UI logic
-        compare1.addEventListener("change", e => {
-            if (compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        // Trigger comparison when both versions are selected
+        compare1.addEventListener('change', () => {
+            if (compare2.value) document.dispatchEvent(new Event('vercompare'))
         })
-        compare2.addEventListener("change", e => {
-            if (compare1.value) { document.dispatchEvent(new Event("vercompare")) }
+        compare2.addEventListener('change', () => {
+            if (compare1.value) document.dispatchEvent(new Event('vercompare'))
         })
-        diffextra.addEventListener("change", e => {
-            if (compare1.value && compare2.value) { document.dispatchEvent(new Event("vercompare")) }
+        diffextra.addEventListener('change', () => {
+            if (compare1.value && compare2.value) document.dispatchEvent(new Event('vercompare'))
         })
 
-        // add version to diff dropdowns
-        document.addEventListener("builddir", e => {
+        // All collected versions for diff dropdowns (sorted at insertion time)
+        const _diffVersions = []
+
+        // "Show all versions" toggle for diff dropdowns
+        document.addEventListener('DOMContentLoaded', () => {
+            const diffShowAll = document.getElementById('diffShowAll')
+            diffShowAll.addEventListener('change', () => {
+                const show = diffShowAll.checked
+                ;[compare1, compare2].forEach(sel => {
+                    ;[...sel.options].forEach(opt => {
+                        if (opt.disabled) return // skip placeholder
+                        if (isPreRelease(opt.value)) {
+                            opt.hidden = !show
+                        }
+                    })
+                })
+            })
+        })
+
+        // Populate diff dropdowns from builddir events
+        document.addEventListener('builddir', e => {
             const file = e.detail
-            compare1.appendChild(new Option(file.name, file.name))
-            compare2.appendChild(new Option(file.name, file.name))
+            _diffVersions.push(file.name)
+            _diffVersions.sort(compareVersions)
+
+            // Rebuild both selects in sorted order
+            ;[compare1, compare2].forEach(sel => {
+                const selectedVal = sel.value
+                // Remove all non-placeholder options
+                while (sel.options.length > 1) sel.remove(1)
+                _diffVersions.forEach(name => {
+                    const opt = new Option(name, name)
+                    if (isPreRelease(name)) opt.hidden = true
+                    sel.appendChild(opt)
+                })
+                sel.value = selectedVal
+            })
         })
 
-        // actual version diff
-        document.addEventListener("vercompare", e => {
-            async function onVerCompare() {
-                console.debug("Starting diff.", { compare1, compare2, diffextra, e })
-                // lock version selection while running
+        // Run the diff comparison
+        document.addEventListener('vercompare', () => {
+            (async function onVerCompare() {
+                // Lock controls during comparison
                 compare1.disabled = true
                 compare2.disabled = true
                 diffextra.disabled = true
                 diffcodedetails.open = false
                 diffcodedetails.hidden = true
-                document.querySelectorAll(`[name=inspectstats]`).forEach(e => e.hidden = true)
+                document.querySelectorAll('[name=inspectstats]').forEach(e => e.hidden = true)
 
                 const useextra = diffextra.checked
                 const files = [
@@ -598,79 +612,70 @@
                     await fetchInspect(compare2.value, useextra)
                 ]
 
-                // run json-diff to get textual diff, and add color back via highlight.js
+                // Generate textual diff and highlight
                 diffcode.removeAttribute('data-highlighted')
                 diffcode.textContent = module.diffString(files[0], files[1], { colors: false })
                 diffcodedetails.hidden = false
                 diffcodedetails.open = true
                 hljs.highlightElement(diffcode)
-                diffcode.classList.remove("hljs")
+                diffcode.classList.remove('hljs')
 
-                // show diff stats
-                const ncmd1 = document.querySelector(`#inspect1 [name=cmd]`).textContent
-                const narg1 = document.querySelector(`#inspect1 [name=arg]`).textContent
-                const ncmd2 = document.querySelector(`#inspect2 [name=cmd]`).textContent
-                const narg2 = document.querySelector(`#inspect2 [name=arg]`).textContent
+                // Compute and display diff stats
+                const ncmd1 = parseInt(document.querySelector('#inspect1 [name=cmd]').textContent, 10)
+                const narg1 = parseInt(document.querySelector('#inspect1 [name=arg]').textContent, 10)
+                const ncmd2 = parseInt(document.querySelector('#inspect2 [name=cmd]').textContent, 10)
+                const narg2 = parseInt(document.querySelector('#inspect2 [name=arg]').textContent, 10)
                 const ncmddiff = ncmd2 - ncmd1
                 const nargdiff = narg2 - narg1
-                ecmddiff.textContent = `${ncmddiff > 0 ? "+" : ""}${ncmddiff}`
-                eargdiff.textContent = `${nargdiff > 0 ? "+" : ""}${nargdiff}`
-                ecmddiff.style = `color: ${ncmddiff > 0 ? "green" : "red"}`
-                eargdiff.style = `color: ${nargdiff > 0 ? "green" : "red"}`
+                ecmddiff.textContent = `${ncmddiff > 0 ? '+' : ''}${ncmddiff}`
+                eargdiff.textContent = `${nargdiff > 0 ? '+' : ''}${nargdiff}`
+                ecmddiff.style.color = ncmddiff > 0 ? 'green' : 'red'
+                eargdiff.style.color = nargdiff > 0 ? 'green' : 'red'
 
-
-                // re-enable controls
+                // Re-enable controls
                 compare1.disabled = false
                 compare2.disabled = false
                 diffextra.disabled = false
 
-                plausible("Diff Run", { props: { compareLeft: compare1.value, compareRight: compare2.value } })
-
-                console.debug("Diff done.  JSON diff stats:", jsonDiffStats(files[0], files[1]))
-            }
-
-            onVerCompare()
+                plausible('Diff Run', { props: { compareLeft: compare1.value, compareRight: compare2.value } })
+            })()
         })
 
-        // update stats on ver diff, for each file after downloaded
+        // Update per-version stats when inspect.json is downloaded
         document.addEventListener('inspectdownload', e => {
-            console.debug("inspectdownload event fired", e)
-            const ever = e.detail.ver
-            const ejson = JSON.parse(JSON.stringify(e.detail.json))
-
+            const { ver, json } = e.detail
+            const ejson = JSON.parse(JSON.stringify(json))
             const types = (new jsonpath.JSONPath()).query(ejson, `$..*[?(@._type)]._type`)
             const stats = { arg: 0, cmd: 0, dir: 0 }
             types.forEach(x => stats[x]++)
 
-            let tag = document.querySelector(`#compare1`).value
-            if (tag === ever) {
-                document.querySelector(`#inspect1 [name=cmd]`).textContent = stats.cmd
-                document.querySelector(`#inspect1 [name=arg]`).textContent = stats.arg
-                document.querySelector(`#inspect1 [name=inspectstats]`).hidden = false
+            if (compare1.value === ver) {
+                document.querySelector('#inspect1 [name=cmd]').textContent = stats.cmd
+                document.querySelector('#inspect1 [name=arg]').textContent = stats.arg
+                document.querySelector('#inspect1 [name=inspectstats]').hidden = false
             }
-            tag = document.querySelector(`#compare2`).value
-            if (tag === ever) {
-                document.querySelector(`#inspect2 [name=cmd]`).textContent = stats.cmd
-                document.querySelector(`#inspect2 [name=arg]`).textContent = stats.arg
-                document.querySelector(`#inspect2 [name=inspectstats]`).hidden = false
+            if (compare2.value === ver) {
+                document.querySelector('#inspect2 [name=cmd]').textContent = stats.cmd
+                document.querySelector('#inspect2 [name=arg]').textContent = stats.arg
+                document.querySelector('#inspect2 [name=inspectstats]').hidden = false
             }
         })
 
-        // helper to do the fetch
+        // Fetch inspect.json for a version and dispatch inspectdownload event
         function fetchInspect(ver, extra = false) {
-            console.debug("fetchInspect() called", { ver, extra })
-            const subdir = extra ? "/extra" : ""
+            const subdir = extra ? '/extra' : ''
             return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
                 .then(response => response.json())
                 .then(data => {
                     document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
                     return data
                 })
-                .catch(error => console.error('Error fetching inspect data', ver, extra, error));
+                .catch(error => console.error('Error fetching inspect data', ver, extra, error))
         }
 
-
-        // "MAIN" - fetch all the version from GitHub, which triggers everything via builddir
+        // -----------------------------------------------------------------
+        // Main: fetch version list from GitHub API, dispatch builddir events
+        // -----------------------------------------------------------------
         fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`)
             .then(response => {
                 if (!response.ok) {
@@ -683,163 +688,56 @@
                     console.error('Unexpected GitHub API payload for contents:', data)
                     return
                 }
-                data.forEach(file => {
-                    if (file.type === "dir") {
-                        console.debug("Got file from GitHub", file)
-                        file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
-                        if (file.name !== "extra") {
-                            document.dispatchEvent(new CustomEvent("builddir", { detail: file }))
-                        }
-                    }
+                // Filter to version directories, sort by semver, then dispatch events
+                const versionDirs = data
+                    .filter(file => file.type === 'dir' && file.name !== 'extra')
+                    .sort((a, b) => compareVersions(a.name, b.name))
+
+                versionDirs.forEach(file => {
+                    file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
+                    document.dispatchEvent(new CustomEvent('builddir', { detail: file }))
                 })
             })
-            .catch(error => console.error('Error fetching build list from GitHub:', error));
-
+            .catch(error => console.error('Error fetching build list from GitHub:', error))
     </script>
 
     <script>
-        function jsonDiffStats(oldJson, newJson) {
-            // Generate the diff
-            const differences = new DeepDiff(oldJson, newJson);
-            console.debug(differences)
-
-            // Schema for results
-            const stats = {
-                added: 0,
-                removed: 0,
-                changed: 0,
-                elements: {
-                    added: 0,
-                    removed: 0,
-                    changed: 0
-                },
-            }
-
-            // Process DeepDiff
-            differences.forEach(diff => {
-                const path = diff.path.join('.');
-                switch (diff.kind) {
-                    case 'N': // New value
-                        stats.added++
-                        break
-                    case 'D': // Deleted value
-                        stats.removed++
-                        break
-                    case 'E': // Edited value
-                        stats.changed++
-                        break
-                    case 'A': // Array change
-                        if (diff.item.kind === 'N') {
-                            stats.elements.added++
-                        } else if (diff.item.kind === 'D') {
-                            stats.elements.removed++
-                        } else if (diff.item.kind === 'E') {
-                            stats.elements.changed++
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            });
-
-            return stats
-        }
-    </script>
-
-    <script>
-        /*** Dark Mode Handling ***/
-        let isLight = true
+        // =====================================================================
+        // Dark mode theme switcher (cycles: auto -> light -> dark -> auto)
+        // =====================================================================
         const html = document.documentElement
         const switchTheme = document.getElementById('theme_switcher')
+
         const sun = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
         const moon = '<svg width="23px" height="23px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
-        const os_default = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+        const osDefault = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+
+        // Theme states cycle: auto -> light -> dark -> auto
+        let themeState = 'auto'
 
         document.addEventListener('DOMContentLoaded', () => {
-            switchTheme.innerHTML = os_default
+            switchTheme.innerHTML = osDefault
             html.setAttribute('data-theme', 'auto')
         })
+
         switchTheme.addEventListener('click', (e) => {
             e.preventDefault()
-            isLight = !isLight
-            html.setAttribute('data-theme', isLight ? 'light' : 'dark')
-            switchTheme.innerHTML = isLight ? sun : moon
+            if (themeState === 'auto') {
+                themeState = 'light'
+                html.setAttribute('data-theme', 'light')
+                switchTheme.innerHTML = sun
+            } else if (themeState === 'light') {
+                themeState = 'dark'
+                html.setAttribute('data-theme', 'dark')
+                switchTheme.innerHTML = moon
+            } else {
+                themeState = 'auto'
+                html.setAttribute('data-theme', 'auto')
+                switchTheme.innerHTML = osDefault
+            }
         })
     </script>
-    <!-- TODO 
-    <script>
-       
-        // Config
-        const isOpenClass = "modal-is-open";
-        const openingClass = "modal-is-opening";
-        const closingClass = "modal-is-closing";
-        const scrollbarWidthCssVar = "--pico-scrollbar-width";
-        const animationDuration = 400; // ms
-        let visibleModal = null;
 
-        // Toggle modal
-        const toggleModal = (event) => {
-            event.preventDefault();
-            const modal = document.getElementById(event.currentTarget.dataset.target);
-            if (!modal) return;
-            modal && (modal.open ? closeModal(modal) : openModal(modal));
-        };
-
-        // Open modal
-        const openModal = (modal) => {
-            const { documentElement: html } = document;
-            const scrollbarWidth = getScrollbarWidth();
-            if (scrollbarWidth) {
-                html.style.setProperty(scrollbarWidthCssVar, `${scrollbarWidth}px`);
-            }
-            html.classList.add(isOpenClass, openingClass);
-            setTimeout(() => {
-                visibleModal = modal;
-                html.classList.remove(openingClass);
-            }, animationDuration);
-            modal.showModal();
-        };
-
-        // Close modal
-        const closeModal = (modal) => {
-            visibleModal = null;
-            const { documentElement: html } = document;
-            html.classList.add(closingClass);
-            setTimeout(() => {
-                html.classList.remove(closingClass, isOpenClass);
-                html.style.removeProperty(scrollbarWidthCssVar);
-                modal.close();
-            }, animationDuration);
-        };
-
-        // Close with a click outside
-        document.addEventListener("click", (event) => {
-            if (visibleModal === null) return;
-            const modalContent = visibleModal.querySelector("article");
-            const isClickInside = modalContent.contains(event.target);
-            !isClickInside && closeModal(visibleModal);
-        });
-
-        // Close with Esc key
-        document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && visibleModal) {
-                closeModal(visibleModal);
-            }
-        });
-
-        // Get scrollbar width
-        const getScrollbarWidth = () => {
-            const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-            return scrollbarWidth;
-        };
-
-        // Is scrollbar visible
-        const isScrollbarVisible = () => {
-            return document.body.scrollHeight > screen.height;
-        };
-
-    </script>
-    -->
 </body>
 
 </html>
