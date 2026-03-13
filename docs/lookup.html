@@ -13,7 +13,7 @@
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
         rel="stylesheet">
 
     <!-- Plausible analytics -->
@@ -23,7 +23,7 @@
 
     <style>
         :root {
-            --pico-font-family-sans-serif: system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
             --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
@@ -32,6 +32,14 @@
             width: var(--font-size);
             height: var(--font-size);
             color: var(--contrast);
+        }
+
+        /* MikroTik logo: swap dark/light based on data-theme */
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        [data-theme=light] img[data-theme=dark] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
         }
 
         #results-table td:first-child,
@@ -75,6 +83,16 @@
             </ul>
             <ul></ul>
             <ul>
+                <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html">Schema Downloads</a></li>
+                            <li><a href="lookup.html" aria-current="page">Command Lookup</a></li>
+                            <li><a href="diff.html">Schema Diff</a></li>
+                        </ul>
+                    </details>
+                </li>
                 <li>
                     <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
@@ -122,6 +140,12 @@
                 <ul>
                     <li>
                         <label>
+                            <input id="includeExtra" type="checkbox" role="switch" aria-label="Include extra-packages in search">
+                            <i>with</i> <code>extra-packages</code>
+                        </label>
+                    </li>
+                    <li style="margin-left:1rem">
+                        <label>
                             <input id="checkAllVersions" type="checkbox" role="switch">
                             check all versions
                         </label>
@@ -154,11 +178,9 @@
             </div>
         </section>
 
-        <!-- Footer navigation -->
+        <!-- Footer -->
         <section>
             <p>
-                <a href="index.html">&larr; RouterOS Schema Tools</a>
-                &nbsp;&middot;&nbsp;
                 <a href="https://github.com/tikoci/restraml#readme">tikoci/restraml on GitHub</a>
             </p>
         </section>
@@ -233,6 +255,7 @@
         const versionSelect = document.getElementById('version-select')
         const checkAllVersions = document.getElementById('checkAllVersions')
         const includeTesting = document.getElementById('includeTesting')
+        const includeExtra = document.getElementById('includeExtra')
         const resultsSection = document.getElementById('results-section')
         const resultsSummary = document.getElementById('results-summary')
         const resultsBody = document.getElementById('results-body')
@@ -276,6 +299,9 @@
         //   not found         → found:false with detail explaining why
         // -----------------------------------------------------------------
         function lookupInInspect(json, segments, attr) {
+            if (!segments || segments.length === 0) {
+                return { found: false, detail: 'no path entered' }
+            }
             let node = json
             for (const seg of segments) {
                 if (!node || typeof node !== 'object' ||
@@ -315,22 +341,28 @@
                 return { found: true, detail }
             }
 
-            // Fallback: just report found
-            return { found: true, detail: nodeType || '' }
+            // Unknown node type — treat as not found to avoid false positives
+            if (!nodeType) {
+                return { found: false, detail: 'path does not point to a valid RouterOS node' }
+            }
+            return { found: true, detail: nodeType }
         }
 
         // -----------------------------------------------------------------
         // Fetch (and cache) inspect.json for a version
+        // Uses extra-packages variant when useExtra is true.
         // -----------------------------------------------------------------
-        function loadInspectJson(ver) {
-            if (inspectCache[ver]) return Promise.resolve(inspectCache[ver])
-            return fetch(`${pagesUrl}/${ver}/inspect.json`)
+        function loadInspectJson(ver, useExtra) {
+            const subdir = useExtra ? '/extra' : ''
+            const key = ver + (useExtra ? '::extra' : '')
+            if (inspectCache[key]) return Promise.resolve(inspectCache[key])
+            return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`)
                     return r.json()
                 })
                 .then(data => {
-                    inspectCache[ver] = data
+                    inspectCache[key] = data
                     return data
                 })
         }
@@ -394,8 +426,14 @@
             }
 
             const segments = parseCombinedPath(pathStr)
+            if (segments.length === 0) {
+                resultsSection.hidden = true
+                return
+            }
+
             const lookAll = checkAllVersions.checked
             const showTesting = includeTesting.checked
+            const useExtra = includeExtra.checked
 
             // Determine which versions to check
             const versionsToCheck = lookAll
@@ -424,7 +462,7 @@
 
                 let result
                 try {
-                    const json = await loadInspectJson(ver)
+                    const json = await loadInspectJson(ver, useExtra)
                     if (thisId !== runLookupId) return // cancelled after fetch
                     result = lookupInInspect(json, segments, attrStr)
                 } catch (err) {
@@ -484,6 +522,9 @@
         // Version select change → immediate single-version lookup
         versionSelect.addEventListener('change', () => triggerLookup(true))
 
+        // "include extra-packages" toggle → immediate lookup
+        includeExtra.addEventListener('change', () => triggerLookup(true))
+
         // "Check all versions" toggle → update disabled state, immediate lookup
         checkAllVersions.addEventListener('change', () => {
             versionSelect.disabled = checkAllVersions.checked
@@ -539,7 +580,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             switchTheme.innerHTML = osDefault
-            html.setAttribute('data-theme', 'auto')
+            // Do NOT set data-theme in auto mode — Pico CSS follows @media (prefers-color-scheme) natively.
+            // Setting data-theme='auto' is not a valid Pico v2 value and forces light mode.
         })
 
         switchTheme.addEventListener('click', (e) => {
@@ -554,7 +596,7 @@
                 switchTheme.innerHTML = moon
             } else {
                 themeState = 'auto'
-                html.setAttribute('data-theme', 'auto')
+                html.removeAttribute('data-theme')  // No attribute = Pico follows OS
                 switchTheme.innerHTML = osDefault
             }
         })

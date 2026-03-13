@@ -63,6 +63,14 @@
             color: var(--contrast);
         }
 
+        /* MikroTik logo: swap dark/light based on data-theme */
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        [data-theme=light] img[data-theme=dark] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+        }
+
         /* Version table link styles */
         .cell-vername a:link,
         .cell-vername a:visited {
@@ -92,6 +100,16 @@
             <ul></ul>
             <ul>
                 <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html" aria-current="page">Schema Downloads</a></li>
+                            <li><a href="lookup.html">Command Lookup</a></li>
+                            <li><a href="diff.html">Schema Diff</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li>
                     <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
             </ul>
@@ -108,9 +126,7 @@
                     href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                 for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
                 <br>
-                Try new RouterOS <a href="lookup.html">command search tool</a>.
-                <br>
-                View <a href="diff.html">side-by-side schema diff</a> between versions.
+                For additional tools — command search and version diff — check the <b>Tools</b> menu above.
                 <br>
                 Problems? Create an <a
                     href="https://github.com/tikoci/restraml/issues/new/choose">issue</a> using GitHub.
@@ -605,7 +621,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             switchTheme.innerHTML = osDefault
-            html.setAttribute('data-theme', 'auto')
+            // Do NOT set data-theme in auto mode — Pico CSS follows @media (prefers-color-scheme) natively.
+            // Setting data-theme='auto' is not a valid Pico v2 value and forces light mode.
         })
 
         switchTheme.addEventListener('click', (e) => {
@@ -620,7 +637,7 @@
                 switchTheme.innerHTML = moon
             } else {
                 themeState = 'auto'
-                html.setAttribute('data-theme', 'auto')
+                html.removeAttribute('data-theme')  // No attribute = Pico follows OS
                 switchTheme.innerHTML = osDefault
             }
         })

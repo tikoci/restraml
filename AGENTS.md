@@ -61,11 +61,12 @@ The `appyamlschemas.yaml` workflow generates and validates them using `appyamlva
 ### Web Pages (`docs/`)
 All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 
-> **Dark mode and diff2html gotchas are documented in `CLAUDE.md`** under
-> "Dark Mode — Correct Pattern for All `docs/` Pages" and "diff2html Integration".
-> Read those sections before touching dark mode logic or adding diff rendering to any page.
+> **Dark mode, diff2html gotchas, and the Tools nav dropdown pattern are documented in `CLAUDE.md`**
+> under "Dark Mode — Correct Pattern for All `docs/` Pages", "diff2html Integration", and
+> "Tools Nav Dropdown — Shared Navigation Pattern".
+> Read those sections before touching dark mode logic, adding diff rendering, or creating new pages.
 - **Pico CSS** (`@picocss/pico@2`) — only CSS framework allowed.
-- **JetBrains Mono** — required font. Can be used creatively for visual effects.
+- **JetBrains Mono + Manrope** — required fonts for all pages. Both must be loaded via Google Fonts.
 - **Semantic HTML** — use proper elements (`<header>`, `<main>`, `<section>`, etc.).
 - **No web frameworks** — no React, Vue, Svelte, etc. Vanilla JavaScript only.
 - **Avoid submit buttons** — use JS event listeners (`input`, `change`, `keydown`) instead of
@@ -75,6 +76,8 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **GitHub API/GraphQL** — use for dynamic data (version lists, schema contents, inspect JSON).
 - **Single `.html` file** — keep JS inline unless there is a very strong reason for separation.
 - **Minimal CDN dependencies** — only add libraries that meaningfully solve a problem.
+- **Tools nav dropdown** — every page must include the shared Tools `<details class="dropdown">` in the nav.
+  When adding a new tool page, update the dropdown in `index.html`, `lookup.html`, and `diff.html` too.
 
 ---
 
@@ -90,8 +93,9 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 1. Read the issue for the desired feature/view.
 2. Create `docs/{custom-name}.html` following the web page conventions above.
 3. Use `docs/index.html` as a reference for patterns (GitHub API fetch, Pico CSS, dark mode, etc.).
-4. Link back to `docs/index.html` for navigation.
-5. Keep all JS in the single HTML file.
+4. Add the shared **Tools nav dropdown** to the new page (see `CLAUDE.md` → "Tools Nav Dropdown").
+5. Also add the new page to the dropdown list in `index.html`, `lookup.html`, and `diff.html`.
+6. Keep all JS in the single HTML file.
 
 ### Update /app YAML schema
 1. Edit `docs/routeros-app-yaml-schema.latest.json` for the single /app schema.

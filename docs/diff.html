@@ -64,8 +64,12 @@
 
         /* Reset Pico CSS table styles that break diff2html layout.
            ID prefix gives us specificity over Pico's [data-theme] attribute selectors.
-           Also reset table background — diff2html's own CSS sets table{background:#fff}
-           which makes empty side-by-side panels appear white. */
+           Also reset backgrounds on diff2html wrapper divs and the table itself — diff2html's
+           own CSS sets opaque white backgrounds that show through in dark mode. */
+        #diffoutput .d2h-file-wrapper,
+        #diffoutput .d2h-diff-table-wrapper {
+            background-color: transparent;
+        }
         #diffoutput .d2h-wrapper table { background-color: unset; }
         #diffoutput .d2h-wrapper td,
         #diffoutput .d2h-wrapper th {
@@ -157,6 +161,16 @@
             <ul></ul>
             <ul>
                 <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html">Schema Downloads</a></li>
+                            <li><a href="lookup.html">Command Lookup</a></li>
+                            <li><a href="diff.html" aria-current="page">Schema Diff</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li>
                     <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
                 </li>
             </ul>
@@ -167,9 +181,6 @@
     <main class="container">
 
         <section>
-            <p>
-                ← <a href="index.html">Back to main page</a>
-            </p>
             <p>
                 Side-by-side diff of RouterOS API commands between two versions.
                 Each line represents a path (<code>/ip/address/</code>), command
