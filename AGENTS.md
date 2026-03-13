@@ -61,10 +61,9 @@ The `appyamlschemas.yaml` workflow generates and validates them using `appyamlva
 ### Web Pages (`docs/`)
 All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 
-> **Dark mode, diff2html gotchas, and the Tools nav dropdown pattern are documented in `CLAUDE.md`**
-> under "Dark Mode — Correct Pattern for All `docs/` Pages", "diff2html Integration", and
-> "Tools Nav Dropdown — Shared Navigation Pattern".
-> Read those sections before touching dark mode logic, adding diff rendering, or creating new pages.
+> **Dark mode, diff2html gotchas, Tools nav dropdown, shareable URL, and Share modal patterns are documented in `CLAUDE.md`**
+> under the relevant sections. Read those sections before touching dark mode logic, adding diff rendering,
+> adding query string support, or creating new pages.
 - **Pico CSS** (`@picocss/pico@2`) — only CSS framework allowed.
 - **JetBrains Mono + Manrope** — required fonts for all pages. Both must be loaded via Google Fonts.
 - **Semantic HTML** — use proper elements (`<header>`, `<main>`, `<section>`, etc.).
@@ -78,6 +77,11 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **Minimal CDN dependencies** — only add libraries that meaningfully solve a problem.
 - **Tools nav dropdown** — every page must include the shared Tools `<details class="dropdown">` in the nav.
   When adding a new tool page, update the dropdown in `index.html`, `lookup.html`, and `diff.html` too.
+- **Shareable URLs** — use `history.replaceState()` to keep the URL current as the user interacts.
+  Read query params after the async version list loads (so `<select>` options exist). See `CLAUDE.md`
+  for the full parameter list per page.
+- **Share modal** — use `<dialog>` with `showModal()` / `close()`. Show URL + copy button.
+  See `diff.html` or `lookup.html` for the canonical implementation.
 
 ---
 
