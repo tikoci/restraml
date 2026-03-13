@@ -147,6 +147,12 @@
             overflow-x: auto;
         }
 
+        /* Hide @@ hunk markers when hide-markers class is applied */
+        #diffoutput.hide-markers td.d2h-info,
+        #diffoutput.hide-markers .d2h-info {
+            display: none;
+        }
+
         /* Loading spinner placement */
         #diffstatus {
             margin-top: 1rem;
@@ -250,12 +256,14 @@
                     <select id="diffContext" style="display:inline-block; width:auto; padding:0.15em 0.4em; font-size:0.85em; margin:0 0.2rem; vertical-align:baseline">
                         <option value="0" selected>no</option>
                         <option value="3">+/- 3 lines</option>
-                        <option value="9999">all</option>
+
                     </select>
-                    context, and
-                    <label style="display:inline; margin:0">
-                        <input id="showMarkers" type="checkbox"> showing <code>@@</code> hunk markers
-                    </label>
+                    context
+                    <select id="diffHunks" style="display:inline-block; width:auto; padding:0.15em 0.4em; font-size:0.85em; margin:0 0.2rem; vertical-align:baseline">
+                        <option value="showing" selected>showing</option>
+                        <option value="hiding">hiding</option>
+                    </select>
+                    hunks
                 </small>
             </div>
 
@@ -371,8 +379,9 @@
         document.getElementById('diffContext').addEventListener('change', () => {
             if (_lastText1) rerenderFromCache()
         })
-        document.getElementById('showMarkers').addEventListener('change', () => {
-            diffoutput.classList.toggle('hide-markers', !document.getElementById('showMarkers').checked)
+        document.getElementById('diffHunks').addEventListener('change', () => {
+            const hideMarkers = document.getElementById('diffHunks').value === 'hiding'
+            diffoutput.classList.toggle('hide-markers', hideMarkers)
         })
 
         // All collected versions for diff dropdowns (sorted at insertion time)
@@ -478,8 +487,8 @@
                 matching: 'lines',
                 outputFormat: getDiffFormat(),
             })
-            const showMarkers = document.getElementById('showMarkers')
-            diffoutput.classList.toggle('hide-markers', !showMarkers.checked)
+            const hideMarkers = document.getElementById('diffHunks').value === 'hiding'
+            diffoutput.classList.toggle('hide-markers', hideMarkers)
         }
 
         function rerenderFromCache() {
