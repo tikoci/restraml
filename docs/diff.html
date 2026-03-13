@@ -439,7 +439,9 @@
 
         // Update per-version stats when inspect.json is downloaded
         document.addEventListener('inspectdownload', e => {
-            const { ver, json } = e.detail
+            const { ver, json, extra } = e.detail
+            // Only update these stats for the base (non-extra) schema
+            if (extra) return
             let cmdCount = 0, argCount = 0
             function countTypes(obj) {
                 for (const k of Object.keys(obj)) {
@@ -470,7 +472,9 @@
             const subdir = extra ? '/extra' : ''
             const key = ver + subdir
             if (_inspectCache[key]) {
-                return Promise.resolve(_inspectCache[key])
+                const cached = _inspectCache[key]
+                document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: cached, extra } }))
+                return Promise.resolve(cached)
             }
             const url = pagesUrl + '/' + ver + subdir + '/inspect.json'
             return fetch(url)
@@ -482,7 +486,7 @@
                 })
                 .then(data => {
                     _inspectCache[key] = data
-                    document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data } }))
+                    document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data, extra } }))
                     return data
                 })
                 .catch(err => {
