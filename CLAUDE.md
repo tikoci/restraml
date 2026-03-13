@@ -12,9 +12,8 @@ The pipeline is:
 1. Boot a RouterOS CHR (Cloud Hosted Router) directly in QEMU on the GitHub Actions runner
 2. Query the router's `/console/inspect` REST endpoint to extract the full command/API tree
 3. Convert that tree to [RAML 1.0](https://raml.org/) schema format
-4. Convert RAML → OpenAPI 2.0 (OAS2)
-5. Generate an HTML reference page from RAML
-6. Commit everything to `/docs/` and publish via GitHub Pages
+4. Generate an HTML reference page from RAML
+5. Commit everything to `/docs/` and publish via GitHub Pages
 
 The generated schemas live at https://tikoci.github.io/restraml — with per-version folders in `/docs/`.
 
@@ -25,7 +24,6 @@ The generated schemas live at https://tikoci.github.io/restraml — with per-ver
 ```
 restraml/
 ├── rest2raml.js          # Main script: connects to RouterOS REST API → RAML 1.0
-├── raml2oas.cjs          # Converts RAML 1.0 → OAS 2.0 (uses webapi-parser)
 ├── validraml.cjs         # Validates RAML 1.0 (uses webapi-parser)
 ├── appyamlvalidate.js    # Validates /app YAML schemas and built-in /app YAMLs (Bun)
 ├── Dockerfile.chr-qemu   # Alpine image that runs RouterOS CHR in QEMU (for local use)
@@ -40,7 +38,6 @@ restraml/
 │   ├── {version}/
 │   │   ├── schema.raml                          # RAML 1.0 schema (presence = "this version is built")
 │   │   ├── inspect.json                         # Raw /console/inspect output from RouterOS
-│   │   ├── oas2.json                            # OpenAPI 2.0 schema
 │   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
 │   │   ├── routeros-app-yaml-store-schema.json  # /app store schema for this version
@@ -193,7 +190,7 @@ docker run --rm -d --device /dev/kvm -p 9180:80 -p 9122:22 chr-qemu
 After schema generation, files are committed directly to `main` branch by `github-actions[bot]`.
 The commit structure is:
 ```
-docs/{rosver}/{schema.raml,inspect.json,oas2.json}
+docs/{rosver}/{schema.raml,inspect.json}
 docs/{rosver}/docs/index.html
 docs/{rosver}/extra/{schema.raml,...}   # extra-packages build only
 ```
@@ -337,7 +334,6 @@ manually, dispatch `auto.yaml` via `workflow_dispatch` with no inputs. Alternati
      QEMU errors. Most likely KVM is unavailable or the image is corrupt.
    - **`rosver` output is empty**: The `bun rest2raml.js --version` step's output parsing failed;
      check the `xargs` command in the `connection-check` step
-   - **`cp ros-oas2*.json` fails**: `raml2oas.cjs` produces `ros-oas20.json`, not `ros-oas2*.json`
 
 ### "Add support for a new RouterOS version format"
 RouterOS versions follow `MAJOR.MINOR[QUALIFIER]` where qualifier is one of:
@@ -367,11 +363,11 @@ URLBASE=http://192.168.88.1/rest BASICAUTH=admin: bun rest2raml.js ip address
 INSPECTFILE=./ros-inspect-all.json URLBASE=http://unused/rest BASICAUTH=x: bun rest2raml.js
 ```
 
-### "Validate or convert the generated RAML"
+### "Validate the generated RAML"
+
 ```sh
 npm install webapi-parser
 node validraml.cjs ros-rest-all.raml
-node raml2oas.cjs ros-rest-all.raml
 ```
 
 ---
@@ -393,21 +389,6 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 ## Things That Are Known-Broken or Incomplete
 
 - `--validate` flag in `rest2raml.js` is not implemented (TODO in code)
-- OAS 3.0 (`oas30`) generation is commented out in `raml2oas.cjs` — it generates output but
-  has 3000+ validation errors; use OAS 2.0 instead
-- `webapi-parser` is installed twice in some workflows (once for validate, once for convert)
-  — harmless but redundant
-- The `manual-from-secrets.yaml` workflow uses `ros-rest-generated.html` not `index.html`
-  and doesn't produce `oas2.json`, so it's not fully consistent with the QEMU-based workflows
-- The `manual-from-secrets.yaml` workflow uses outdated `actions/checkout@v3` and
-  `oven-sh/setup-bun@v1` — should be updated to v4 and v2 respectively
-- `manual-using-extra-docker-in-docker.yaml` is missing the `cdn.mikrotik.com` fallback for
-  the extra packages download — beta/rc builds will fail to download extra packages. Compare
-  with `appyamlschemas.yaml` which correctly falls back to CDN
-- Stale files in `docs/` root: `routeros-openapi3.json` (12MB), `routeros.raml`,
-  `routeros.7.13.raml`, `routeros.7.14.raml`, `routeros.7.14.3.html`, `sideview-g1.html`,
-  `sideview-g2.html` — these are from before the versioned directory structure and could be
-  cleaned up
 
 ---
 
@@ -430,7 +411,7 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `ajv-formats` | `appyamlvalidate.js` (Bun) | AJV plugin for format validators (uri, email, etc.) |
 | `raml2html` | CI workflows | Generate HTML from RAML |
 | `raml2html-slate-theme` | CI workflows | Slate theme for raml2html |
-| `webapi-parser` | `validraml.cjs`, `raml2oas.cjs` | RAML validation and OAS conversion |
+| `webapi-parser` | `validraml.cjs` | RAML validation |
 | `qemu-system-x86` | CI workflows (apt) | Runs RouterOS CHR VM (Ubuntu package; provides `qemu-system-x86_64` binary) |
 | `qemu-utils` | CI workflows (apt) | Provides `qemu-img` for VDI→qcow2 disk conversion |
 | `qemu-system-x86_64` | `Dockerfile.chr-qemu` (Alpine apk) | Runs RouterOS CHR VM in local Docker |

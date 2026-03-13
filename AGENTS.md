@@ -5,7 +5,7 @@
 
 ## What This Repository Does
 
-**restraml** auto-generates RAML 1.0 and OpenAPI 2.0 schemas for the MikroTik RouterOS REST API
+**restraml** auto-generates RAML 1.0 schemas for the MikroTik RouterOS REST API
 by booting RouterOS CHR in QEMU on GitHub Actions runners, querying its `/console/inspect` endpoint,
 and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 
@@ -33,7 +33,7 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 
 ### Schema Generation
 - `rest2raml.js` runs under **Bun** (not Node.js). Uses `Bun.argv` for CLI args.
-- `raml2oas.cjs` and `validraml.cjs` run under **Node.js 18**.
+- `validraml.cjs` runs under **Node.js 18**.
 - `appyamlvalidate.js` runs under **Bun**. Validates /app YAML schemas and live /app entries.
 - `URLBASE` and `BASICAUTH` env vars configure the RouterOS REST API connection.
 
@@ -52,8 +52,7 @@ The `appyamlschemas.yaml` workflow generates and validates them using `appyamlva
 
 **VSCode / Editor notes:**
 - The schemas work with the [RedHat YAML VSCode extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
-- Strict `pattern` regex in the schema prevents VSCode autocompletion. A future "loose" version
-  without regex patterns may be created for better editor UX (DX-friendly vs. validation-strict).
+- Strict `pattern` regex in the schema prevents VSCode autocompletion. 
 - The schemas may be submitted to [SchemaStore](https://www.schemastore.org) — which auto-applies
   schemas to matching filenames in editors like VSCode. Ensure `$id`, `$schema`, and `title` are
   correct before submitting.
@@ -120,7 +119,6 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | File | Purpose |
 |---|---|
 | `rest2raml.js` | Main schema generator (Bun runtime) |
-| `raml2oas.cjs` | RAML → OAS 2.0 converter (Node.js) |
 | `validraml.cjs` | RAML 1.0 validator (Node.js) |
 | `appyamlvalidate.js` | /app YAML schema validator and per-version schema generator (Bun) |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |

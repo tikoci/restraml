@@ -15,7 +15,6 @@ Pre-built schema files for the RouterOS REST API are available at
 Each RouterOS version includes:
 
 * **RAML** — RAML 1.0 schema, usable in Postman, MuleSoft, and other API tools
-* **OAS2** — OpenAPI 2.0, converted from RAML
 * **HTML** — human-readable API documentation generated from the schema
 * **JSON** — raw `/console/inspect` output from RouterOS, useful for data analysis and diffs
 * **MIB** — link to the official MikroTik MIB for SNMP
@@ -107,19 +106,9 @@ Add to your `.vscode/settings.json` to apply the schema automatically to files m
 
 The RAML 1.0 schema can be imported into [Postman](https://www.postman.com/) to explore the RouterOS REST API:
 
-1. Download the `schema.raml` file for your RouterOS version from the [schema downloads](https://tikoci.github.io/restraml)
-2. In Postman, go to **APIs** → **Import** (or **File** → **Import**)
-3. Select the `.raml` file — Postman will parse it and create an API definition
-4. From the imported API, click **Generate Collection** to create a usable request collection
-
-### What about OpenAPI?
-
-OpenAPI 2.0 (`OAS2`) schemas are also available on the [downloads page](https://tikoci.github.io/restraml). The OpenAPI schema is converted from RAML, so the RAML version is more complete.
-
-If OpenAPI 3.0 is needed, use MuleSoft's [RAML to OAS Converter](https://mulesoft.github.io/oas-raml-converter). Note: the OAS3 output has known validation issues but will load in most tools.
-
-> [!TIP]
-> If your tool supports RAML, prefer the RAML schema — other formats lose some fidelity in conversion.
+1. Copy the URL of the version-specific RAML file from the [Schema Downloads](https://tikoci.github.io/restraml/#section-schema-downloads) table (right-click the **base** or **+extra** link under RAML)
+2. In Postman, go to **File** → **Import** and paste the URL
+3. On the next screen, select **Postman Collection** — note this may take several minutes for the full schema
 
 > [!WARNING]
 > The generated schema is more for convenience than strict validation. Generation is limited to the data available from `/console/inspect`. For example, all parameters are marked as optional in the schema even though some are required in practice.
@@ -131,7 +120,6 @@ If OpenAPI 3.0 is needed, use MuleSoft's [RAML to OAS Converter](https://mulesof
 ```text
 restraml/
 ├── rest2raml.js              # Main script: RouterOS REST API → RAML 1.0
-├── raml2oas.cjs              # RAML 1.0 → OpenAPI 2.0 converter
 ├── validraml.cjs             # RAML 1.0 validator
 ├── appyamlvalidate.js        # /app YAML schema validator (Bun)
 ├── Dockerfile.chr-qemu       # Local dev: RouterOS CHR in QEMU via Docker
@@ -151,7 +139,6 @@ restraml/
     ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
     └── manual-from-secrets.yaml
 ```
--->
 
 ---
 

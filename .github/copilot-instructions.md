@@ -5,10 +5,10 @@
 
 ## Project Summary
 
-This repository (`restraml`) generates RAML 1.0 and OpenAPI 2.0 API schemas for the
+This repository (`restraml`) generates RAML 1.0 API schemas for the
 [MikroTik RouterOS](https://mikrotik.com/) REST API. Schemas are built by spinning up a
-RouterOS CHR (Cloud Hosted Router) VM in QEMU inside Docker, querying its `/console/inspect`
-REST endpoint, and converting the result to RAML/OAS.
+RouterOS CHR (Cloud Hosted Router) VM in QEMU on GitHub Actions runners, querying its
+`/console/inspect` REST endpoint, and converting the result to RAML.
 
 Generated schemas are published to https://tikoci.github.io/restraml via GitHub Pages from
 the `/docs/` directory in this repository.
@@ -16,7 +16,6 @@ the `/docs/` directory in this repository.
 ## Key Files
 
 - **`rest2raml.js`** — Main schema generator (runs under Bun, not Node.js)
-- **`raml2oas.cjs`** — Converts RAML 1.0 → OAS 2.0
 - **`validraml.cjs`** — Validates RAML 1.0 using webapi-parser
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
 - **`Dockerfile.chr-qemu`** — Alpine image that runs RouterOS CHR in QEMU

@@ -20,7 +20,7 @@ const YAML = require("js-yaml")
 const Ajv = require("ajv")
 const addFormats = require("ajv-formats")
 
-const SINGLE_SCHEMA_PATH = process.env.APP_YAML_SCHEMA || "docs/routeros-app-yaml-schema.ci.json"
+const SINGLE_SCHEMA_PATH = process.env.APP_YAML_SCHEMA || "docs/routeros-app-yaml-schema.latest.json"
 const STORE_SCHEMA_PATH = "docs/routeros-app-yaml-store-schema.latest.json"
 const FAILURES_FILE = "/tmp/app-yaml-failures.txt"
 

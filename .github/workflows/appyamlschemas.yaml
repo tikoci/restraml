@@ -28,7 +28,6 @@ jobs:
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
-      APP_YAML_SCHEMA: "docs/routeros-app-yaml-schema.ci.json"
 
     steps:
     - name: Checkout repository

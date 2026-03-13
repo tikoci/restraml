@@ -126,7 +126,7 @@
                     </label>
                     <label style="margin-left:1rem">
                         <input id="diffShowAll" type="checkbox" role="switch">
-                        Show all versions
+                        include <code>testing</code>
                     </label>
                 </ul>
             </nav>
@@ -176,57 +176,15 @@
         <section id="section-app-yaml">
             <h3>Schema for <code>/app</code> YAML</h3>
             <article>
-                <small>
-                    <p>RouterOS 7.22+ includes custom <code>/app</code> support using YAML to define
-                        container applications. While similar to <code>docker-compose</code>, the format is
-                        RouterOS-specific. This project provides a JSON Schema to validate <code>/app</code>
-                        YAML in editors like VSCode with the
-                        <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">Red Hat
-                            YAML extension</a>.
-                    </p>
-                </small>
-                <p>Download the RouterOS <code>/app</code> YAML schema:
+                <p>
                     <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
+                    &mdash; single <code>/app</code> definition
                 </p>
-            </article>
-        </section>
-
-        <!-- RouterOS Binary Downloads -->
-        <section id="section-binary-downloads">
-            <h3>RouterOS Binary Downloads</h3>
-            <article>
-                <p>Choose an architecture and a RouterOS version to compute MikroTik download links for the
-                    <code>routeros.npk</code> and the <code>all_packages</code> extra archive.
+                <p>
+                    <a href="https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.latest.json">routeros-app-yaml-store-schema.latest.json</a>
+                    &mdash; app store format (for <code>app-store-urls=</code>)
                 </p>
-                <fieldset class="grid">
-                    <div>
-                        <label for="rosarch"><b>Architecture</b></label>
-                        <select id="rosarch" aria-label="RouterOS architecture"></select>
-                    </div>
-                    <div>
-                        <label for="rosverselect"><b>Version</b></label>
-                        <select id="rosverselect" aria-label="RouterOS version">
-                            <option selected disabled value="">Select version...</option>
-                        </select>
-                    </div>
-                </fieldset>
-
-                <div id="downloadLinks" style="display:none;margin-top:0.5em">
-                    <div style="display:flex;align-items:center;gap:0.6rem">
-                        <a id="npkLink" href="#" target="_blank">SYSTEM PACKAGE</a>
-                        <span id="npkUrl"
-                            style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                        <button id="copyNpk" class="contrast" type="button" title="Copy URL"
-                            aria-label="Copy system package URL">📋</button>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.25rem">
-                        <a id="extraLink" href="#" target="_blank">EXTRA PACKAGES</a>
-                        <span id="extraUrl"
-                            style="color:#666;font-family:var(--pico-font-family-monospace);font-size:0.9rem"></span>
-                        <button id="copyExtra" class="contrast" type="button" title="Copy URL"
-                            aria-label="Copy extra packages URL">📋</button>
-                    </div>
-                </div>
+                <small>See <a href="https://github.com/tikoci/restraml/blob/main/README.md#routeros-app-yaml-schema">README.md</a> for VSCode setup and usage details.</small>
             </article>
         </section>
 
@@ -239,7 +197,7 @@
                 <ul>
                     <label>
                         <input id="schemaShowAll" type="checkbox" role="switch">
-                        Show all versions
+                        include <code>testing</code>
                     </label>
                 </ul>
             </nav>
@@ -252,7 +210,7 @@
                 <thead>
                     <tr>
                         <th scope="col">Version</th>
-                        <td colspan="2">REST Schema</td>
+                        <td>REST Schema</td>
                         <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
                         <td>API Docs</td>
                         <td>SNMP MIB</td>
@@ -272,7 +230,6 @@
                         <tr class="row-ver">
                             <th class="cell-vername"><a href="#"></a></th>
                             <td class="cell-raml"></td>
-                            <td class="cell-oas2"></td>
                             <td class="cell-json"></td>
                             <td class="cell-html"></td>
                             <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
@@ -284,7 +241,6 @@
                         <td><small>
                                 <a href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
                             </small></td>
-                        <th scope="col"></th>
                         <th scope="col"></th>
                         <th scope="col"></th>
                         <th scope="col"></th>
@@ -359,105 +315,26 @@
         function isPreRelease(name) {
             return /(?:beta|rc)\d*$/.test(name)
         }
-    </script>
 
-    <script>
-        // =====================================================================
-        // RouterOS Binary Downloads helper
-        // =====================================================================
-
-        // Queue early `builddir` events in case they fire before DOMContentLoaded
-        const _pendingBuildDirs = []
-        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail) }
-        document.addEventListener('builddir', _earlyBuilddirListener)
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const archSelect = document.getElementById('rosarch')
-            const verSelect = document.getElementById('rosverselect')
-            const npkLink = document.getElementById('npkLink')
-            const extraLink = document.getElementById('extraLink')
-
-            const architectures = ['x86', 'arm', 'arm64', 'mipsbe', 'smips', 'tile', 'powerpc']
-            architectures.forEach(a => archSelect.appendChild(new Option(a, a)))
-
-            // Process any queued builddir events that fired before DOMContentLoaded
-            if (_pendingBuildDirs.length) {
-                _pendingBuildDirs.forEach(file => {
-                    if (![...verSelect.options].some(o => o.value === file.name)) {
-                        verSelect.appendChild(new Option(file.name, file.name))
-                    }
-                })
-                _pendingBuildDirs.length = 0
-            }
-
-            // Register builddir listener for future events
-            document.addEventListener('builddir', e => {
-                const file = e.detail
-                if (![...verSelect.options].some(o => o.value === file.name)) {
-                    verSelect.appendChild(new Option(file.name, file.name))
+        /**
+         * Rebuild a <select> element's options from a sorted version list.
+         * Safari does not support `option.hidden`, so we add/remove options instead.
+         * Preserves the current selection if still present.
+         */
+        function rebuildSelect(sel, versions, showAll) {
+            const selectedVal = sel.value
+            // Remove all non-placeholder options
+            while (sel.options.length > 1) sel.remove(1)
+            versions.forEach(name => {
+                if (showAll || !isPreRelease(name)) {
+                    sel.appendChild(new Option(name, name))
                 }
             })
-
-            // Remove the early listener now that we've processed queued events
-            document.removeEventListener('builddir', _earlyBuilddirListener)
-
-            function buildNpkUrl(arch, ver) {
-                const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
-                if (arch === 'x86') return baseDir + `routeros-${ver}.npk`
-                return baseDir + `routeros-${arch}-${ver}.npk`
+            // Restore selection if the value is still in the list
+            if ([...sel.options].some(o => o.value === selectedVal)) {
+                sel.value = selectedVal
             }
-
-            function buildExtraUrl(arch, ver) {
-                const baseDir = `https://download.mikrotik.com/routeros/${ver}/`
-                if (arch === 'x86') return baseDir + `all_packages-x86-${ver}.zip`
-                return baseDir + `all_packages-${arch}-${ver}.zip`
-            }
-
-            function computeLinks() {
-                const arch = archSelect.value
-                const ver = verSelect.value
-                const dl = document.getElementById('downloadLinks')
-                if (!arch || !ver) {
-                    if (dl) dl.style.display = 'none'
-                    return
-                }
-
-                const npkUrl = buildNpkUrl(arch, ver)
-                const extraUrl = buildExtraUrl(arch, ver)
-
-                npkLink.href = npkUrl
-                npkLink.title = npkUrl
-                npkLink.textContent = 'SYSTEM PACKAGE'
-                document.getElementById('npkUrl').textContent = npkUrl
-
-                extraLink.href = extraUrl
-                extraLink.title = extraUrl
-                extraLink.textContent = 'EXTRA PACKAGES'
-                document.getElementById('extraUrl').textContent = extraUrl
-
-                if (dl) dl.style.display = 'block'
-            }
-
-            function setupCopyButton(btnId, urlId) {
-                document.getElementById(btnId).addEventListener('click', async () => {
-                    const url = document.getElementById(urlId).textContent
-                    if (!url) return
-                    try {
-                        await navigator.clipboard.writeText(url)
-                        const btn = document.getElementById(btnId)
-                        btn.textContent = '✔'
-                        setTimeout(() => (btn.textContent = '📋'), 1500)
-                    } catch (err) {
-                        console.debug('Clipboard write failed', err)
-                    }
-                })
-            }
-
-            archSelect.addEventListener('change', computeLinks)
-            verSelect.addEventListener('change', computeLinks)
-            setupCopyButton('copyNpk', 'npkUrl')
-            setupCopyButton('copyExtra', 'extraUrl')
-        })
+        }
     </script>
 
     <script>
@@ -469,6 +346,11 @@
         const repo = 'restraml'
         const path = 'docs'
         const pagesUrl = `https://${owner}.github.io/${repo}`
+
+        // Queue early `builddir` events in case they fire before DOMContentLoaded
+        const _pendingBuildDirs = []
+        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail) }
+        document.addEventListener('builddir', _earlyBuilddirListener)
 
         const filerows = document.getElementById('filerows')
 
@@ -499,7 +381,6 @@
             }
 
             makeVerCellExtra('raml', 'schema.raml')
-            makeVerCellExtra('oas2', 'oas2.json', { base: false })
             makeVerCellExtra('html', 'docs')
             makeVerCellExtra('json', 'inspect.json')
 
@@ -520,7 +401,7 @@
         })
 
         // -----------------------------------------------------------------
-        // "Show all versions" toggle for schema downloads table
+        // "include testing" toggle for schema downloads table
         // -----------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
             const schemaShowAll = document.getElementById('schemaShowAll')
@@ -558,41 +439,44 @@
 
         // All collected versions for diff dropdowns (sorted at insertion time)
         const _diffVersions = []
+        let _diffShowAll = false
 
-        // "Show all versions" toggle for diff dropdowns
+        // "include testing" toggle for diff dropdowns
+        // Uses rebuildSelect() instead of option.hidden for Safari compatibility.
         document.addEventListener('DOMContentLoaded', () => {
             const diffShowAll = document.getElementById('diffShowAll')
-            diffShowAll.addEventListener('change', () => {
-                const show = diffShowAll.checked
-                ;[compare1, compare2].forEach(sel => {
-                    ;[...sel.options].forEach(opt => {
-                        if (opt.disabled) return // skip placeholder
-                        if (isPreRelease(opt.value)) {
-                            opt.hidden = !show
-                        }
-                    })
+
+            // Process any queued builddir events that fired before DOMContentLoaded
+            if (_pendingBuildDirs.length) {
+                _pendingBuildDirs.forEach(file => {
+                    if (!_diffVersions.includes(file.name)) {
+                        _diffVersions.push(file.name)
+                    }
                 })
+                _diffVersions.sort(compareVersions)
+                _pendingBuildDirs.length = 0
+            }
+
+            // Remove the early listener now that we've processed queued events
+            document.removeEventListener('builddir', _earlyBuilddirListener)
+
+            diffShowAll.addEventListener('change', () => {
+                _diffShowAll = diffShowAll.checked
+                rebuildSelect(compare1, _diffVersions, _diffShowAll)
+                rebuildSelect(compare2, _diffVersions, _diffShowAll)
             })
         })
 
         // Populate diff dropdowns from builddir events
         document.addEventListener('builddir', e => {
             const file = e.detail
-            _diffVersions.push(file.name)
-            _diffVersions.sort(compareVersions)
-
-            // Rebuild both selects in sorted order
-            ;[compare1, compare2].forEach(sel => {
-                const selectedVal = sel.value
-                // Remove all non-placeholder options
-                while (sel.options.length > 1) sel.remove(1)
-                _diffVersions.forEach(name => {
-                    const opt = new Option(name, name)
-                    if (isPreRelease(name)) opt.hidden = true
-                    sel.appendChild(opt)
-                })
-                sel.value = selectedVal
-            })
+            if (!_diffVersions.includes(file.name)) {
+                _diffVersions.push(file.name)
+                _diffVersions.sort(compareVersions)
+            }
+            // Rebuild both selects with current filter state
+            rebuildSelect(compare1, _diffVersions, _diffShowAll)
+            rebuildSelect(compare2, _diffVersions, _diffShowAll)
         })
 
         // Run the diff comparison
