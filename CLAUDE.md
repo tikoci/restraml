@@ -283,10 +283,12 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 - **Dynamic, no submit button**: results update as the user types (400 ms debounce on the text
   input, immediate on `change` events for `<select>` and checkboxes). The "Lookup" button was
   intentionally removed — events drive all interactions.
-- **inspect.json cache**: fetched inspect JSON is cached per version in memory (`inspectCache`
-  object) so repeated lookups against the same version are instant.
+- **inspect.json cache**: fetched inspect JSON is cached per version+subdir in memory (`inspectCache`
+  object keyed by `ver` or `ver/extra`) so repeated lookups against the same version are instant.
 - **Cancellation tokens**: `runLookupId` counter is incremented at the start of each run and
   checked after each `await`; stale runs exit early without updating the DOM.
+- **Extra-packages toggle**: `includeExtra` checkbox selects `{version}/extra/inspect.json` vs
+  the base `{version}/inspect.json`. Cache key includes the subdir suffix to avoid collisions.
 - **Checkbox implied behaviour**: toggling "include testing" automatically enables "check all
   versions" (since testing implies checking all). Toggling "check all versions" triggers an
   immediate lookup.
@@ -295,6 +297,8 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   - `"cmd"` + no attribute: detail = comma-separated list of `arg` names
   - `"cmd"` + attribute match: detail = the `desc` field of that arg (empty if absent)
   - not found: detail shown in `<em>` italics; errors likewise in italics
+  - empty segments (`""`, `"/"`) → results hidden, no lookup fired
+  - unknown `_type`: `found: false` (avoids false positives from root-of-JSON edge case)
 
 ### Custom / Derivative Pages (`docs/*.html`)
 
@@ -308,7 +312,7 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
   URLs follow the pattern `https://tikoci.github.io/restraml/{version}/inspect.json` and
   `https://tikoci.github.io/restraml/{version}/schema.raml`.
 - No server-side code, no backend, no build step.
-- Link back to `docs/index.html` for navigation.
+- **Include the shared Tools nav dropdown** (see "Tools Nav Dropdown" section below) for consistent navigation.
 - Keep JavaScript in the single `.html` file (no separate `.js` files unless there is a very
   strong reason for separation).
 - Issues requesting custom views will typically describe a desired user-facing feature (e.g.,
@@ -320,6 +324,32 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
 - A filterable/searchable table of commands and arguments
 - A changelog-style page showing what changed between versions
 - A diff page highlighting only added/removed commands between two versions
+
+### Tools Nav Dropdown — Shared Navigation Pattern
+
+All `docs/*.html` pages include a **Tools** dropdown in the top nav (Pico CSS `<details class="dropdown">`),
+providing consistent navigation between tools. The dropdown lists all tools; mark the current page with
+`aria-current="page"`.
+
+```html
+<!-- In the right-side <ul> of the header <nav>, before the theme switcher -->
+<li>
+    <details class="dropdown">
+        <summary>Tools</summary>
+        <ul dir="rtl">
+            <li><a href="index.html" aria-current="page">Schema Downloads</a></li>
+            <li><a href="lookup.html">Command Lookup</a></li>
+            <li><a href="diff.html">Schema Diff</a></li>
+        </ul>
+    </details>
+</li>
+```
+
+- Use `dir="rtl"` on the `<ul>` so the dropdown aligns right when placed in the right nav column.
+- The theme switcher `<li>` follows the Tools `<li>` in the same `<ul>`.
+- When adding a new `docs/*.html` tool page, add it to the dropdown list in **all three** existing pages
+  (`index.html`, `lookup.html`, `diff.html`) plus any other tool pages.
+- On `index.html`, replace direct links to other tools in the intro text with "check the **Tools** menu above".
 
 ### Dark Mode — Correct Pattern for All `docs/` Pages
 
@@ -375,9 +405,12 @@ Use an `#id` prefix on all overrides to guarantee higher specificity than Pico's
 2. **Classes are on `<td>` directly, not on `<tr>`** — correct selectors are `td.d2h-del`,
    `td.d2h-ins`, `td.d2h-cntx`, `td.d2h-info`. Not `.d2h-del > td` or `.d2h-del td`.
 
-3. **diff2html CDN CSS sets `table { background-color: #fff }`** — transparent `td` cells still
-   appear white because the parent `table` has an opaque background. Reset with:
+3. **diff2html CDN CSS sets opaque white backgrounds** — not just on `table` but also on `.d2h-file-wrapper`
+   and `.d2h-diff-table-wrapper`. These opaque backgrounds show through in dark mode as white blocks.
+   Reset all of them:
    ```css
+   #diffoutput .d2h-file-wrapper,
+   #diffoutput .d2h-diff-table-wrapper { background-color: transparent; }
    #diffoutput .d2h-wrapper table { background-color: unset; }
    ```
 

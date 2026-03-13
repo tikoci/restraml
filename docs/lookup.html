@@ -140,7 +140,7 @@
                 <ul>
                     <li>
                         <label>
-                            <input id="includeExtra" type="checkbox" role="switch">
+                            <input id="includeExtra" type="checkbox" role="switch" aria-label="Include extra-packages in search">
                             <i>with</i> <code>extra-packages</code>
                         </label>
                     </li>
@@ -354,7 +354,7 @@
         // -----------------------------------------------------------------
         function loadInspectJson(ver, useExtra) {
             const subdir = useExtra ? '/extra' : ''
-            const key = ver + subdir
+            const key = ver + (useExtra ? '::extra' : '')
             if (inspectCache[key]) return Promise.resolve(inspectCache[key])
             return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
                 .then(r => {
