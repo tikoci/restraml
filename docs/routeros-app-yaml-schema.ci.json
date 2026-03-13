@@ -68,6 +68,7 @@
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
           "additionalProperties": false,
+          "required": ["image"],
           "properties": {
             "image": {
               "type": "string",
