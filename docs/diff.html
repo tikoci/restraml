@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouterOS Schema — Side-by-Side Diff</title>
+
+    <!-- Pico CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <!-- Fonts and favicon -->
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+
+    <!-- Plausible analytics -->
+    <script defer data-domain="tikoci.github.io/restraml"
+        src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+
+    <!-- diff2html CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/css/diff2html.min.css">
+
+    <!-- diff (jsdiff) for generating unified patches -->
+    <script src="https://cdn.jsdelivr.net/npm/diff@8.0.3/dist/diff.min.js"></script>
+
+    <!-- diff2html for side-by-side HTML rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/js/diff2html.min.js"></script>
+
+    <style>
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+
+        /* Dark mode theme switcher icon sizing */
+        header nav li a svg {
+            width: var(--font-size);
+            height: var(--font-size);
+            color: var(--contrast);
+        }
+
+        /* MikroTik logo: swap dark/light based on data-theme */
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        [data-theme=light] img[data-theme=dark] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+        }
+
+        /* diff2html font and width overrides */
+        .d2h-wrapper {
+            font-family: var(--pico-font-family-monospace);
+            font-size: 0.8rem;
+        }
+        .d2h-wrapper .d2h-code-line,
+        .d2h-wrapper .d2h-code-side-line {
+            font-family: var(--pico-font-family-monospace);
+        }
+
+        /* diff2html dark-mode Pico CSS integration */
+        [data-theme=dark] .d2h-wrapper {
+            color-scheme: dark;
+        }
+
+        /* Wider diff output — override Pico container padding */
+        #diffoutput {
+            overflow-x: auto;
+        }
+
+        /* Loading spinner placement */
+        #diffstatus {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <!-- MikroTik logos: swap visibility based on data-theme -->
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg"
+                    alt="MikroTik logo">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg"
+                    alt="MikroTik logo">
+            </ul>
+            <ul></ul>
+            <ul>
+                <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+            </ul>
+        </nav>
+        <h1><mark>Unofficial</mark> RouterOS API Schema <code>diff</code></h1>
+    </header>
+
+    <main class="container">
+
+        <section>
+            <p>
+                ← <a href="index.html">Back to main page</a>
+            </p>
+            <p>
+                Side-by-side diff of RouterOS API commands between two versions.
+                Each line represents a path (<code>/ip/address/</code>), command
+                (<code>/ip/address/add</code>), or argument
+                (<code>/ip/address/add address=(> "A.B.C.D/M")</code>)
+                from <code>/console/inspect</code>.
+            </p>
+        </section>
+
+        <section id="section-diff">
+            <nav>
+                <ul>
+                    <h3>Compare Versions</h3>
+                </ul>
+                <ul>
+                    <label>
+                        <input id="diffextra" type="checkbox" role="switch" checked>
+                        <i>with</i> <code>extra-packages</code>
+                    </label>
+                    <label style="margin-left:1rem">
+                        <input id="diffShowAll" type="checkbox" role="switch">
+                        include <code>testing</code>
+                    </label>
+                </ul>
+            </nav>
+
+            <fieldset class="grid">
+                <div id="inspect1">
+                    <select id="compare1" required>
+                        <option selected disabled value="">Version to compare...</option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" hidden>
+                            <b><span name="cmd">0</span></b> commands,
+                            <b><span name="arg">0</span></b> attributes
+                        </div>
+                    </small>
+                </div>
+                <div id="inspect2">
+                    <select id="compare2" required>
+                        <option selected disabled value="">...against this version</option>
+                    </select>
+                    <small>
+                        <div name="inspectstats" hidden>
+                            <b><span name="cmd">0</span></b> commands,
+                            <b><span name="arg">0</span></b> attributes
+                        </div>
+                    </small>
+                </div>
+            </fieldset>
+
+            <div id="diffstatus" hidden>
+                <p aria-busy="true">Computing diff&hellip;</p>
+            </div>
+
+            <details id="diffcodedetails" open hidden>
+                <summary>
+                    <div class="grid">
+                        <div>
+                            <h4>Side-by-Side <code>diff</code> Output</h4>
+                        </div>
+                        <div class="grid">
+                            <div><b><span class="cmddiff"></span></b> commands</div>
+                            <div><b><span class="argdiff"></span></b> attributes</div>
+                        </div>
+                    </div>
+                </summary>
+                <div id="diffoutput"></div>
+            </details>
+        </section>
+
+        <section>
+            <blockquote>
+                <h5>* Disclaimer</h5>
+                <small>This site is not affiliated, associated, authorized, endorsed by, or in any way officially
+                    connected with <a href="https://mikrotik.com">Mikrotik</a>.
+                    All product and company names are trademarks™ or registered® trademarks of their respective
+                    holders. Use of them does not imply any affiliation with or endorsement by them.</small>
+            </blockquote>
+        </section>
+
+    </main>
+
+    <!--
+        ========================================================================
+        SCRIPTS
+        ========================================================================
+    -->
+
+    <script>
+        // =====================================================================
+        // Version parsing and sorting utilities (same as index.html)
+        // =====================================================================
+
+        function parseVersion(str) {
+            const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
+            if (!m) return null
+            return {
+                major: parseInt(m[1], 10),
+                minor: parseInt(m[2], 10),
+                patch: parseInt(m[3] || '0', 10),
+                pre: m[4] || '',
+                preNum: m[5] ? parseInt(m[5], 10) : (m[4] ? 0 : Infinity)
+            }
+        }
+
+        function compareVersions(a, b) {
+            const va = parseVersion(a)
+            const vb = parseVersion(b)
+            if (!va && !vb) return a.localeCompare(b)
+            if (!va) return 1
+            if (!vb) return -1
+            if (va.major !== vb.major) return vb.major - va.major
+            if (va.minor !== vb.minor) return vb.minor - va.minor
+            if (va.patch !== vb.patch) return vb.patch - va.patch
+            if (va.preNum !== vb.preNum) return vb.preNum - va.preNum
+            return 0
+        }
+
+        function isPreRelease(name) {
+            return /(?:beta|rc)\d*$/.test(name)
+        }
+
+        function rebuildSelect(sel, versions, showAll) {
+            const selectedVal = sel.value
+            while (sel.options.length > 1) sel.remove(1)
+            versions.forEach(name => {
+                if (showAll || !isPreRelease(name)) {
+                    sel.appendChild(new Option(name, name))
+                }
+            })
+            if ([...sel.options].some(o => o.value === selectedVal)) {
+                sel.value = selectedVal
+            }
+        }
+    </script>
+
+    <script>
+        // =====================================================================
+        // Main: version fetch, diff, and RouterOS syntax conversion
+        // =====================================================================
+
+        const owner = 'tikoci'
+        const repo = 'restraml'
+        const pagesUrl = `https://${owner}.github.io/${repo}`
+
+        // Early-event queue for builddir events that fire before DOMContentLoaded
+        const _pendingBuildDirs = []
+        function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail) }
+        document.addEventListener('builddir', _earlyBuilddirListener)
+
+        const compare1 = document.getElementById('compare1')
+        const compare2 = document.getElementById('compare2')
+        const diffextra = document.getElementById('diffextra')
+        const diffstatus = document.getElementById('diffstatus')
+        const diffcodedetails = document.getElementById('diffcodedetails')
+        const diffoutput = document.getElementById('diffoutput')
+        const ecmddiff = diffcodedetails.querySelector('.cmddiff')
+        const eargdiff = diffcodedetails.querySelector('.argdiff')
+
+        // Trigger comparison when both versions are selected
+        compare1.addEventListener('change', () => {
+            if (compare2.value) document.dispatchEvent(new Event('vercompare'))
+        })
+        compare2.addEventListener('change', () => {
+            if (compare1.value) document.dispatchEvent(new Event('vercompare'))
+        })
+        diffextra.addEventListener('change', () => {
+            if (compare1.value && compare2.value) document.dispatchEvent(new Event('vercompare'))
+        })
+
+        // All collected versions for diff dropdowns (sorted at insertion time)
+        const _diffVersions = []
+        let _diffShowAll = false
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const diffShowAll = document.getElementById('diffShowAll')
+
+            // Process queued builddir events that fired before DOMContentLoaded
+            if (_pendingBuildDirs.length) {
+                _pendingBuildDirs.forEach(file => {
+                    if (!_diffVersions.includes(file.name)) _diffVersions.push(file.name)
+                })
+                _diffVersions.sort(compareVersions)
+                _pendingBuildDirs.length = 0
+            }
+            document.removeEventListener('builddir', _earlyBuilddirListener)
+
+            diffShowAll.addEventListener('change', () => {
+                _diffShowAll = diffShowAll.checked
+                rebuildSelect(compare1, _diffVersions, _diffShowAll)
+                rebuildSelect(compare2, _diffVersions, _diffShowAll)
+            })
+        })
+
+        // Populate diff dropdowns from builddir events
+        document.addEventListener('builddir', e => {
+            const file = e.detail
+            if (!_diffVersions.includes(file.name)) {
+                _diffVersions.push(file.name)
+                _diffVersions.sort(compareVersions)
+            }
+            rebuildSelect(compare1, _diffVersions, _diffShowAll)
+            rebuildSelect(compare2, _diffVersions, _diffShowAll)
+        })
+
+        // -----------------------------------------------------------------
+        // RouterOS terse-export style conversion from inspect.json
+        // Each path/cmd/arg becomes its own flat line:
+        //   /ip/address/          ← dir/path (trailing slash)
+        //   /ip/address/add       ← cmd
+        //   /ip/address/add address=(> "A.B.C.D/M")   ← arg with desc
+        //   /ip/address/add interface                  ← arg without desc
+        // -----------------------------------------------------------------
+
+        // Escape special characters in arg description values
+        function escapeRosArgDesc(str) {
+            return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        }
+
+        function inspectToRosLines(obj, currentPath) {
+            const lines = []
+            currentPath = currentPath || ''
+            for (const key of Object.keys(obj)) {
+                if (key.startsWith('_')) continue
+                const value = obj[key]
+                if (typeof value !== 'object' || value === null) continue
+                const nodeType = value._type
+                if (!nodeType) continue
+                const nodePath = currentPath ? currentPath + '/' + key : '/' + key
+                if (nodeType === 'dir' || nodeType === 'path') {
+                    lines.push(nodePath + '/')
+                    for (const child of inspectToRosLines(value, nodePath)) lines.push(child)
+                } else if (nodeType === 'cmd') {
+                    lines.push(nodePath)
+                    for (const argKey of Object.keys(value)) {
+                        if (argKey.startsWith('_')) continue
+                        const argVal = value[argKey]
+                        if (typeof argVal !== 'object' || !argVal || argVal._type !== 'arg') continue
+                        if (argVal.desc) {
+                            lines.push(nodePath + ' ' + argKey + '=(> "' + escapeRosArgDesc(argVal.desc) + '")')
+                        } else {
+                            lines.push(nodePath + ' ' + argKey)
+                        }
+                    }
+                }
+            }
+            return lines
+        }
+
+        // -----------------------------------------------------------------
+        // Render diff2html side-by-side output, honouring current theme
+        // -----------------------------------------------------------------
+        let _lastPatch = null
+
+        function renderDiff(patch) {
+            _lastPatch = patch
+            const theme = document.documentElement.getAttribute('data-theme')
+            const isDark = theme === 'dark' ||
+                (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            diffoutput.innerHTML = Diff2Html.html(patch, {
+                drawFileList: false,
+                matching: 'lines',
+                outputFormat: 'side-by-side',
+                colorScheme: isDark ? 'dark' : 'light',
+            })
+        }
+
+        // Run the diff comparison
+        document.addEventListener('vercompare', () => {
+            (async function onVerCompare() {
+                compare1.disabled = true
+                compare2.disabled = true
+                diffextra.disabled = true
+                diffcodedetails.hidden = true
+                diffstatus.hidden = false
+                document.querySelectorAll('[name=inspectstats]').forEach(e => e.hidden = true)
+
+                try {
+                    const useextra = diffextra.checked
+                    const [json1, json2] = await Promise.all([
+                        fetchInspect(compare1.value, useextra),
+                        fetchInspect(compare2.value, useextra),
+                    ])
+
+                    const text1 = inspectToRosLines(json1).join('\n') + '\n'
+                    const text2 = inspectToRosLines(json2).join('\n') + '\n'
+
+                    // Generate unified diff patch via jsdiff
+                    const patch = Diff.createPatch(
+                        'RouterOS API Schema',
+                        text1,
+                        text2,
+                        compare1.value,
+                        compare2.value
+                    )
+
+                    renderDiff(patch)
+
+                    // Compute and display command/attribute diff stats
+                    function getStatCount(inspectId, statName) {
+                        return parseInt(document.querySelector('#' + inspectId + ' [name=' + statName + ']').textContent, 10) || 0
+                    }
+                    const ncmd1 = getStatCount('inspect1', 'cmd')
+                    const narg1 = getStatCount('inspect1', 'arg')
+                    const ncmd2 = getStatCount('inspect2', 'cmd')
+                    const narg2 = getStatCount('inspect2', 'arg')
+                    const ncmddiff = ncmd2 - ncmd1
+                    const nargdiff = narg2 - narg1
+                    ecmddiff.textContent = (ncmddiff > 0 ? '+' : '') + ncmddiff
+                    eargdiff.textContent = (nargdiff > 0 ? '+' : '') + nargdiff
+                    ecmddiff.style.color = ncmddiff > 0 ? 'green' : (ncmddiff < 0 ? 'red' : '')
+                    eargdiff.style.color = nargdiff > 0 ? 'green' : (nargdiff < 0 ? 'red' : '')
+
+                    diffstatus.hidden = true
+                    diffcodedetails.hidden = false
+
+                    plausible('SideBySideDiff', { props: { left: compare1.value, right: compare2.value } })
+                } catch (error) {
+                    console.error('Failed to compare RouterOS schemas', error)
+                    diffstatus.hidden = false
+                    diffstatus.textContent = 'Error: Failed to compare RouterOS schemas. ' + (error && error.message ? error.message : '')
+                    diffcodedetails.hidden = true
+                } finally {
+                    compare1.disabled = false
+                    compare2.disabled = false
+                    diffextra.disabled = false
+                }
+            })()
+        })
+
+        // Update per-version stats when inspect.json is downloaded
+        document.addEventListener('inspectdownload', e => {
+            const { ver, json, extra } = e.detail
+            // Only update these stats for the base (non-extra) schema
+            if (extra) return
+            let cmdCount = 0, argCount = 0
+            function countTypes(obj) {
+                for (const k of Object.keys(obj)) {
+                    if (k.startsWith('_')) continue
+                    const v = obj[k]
+                    if (typeof v !== 'object' || !v || !v._type) continue
+                    if (v._type === 'cmd') cmdCount++
+                    else if (v._type === 'arg') argCount++
+                    countTypes(v)
+                }
+            }
+            countTypes(json)
+            if (compare1.value === ver) {
+                document.querySelector('#inspect1 [name=cmd]').textContent = cmdCount
+                document.querySelector('#inspect1 [name=arg]').textContent = argCount
+                document.querySelector('#inspect1 [name=inspectstats]').hidden = false
+            }
+            if (compare2.value === ver) {
+                document.querySelector('#inspect2 [name=cmd]').textContent = cmdCount
+                document.querySelector('#inspect2 [name=arg]').textContent = argCount
+                document.querySelector('#inspect2 [name=inspectstats]').hidden = false
+            }
+        })
+
+        // Fetch inspect.json for a version (with in-memory cache) and dispatch inspectdownload
+        const _inspectCache = {}
+        function fetchInspect(ver, extra) {
+            const subdir = extra ? '/extra' : ''
+            const key = ver + subdir
+            if (_inspectCache[key]) {
+                const cached = _inspectCache[key]
+                document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: cached, extra } }))
+                return Promise.resolve(cached)
+            }
+            const url = pagesUrl + '/' + ver + subdir + '/inspect.json'
+            return fetch(url)
+                .then(r => {
+                    if (!r.ok) {
+                        throw new Error('Failed to fetch inspect.json: ' + r.status + ' ' + r.statusText + ' (' + url + ')')
+                    }
+                    return r.json()
+                })
+                .then(data => {
+                    _inspectCache[key] = data
+                    document.dispatchEvent(new CustomEvent('inspectdownload', { detail: { ver, json: data, extra } }))
+                    return data
+                })
+                .catch(err => {
+                    console.error('Error fetching inspect.json', ver, extra, err)
+                    throw err
+                })
+        }
+
+        // Fetch version list from GitHub API and dispatch builddir events
+        fetch('https://api.github.com/repos/' + owner + '/' + repo + '/contents/docs')
+            .then(r => {
+                if (!r.ok) throw new Error('GitHub API: ' + r.status)
+                return r.json()
+            })
+            .then(data => {
+                if (!Array.isArray(data)) return
+                data
+                    .filter(f => f.type === 'dir' && f.name !== 'extra')
+                    .sort((a, b) => compareVersions(a.name, b.name))
+                    .forEach(f => document.dispatchEvent(new CustomEvent('builddir', { detail: f })))
+            })
+            .catch(err => console.error('Error fetching version list:', err))
+    </script>
+
+    <script>
+        // =====================================================================
+        // Dark mode theme switcher (cycles: auto -> light -> dark -> auto)
+        // Re-renders the diff output when theme changes.
+        // =====================================================================
+        const html = document.documentElement
+        const switchTheme = document.getElementById('theme_switcher')
+
+        const sun = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 11a3 3 0 1 1 0-6a3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>'
+        const moon = '<svg width="23px" height="23px" viewBox="0 0 16 16"><g fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858a7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277c.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316a.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71C0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278zM4.858 1.311A7.269 7.269 0 0 0 1.025 7.71c0 4.02 3.279 7.276 7.319 7.276a7.316 7.316 0 0 0 5.205-2.162c-.337.042-.68.063-1.029.063c-4.61 0-8.343-3.714-8.343-8.29c0-1.167.242-2.278.681-3.286z"/><path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/></g></svg>'
+        const osDefault = '<svg width="23px" height="23px" viewBox="0 0 16 16"><path fill="currentColor" d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/></svg>'
+
+        let themeState = 'auto'
+
+        document.addEventListener('DOMContentLoaded', () => {
+            switchTheme.innerHTML = osDefault
+            html.setAttribute('data-theme', 'auto')
+        })
+
+        switchTheme.addEventListener('click', (e) => {
+            e.preventDefault()
+            if (themeState === 'auto') {
+                themeState = 'light'
+                html.setAttribute('data-theme', 'light')
+                switchTheme.innerHTML = sun
+            } else if (themeState === 'light') {
+                themeState = 'dark'
+                html.setAttribute('data-theme', 'dark')
+                switchTheme.innerHTML = moon
+            } else {
+                themeState = 'auto'
+                html.setAttribute('data-theme', 'auto')
+                switchTheme.innerHTML = osDefault
+            }
+            // Re-render diff with updated color scheme if one is shown
+            if (_lastPatch) renderDiff(_lastPatch)
+        })
+    </script>
+
+</body>
+
+</html>
