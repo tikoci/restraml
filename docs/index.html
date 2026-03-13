@@ -128,12 +128,14 @@
                 See <a
                     href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                 for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
-                <br>
                 For additional tools — command search and version diff — check the <b>Tools</b> menu above.
-                <br>
-                Problems? Create an <a
-                    href="https://github.com/tikoci/restraml/issues/new/choose">issue</a> using GitHub.
             </p>
+            <article>
+                <small>💬 <strong>Found a bug? Want a feature? Need a specific version built?</strong>
+                Everything is tracked on GitHub —
+                <a href="https://github.com/tikoci/restraml/issues/new/choose">open an issue</a>
+                and it'll get done.</small>
+            </article>
         </section>
 
         <!-- Diff Tool -->
@@ -179,11 +181,11 @@
                 </div>
             </fieldset>
 
-            <details id="diffcodedetails" open hidden>
+            <details id="diffcodedetails" hidden>
                 <summary>
                     <div class="grid">
                         <div>
-                            <h4><code>diff</code>&nbsp;Output</h4>
+                            <span id="diff-toggle-label">Show JSON Diff</span>
                         </div>
                         <div class="grid">
                             <div><b><span class="cmddiff"></span></b> commands</div>
@@ -192,6 +194,7 @@
                     </div>
                 </summary>
                 <pre><code id="diffcode" class="language-diff"></code></pre>
+                <p><small>For side-by-side view, context lines, and shareable links — try <a href="diff.html">Schema Diff →</a></small></p>
             </details>
         </section>
 
@@ -258,9 +261,7 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td><small>
-                                <a href="https://github.com/tikoci/restraml/issues/new?labels=newbuild&projects=&template=version-update-request.md&title=Version+Update+Request">Request...</a>
-                            </small></td>
+                        <td></td>
                         <th scope="col"></th>
                         <th scope="col"></th>
                         <th scope="col"></th>
@@ -499,6 +500,62 @@
             rebuildSelect(compare2, _diffVersions, _diffShowAll)
         })
 
+        // Update "Show/Hide JSON Diff" toggle label based on open state
+        diffcodedetails.addEventListener('toggle', () => {
+            document.getElementById('diff-toggle-label').textContent =
+                diffcodedetails.open ? 'Hide JSON Diff' : 'Show JSON Diff'
+        })
+
+        // -----------------------------------------------------------------
+        // Query string: read initial params & write on change
+        // -----------------------------------------------------------------
+        function writeQueryParams() {
+            const params = new URLSearchParams()
+            if (compare1.value) params.set('compare1', compare1.value)
+            if (compare2.value) params.set('compare2', compare2.value)
+            if (!diffextra.checked) params.set('extra', 'false')
+            if (_diffShowAll) params.set('testing', 'true')
+            const qs = params.toString()
+            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+        }
+
+        function applyQueryParams() {
+            const params = new URLSearchParams(window.location.search)
+            const q1 = params.get('compare1')
+            const q2 = params.get('compare2')
+            const extra = params.get('extra')
+            const testing = params.get('testing')
+            const diffShowAll = document.getElementById('diffShowAll')
+            const schemaShowAll = document.getElementById('schemaShowAll')
+
+            // Apply "testing" flag first so pre-release versions are available
+            if (testing === 'true' && !_diffShowAll) {
+                _diffShowAll = true
+                diffShowAll.checked = true
+                schemaShowAll.checked = true
+                rebuildSelect(compare1, _diffVersions, true)
+                rebuildSelect(compare2, _diffVersions, true)
+                document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                    if (isPreRelease(row.dataset.version)) row.style.display = ''
+                })
+            }
+
+            if (extra === 'false') diffextra.checked = false
+
+            let needsCompare = false
+            if (q1 && [...compare1.options].some(o => o.value === q1)) {
+                compare1.value = q1
+                needsCompare = true
+            }
+            if (q2 && [...compare2.options].some(o => o.value === q2)) {
+                compare2.value = q2
+                needsCompare = true
+            }
+            if (needsCompare && compare1.value && compare2.value) {
+                document.dispatchEvent(new Event('vercompare'))
+            }
+        }
+
         // Run the diff comparison
         document.addEventListener('vercompare', () => {
             (async function onVerCompare() {
@@ -520,7 +577,8 @@
                 diffcode.removeAttribute('data-highlighted')
                 diffcode.textContent = module.diffString(files[0], files[1], { colors: false })
                 diffcodedetails.hidden = false
-                diffcodedetails.open = true
+                // Default to closed — user clicks "Show JSON Diff" to expand
+                diffcodedetails.open = false
                 hljs.highlightElement(diffcode)
                 diffcode.classList.remove('hljs')
 
@@ -541,6 +599,7 @@
                 compare2.disabled = false
                 diffextra.disabled = false
 
+                writeQueryParams()
                 plausible('Diff Run', { props: { compareLeft: compare1.value, compareRight: compare2.value } })
             })()
         })
@@ -601,6 +660,8 @@
                     file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
                     document.dispatchEvent(new CustomEvent('builddir', { detail: file }))
                 })
+                // Apply URL query params after all version options are populated
+                applyQueryParams()
             })
             .catch(error => console.error('Error fetching build list from GitHub:', error))
     </script>

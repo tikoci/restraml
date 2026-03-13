@@ -273,6 +273,9 @@
 
             <div id="diffcodedetails" hidden>
                 <div id="diffoutput"></div>
+                <div id="share-section" style="margin-top:1.5rem; text-align:right">
+                    <a href="#" id="share-link" style="font-size:0.9em">🔗 Share this diff</a>
+                </div>
             </div>
         </section>
 
@@ -284,9 +287,25 @@
                     All product and company names are trademarks™ or registered® trademarks of their respective
                     holders. Use of them does not imply any affiliation with or endorsement by them.</small>
             </blockquote>
+            <p><small>💬 <strong>Spot something off? Want a new feature?</strong>
+                <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a> — bugs and ideas welcome.</small></p>
         </section>
 
     </main>
+
+    <!-- Share modal -->
+    <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">
+        <article style="margin:0">
+            <header style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.75rem">
+                <strong>Share this diff</strong>
+                <a href="#" id="share-modal-close" aria-label="Close">✕</a>
+            </header>
+            <input id="share-url" type="text" readonly style="font-size:0.8em; font-family:var(--pico-font-family-monospace)" aria-label="Shareable URL">
+            <footer style="display:flex; justify-content:flex-end; gap:0.5rem; padding-top:0.75rem">
+                <button id="share-copy" class="secondary" style="width:auto">Copy to clipboard</button>
+            </footer>
+        </article>
+    </dialog>
 
     <!--
         ========================================================================
@@ -374,14 +393,15 @@
         })
 
         document.getElementById('diffFormat').addEventListener('change', () => {
-            if (_lastPatch) renderDiff(_lastPatch)
+            if (_lastPatch) { renderDiff(_lastPatch); writeQueryParams() }
         })
         document.getElementById('diffContext').addEventListener('change', () => {
-            if (_lastText1) rerenderFromCache()
+            if (_lastText1) { rerenderFromCache(); writeQueryParams() }
         })
         document.getElementById('diffHunks').addEventListener('change', () => {
             const hideMarkers = document.getElementById('diffHunks').value === 'hiding'
             diffoutput.classList.toggle('hide-markers', hideMarkers)
+            writeQueryParams()
         })
 
         // All collected versions for diff dropdowns (sorted at insertion time)
@@ -543,6 +563,7 @@
                     diffstatus.hidden = true
                     diffcodedetails.hidden = false
 
+                    writeQueryParams()
                     plausible('SideBySideDiff', { props: { left: compare1.value, right: compare2.value } })
                 } catch (error) {
                     console.error('Failed to compare RouterOS schemas', error)
@@ -627,8 +648,102 @@
                     .filter(f => f.type === 'dir' && f.name !== 'extra')
                     .sort((a, b) => compareVersions(a.name, b.name))
                     .forEach(f => document.dispatchEvent(new CustomEvent('builddir', { detail: f })))
+                // Apply URL query params after all version options are populated
+                applyQueryParams()
             })
             .catch(err => console.error('Error fetching version list:', err))
+
+        // -----------------------------------------------------------------
+        // Query string: read initial params & write on change
+        // -----------------------------------------------------------------
+        function writeQueryParams() {
+            const params = new URLSearchParams()
+            if (compare1.value) params.set('compare1', compare1.value)
+            if (compare2.value) params.set('compare2', compare2.value)
+            if (!diffextra.checked) params.set('extra', 'false')
+            if (_diffShowAll) params.set('testing', 'true')
+            const fmt = document.getElementById('diffFormat').value
+            if (fmt !== 'side-by-side') params.set('format', fmt)
+            const ctx = document.getElementById('diffContext').value
+            if (ctx !== '0') params.set('context', ctx)
+            const hunks = document.getElementById('diffHunks').value
+            if (hunks !== 'showing') params.set('hunks', hunks)
+            const qs = params.toString()
+            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+        }
+
+        function applyQueryParams() {
+            const params = new URLSearchParams(window.location.search)
+            const q1 = params.get('compare1')
+            const q2 = params.get('compare2')
+            const extra = params.get('extra')
+            const testing = params.get('testing')
+            const fmt = params.get('format')
+            const ctx = params.get('context')
+            const hunks = params.get('hunks')
+            const diffShowAll = document.getElementById('diffShowAll')
+
+            if (testing === 'true' && !_diffShowAll) {
+                _diffShowAll = true
+                diffShowAll.checked = true
+                rebuildSelect(compare1, _diffVersions, true)
+                rebuildSelect(compare2, _diffVersions, true)
+            }
+            if (extra === 'false') diffextra.checked = false
+
+            if (fmt && ['side-by-side', 'line-by-line'].includes(fmt)) {
+                document.getElementById('diffFormat').value = fmt
+            }
+            if (ctx !== null && ['0', '3'].includes(ctx)) {
+                document.getElementById('diffContext').value = ctx
+            }
+            if (hunks && ['showing', 'hiding'].includes(hunks)) {
+                const diffHunks = document.getElementById('diffHunks')
+                diffHunks.value = hunks
+                diffoutput.classList.toggle('hide-markers', hunks === 'hiding')
+            }
+
+            let needsCompare = false
+            if (q1 && [...compare1.options].some(o => o.value === q1)) {
+                compare1.value = q1
+                needsCompare = true
+            }
+            if (q2 && [...compare2.options].some(o => o.value === q2)) {
+                compare2.value = q2
+                needsCompare = true
+            }
+            if (needsCompare && compare1.value && compare2.value) {
+                document.dispatchEvent(new Event('vercompare'))
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Share modal
+        // -----------------------------------------------------------------
+        const shareModal = document.getElementById('share-modal')
+        document.getElementById('share-link').addEventListener('click', e => {
+            e.preventDefault()
+            writeQueryParams()
+            document.getElementById('share-url').value = window.location.href
+            shareModal.showModal()
+        })
+        document.getElementById('share-modal-close').addEventListener('click', e => {
+            e.preventDefault()
+            shareModal.close()
+        })
+        shareModal.addEventListener('click', e => {
+            if (e.target === shareModal) shareModal.close()
+        })
+        document.getElementById('share-copy').addEventListener('click', () => {
+            const url = document.getElementById('share-url').value
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.getElementById('share-copy')
+                btn.textContent = 'Copied!'
+                setTimeout(() => { btn.textContent = 'Copy to clipboard' }, 2000)
+            }).catch(() => {
+                document.getElementById('share-url').select()
+            })
+        })
     </script>
 
     <script>

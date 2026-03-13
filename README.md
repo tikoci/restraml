@@ -1,6 +1,10 @@
 # RouterOS API Schema Tools
 
-Unofficial, auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API — published at **<https://tikoci.github.io/restraml>**
+> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, and a command lookup tool for the MikroTik RouterOS REST API. No install needed, runs in your browser.
+>
+> For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — setup details below.
+
+Unofficial, auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API.
 
 [![RouterOS diff tool screenshot](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
 
@@ -10,7 +14,7 @@ Pre-built schema files for the RouterOS REST API are available at
 <https://tikoci.github.io/restraml>
 
 > [!TIP]
-> File an [issue](https://github.com/tikoci/restraml/issues/new/choose) if you'd like a specific version built.
+> Missing a version? Need a feature? Spot a bug? [Open an issue](https://github.com/tikoci/restraml/issues/new/choose) — builds run automatically for new RouterOS releases, and requests are welcome.
 
 Each RouterOS version includes:
 
