@@ -1,6 +1,6 @@
 # RouterOS API Schema Tools
 
-> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, and a command lookup tool for the MikroTik RouterOS REST API. No install needed, runs in your browser.
+> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, a command lookup tool, and a browser-based `/app` YAML editor for the MikroTik RouterOS REST API. No install needed, runs in your browser.
 >
 > For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — [setup details below](#using-the-app-yaml-schema-in-vscode).
 
@@ -31,6 +31,20 @@ There may be a _base_ and _+extra_ download for each version:
 ### `diff` RouterOS Commands
 
 The [project website](https://tikoci.github.io/restraml) includes a **diff tool** that compares the `/console/inspect` output between any two RouterOS versions — useful for tracking new commands, removed attributes, and API changes across releases.
+
+### `lookup` RouterOS Commands
+
+A **command lookup tool** at [tikoci.github.io/restraml/lookup.html](https://tikoci.github.io/restraml/lookup.html) lets you search RouterOS commands and attributes across versions, with filtering by path and attribute name.
+
+### `/app` YAML Editor
+
+A **browser-based YAML editor** at [tikoci.github.io/restraml/tikapp.html](https://tikoci.github.io/restraml/tikapp.html) lets you write and validate RouterOS `/app` YAML directly in your browser using Monaco editor (the same editor that powers VS Code). Features include:
+
+* Schema validation against any versioned schema (7.22+) or the latest schema
+* Built-in examples from MikroTik's app library, filterable by category
+* Custom YAML saved to browser local storage
+* Support for both single `/app` definitions and `app-store-urls=` array format
+* Download as `.tikapp.yaml` or copy directly as a RouterOS `/app add yaml=` command
 
 ---
 

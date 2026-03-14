@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouterOS /app YAML Editor</title>
+
+    <!-- Pico CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <!-- Fonts and favicon -->
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+
+    <!-- Plausible analytics -->
+    <script defer data-domain="tikoci.github.io/restraml"
+        src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+
+    <!-- js-yaml for YAML parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+
+    <!-- Ajv v6 for JSON Schema draft-07 validation (browser UMD bundle) -->
+    <script src="https://cdn.jsdelivr.net/npm/ajv@6.12.6/dist/ajv.min.js"></script>
+
+    <!-- Monaco editor AMD loader -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+
+    <style>
+        /* --- Font overrides --- */
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: var(--pico-font-family-sans-serif);
+        }
+
+        /* --- No-scroll full-viewport layout --- */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+        }
+
+        header.container {
+            flex-shrink: 0;
+            padding-top: 0.6rem;
+            padding-bottom: 0.2rem;
+        }
+
+        header h1 {
+            margin-bottom: 0.2rem;
+            font-size: 1.4rem;
+        }
+
+        main.container {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding-top: 0.3rem;
+            padding-bottom: 0.4rem;
+        }
+
+        /* --- Theme switcher icon sizing --- */
+        header nav li a svg {
+            width: var(--font-size);
+            height: var(--font-size);
+            color: var(--contrast);
+        }
+
+        /* --- MikroTik logo swap (light/dark) --- */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        [data-theme=light] img[data-theme=dark] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+        }
+
+        header nav img[data-theme] {
+            height: 2rem;
+            width: auto;
+        }
+
+        /* --- Controls row: all inline, reads like a sentence --- */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin: 0 0 0.3rem 0;
+            font-size: 0.82rem;
+            padding: 0;
+        }
+
+        .controls-row select {
+            width: auto;
+            display: inline-block;
+            margin: 0;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.82rem;
+            height: auto;
+            border-radius: var(--pico-border-radius);
+            border: var(--pico-border-width) solid var(--pico-form-element-border-color);
+            background-color: var(--pico-form-element-background-color);
+            color: var(--pico-color);
+        }
+
+        .controls-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin: 0;
+            font-size: 0.82rem;
+        }
+
+        .controls-row input[type=checkbox] {
+            width: auto;
+            display: inline-block;
+            margin: 0;
+        }
+
+        .controls-row code {
+            font-size: 0.82rem;
+        }
+
+        /* --- Editor container fills all remaining space --- */
+        #editor-container {
+            flex: 1;
+            min-height: 0;
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius);
+            overflow: hidden;
+        }
+
+        /* --- Validation dropdown (compact, below editor) --- */
+        #val-dropdown {
+            flex-shrink: 0;
+            margin-top: 0.3rem;
+            margin-bottom: 0;
+        }
+
+        #val-dropdown > summary {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+        }
+
+        #val-dropdown ul {
+            margin: 0;
+            padding: 0.3rem 0;
+            max-height: 8rem;
+            overflow-y: auto;
+            font-size: 0.78rem;
+        }
+
+        #val-dropdown ul li {
+            padding: 0.1rem 0.6rem;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        #val-dropdown ul li:hover {
+            background: var(--pico-form-element-focus-color, rgba(100,100,255,0.1));
+        }
+
+        /* --- Action buttons row --- */
+        .action-row {
+            flex-shrink: 0;
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 0.3rem;
+        }
+
+        .action-row button {
+            margin: 0;
+            padding: 0.25rem 0.7rem;
+            font-size: 0.78rem;
+        }
+
+        .action-row img[data-theme] {
+            height: 0.85em;
+            width: auto;
+            vertical-align: middle;
+            margin: 0 2px;
+        }
+
+        /* --- Error/rate-limit banner --- */
+        #error-banner {
+            display: none;
+            background: var(--pico-del-color, #e74c3c);
+            color: white;
+            padding: 0.5rem 0.8rem;
+            border-radius: var(--pico-border-radius);
+            font-size: 0.85rem;
+            margin-bottom: 0.4rem;
+        }
+
+        /* --- No-schema message (replaces editor when no schemas found) --- */
+        #no-schema-msg {
+            display: none;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        /* --- Caption lines above / below editor --- */
+        .caption-line {
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            color: var(--pico-muted-color);
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg"
+                    alt="MikroTik logo">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg"
+                    alt="MikroTik logo">
+            </ul>
+            <ul></ul>
+            <ul>
+                <li>
+                    <a id="theme_switcher" href="#" aria-label="Toggle theme"></a>
+                </li>
+                <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html">Schema Downloads</a></li>
+                            <li><a href="lookup.html">Command Lookup</a></li>
+                            <li><a href="diff.html">Schema Diff</a></li>
+                            <li><a href="tikapp.html" aria-current="page">/app Editor</a></li>
+                        </ul>
+                    </details>
+                </li>
+            </ul>
+        </nav>
+        <h1><code>/app</code> <mark>YAML Editor</mark></h1>
+    </header>
+
+    <main class="container">
+
+        <!-- Error / rate-limit banner -->
+        <div id="error-banner"></div>
+
+        <!-- Controls row (single sentence line) -->
+        <div class="controls-row" id="controls-row">
+            <code>/app</code> YAML
+            <select id="ver-select" title="RouterOS version" disabled>
+                <option value="">loading…</option>
+            </select>
+            from
+            <select id="source-select" title="Content source" disabled>
+                <option value="example">example</option>
+                <option value="custom">custom</option>
+            </select>
+
+            <!-- Example controls -->
+            <span id="example-controls">
+                <select id="app-name-select" title="App name" disabled>
+                    <option value="">loading…</option>
+                </select>
+                in
+                <select id="app-category-select" title="Category" disabled>
+                    <option value="all">all</option>
+                </select>
+            </span>
+
+            <!-- Custom controls -->
+            <span id="custom-controls" hidden>
+                using browser storage&nbsp;for
+                <label>
+                    <input type="checkbox" id="store-toggle">
+                    <code>app-store-urls=</code>
+                </label>
+            </span>
+        </div>
+
+        <!-- Caption above editor -->
+        <p class="caption-line">Edit your RouterOS <code>/app</code> YAML below — validation runs automatically against the selected schema version.</p>
+
+        <!-- No-schema fallback message -->
+        <div id="no-schema-msg">
+            <article>
+                <hgroup>
+                    <h3>No schema versions found</h3>
+                    <p>No RouterOS versions with <code>/app</code> YAML schemas were found in this repository.</p>
+                </hgroup>
+                <p>
+                    <a href="https://github.com/tikoci/restraml/issues/new/choose" role="button">Open a GitHub issue</a>
+                    to request a build or report a problem.
+                </p>
+            </article>
+        </div>
+
+        <!-- Monaco editor container -->
+        <div id="editor-container"></div>
+
+        <!-- Validation state dropdown (Pico CSS validation states) -->
+        <details id="val-dropdown">
+            <summary id="val-summary">
+                <span id="val-label">Initializing…</span>
+            </summary>
+            <ul id="val-list"></ul>
+        </details>
+
+        <!-- Caption / note below validation -->
+        <div class="action-row">
+            <button id="download-btn" type="button" class="outline secondary" title="Download YAML file" disabled>⬇ Download</button>
+            <button id="copy-btn" type="button" class="outline secondary" title="Copy YAML to clipboard" disabled>📋 Copy</button>
+            <button id="copy-cmd-btn" type="button" class="outline secondary" title="Copy as RouterOS /app add command" disabled>
+                Copy as
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg" alt="MikroTik">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" alt="MikroTik">
+                command
+            </button>
+            <button id="paste-btn" type="button" class="outline secondary" title="Paste YAML from clipboard" disabled>📥 Paste YAML</button>
+            <span style="flex:1"></span>
+            <small style="color:var(--pico-muted-color);font-size:0.72rem">
+                <em>Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.</em>
+            </small>
+        </div>
+
+    </main>
+
+    <!-- Shared utilities (theme switcher, version list, share modal) -->
+    <script src="restraml-shared.js"></script>
+
+    <script>
+        // =================================================================
+        // tikapp.html — RouterOS /app YAML Editor
+        // Monaco editor + ajv JSON Schema validation + app.json examples
+        // =================================================================
+
+        // --- State -------------------------------------------------------
+        let editor = null           // Monaco editor instance
+        let monacoReady = false     // Monaco loaded flag
+        let ajvInst = null          // Ajv instance
+        let validateSingle = null   // Compiled single-app validator
+        let validateStore = null    // Compiled store validator
+        let allApps = []            // All apps from app.json for current version
+        let filteredApps = []       // Apps filtered by selected category
+        let useStoreSchema = false  // app-store-urls= toggle state
+        let sourceMode = 'example'  // 'example' | 'custom'
+        let latestStableVer = null  // Most recent stable version (for app.json when "latest" selected)
+        let schemaVersions = []     // Versions with /app schema files
+        let validationErrors = []   // Current validation errors list
+        let suppressChangeEvent = false // Prevent auto-switch to custom while loading examples
+
+        // localStorage key for custom YAML
+        const CUSTOM_KEY = 'restraml_tikapp_custom'
+        const DEFAULT_VERSION = '7.22'
+        const DEFAULT_APP = 'code-server'
+
+        // --- DOM refs ----------------------------------------------------
+        const verSelect = document.getElementById('ver-select')
+        const sourceSelect = document.getElementById('source-select')
+        const appNameSelect = document.getElementById('app-name-select')
+        const appCategorySelect = document.getElementById('app-category-select')
+        const exampleControls = document.getElementById('example-controls')
+        const customControls = document.getElementById('custom-controls')
+        const storeToggle = document.getElementById('store-toggle')
+        const errorBanner = document.getElementById('error-banner')
+        const editorContainer = document.getElementById('editor-container')
+        const noSchemaMsg = document.getElementById('no-schema-msg')
+        const valDropdown = document.getElementById('val-dropdown')
+        const valSummary = document.getElementById('val-summary')
+        const valLabel = document.getElementById('val-label')
+        const valList = document.getElementById('val-list')
+        const downloadBtn = document.getElementById('download-btn')
+        const copyBtn = document.getElementById('copy-btn')
+        const copyCmdBtn = document.getElementById('copy-cmd-btn')
+        const pasteBtn = document.getElementById('paste-btn')
+
+        // --- Error banner ------------------------------------------------
+        function showError(msg) {
+            errorBanner.textContent = msg
+            errorBanner.style.display = 'block'
+        }
+        function hideError() {
+            errorBanner.style.display = 'none'
+        }
+
+        // --- Monaco theme sync -------------------------------------------
+        function getMonacoTheme() {
+            const t = document.documentElement.getAttribute('data-theme')
+            if (t === 'dark') return 'vs-dark'
+            if (t === 'light') return 'vs'
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs'
+        }
+
+        function syncMonacoTheme() {
+            if (editor && monacoReady) {
+                monaco.editor.setTheme(getMonacoTheme())
+            }
+        }
+
+        // Watch for data-theme attribute changes on <html>
+        new MutationObserver(syncMonacoTheme).observe(
+            document.documentElement,
+            { attributes: true, attributeFilter: ['data-theme'] }
+        )
+        // Also watch for OS dark mode changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncMonacoTheme)
+
+        // --- Version list with schema filtering --------------------------
+        async function loadSchemaVersions() {
+            let allVersions
+            try {
+                allVersions = await fetchVersionList()
+            } catch (e) {
+                const msg = e.message || String(e)
+                if (msg.includes('403')) {
+                    showError('GitHub API rate limit exceeded — version list unavailable. Try again in a few minutes.')
+                } else {
+                    showError(`Failed to load version list: ${msg}`)
+                }
+                return []
+            }
+
+            // Parallel HEAD checks on Pages URLs for schema file presence
+            const results = await Promise.allSettled(
+                allVersions.map(async v => {
+                    try {
+                        const url = `${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-schema.json`
+                        const r = await fetch(url, { method: 'HEAD' })
+                        if (r.status === 403) {
+                            showError('GitHub Pages rate limit hit — some versions may be missing from dropdown.')
+                        }
+                        return r.ok ? v : null
+                    } catch (_) {
+                        return null
+                    }
+                })
+            )
+
+            return results
+                .filter(r => r.status === 'fulfilled' && r.value !== null)
+                .map(r => r.value)
+        }
+
+        // --- Populate version dropdown -----------------------------------
+        async function initVersionDropdown() {
+            schemaVersions = await loadSchemaVersions()
+
+            if (schemaVersions.length === 0) {
+                // No versions found — show fallback message
+                editorContainer.style.display = 'none'
+                noSchemaMsg.style.display = 'flex'
+                setControlsDisabled(true)
+                return
+            }
+
+            // Track most recent stable version (for app.json when "latest" is selected)
+            latestStableVer = schemaVersions[0].name
+
+            // Build options: "latest" first, then stable versions newest-first
+            verSelect.innerHTML = ''
+
+            // "latest" option
+            const latestOpt = new Option('latest', 'latest')
+            verSelect.appendChild(latestOpt)
+
+            for (const v of schemaVersions) {
+                verSelect.appendChild(new Option(v.name, v.name))
+            }
+
+            // Default to 7.22 if available, otherwise first in list
+            const hasDefault = [...verSelect.options].some(o => o.value === DEFAULT_VERSION)
+            verSelect.value = hasDefault ? DEFAULT_VERSION : schemaVersions[0].name
+
+            verSelect.disabled = false
+            sourceSelect.disabled = false
+
+            await onVersionChanged()
+        }
+
+        // --- Disable/enable all controls ---------------------------------
+        function setControlsDisabled(disabled) {
+            verSelect.disabled = disabled
+            sourceSelect.disabled = disabled
+            appNameSelect.disabled = disabled
+            appCategorySelect.disabled = disabled
+            storeToggle.disabled = disabled
+            downloadBtn.disabled = disabled
+            copyBtn.disabled = disabled
+            copyCmdBtn.disabled = disabled
+            pasteBtn.disabled = disabled
+        }
+
+        // --- Load app.json for given version -----------------------------
+        async function loadAppJson(version) {
+            // "latest" uses the most recent stable version's app.json
+            const ver = (version === 'latest') ? latestStableVer : version
+            if (!ver) return []
+
+            try {
+                const url = `${RESTRAML.pagesUrl}/${ver}/app.json`
+                const r = await fetch(url)
+                if (!r.ok) return []
+                return await r.json()
+            } catch (_) {
+                return []
+            }
+        }
+
+        // --- Load and compile JSON schemas for version -------------------
+        async function loadSchemas(version) {
+            let schemaUrl, storeSchemaUrl
+            if (version === 'latest') {
+                schemaUrl = `${RESTRAML.pagesUrl}/routeros-app-yaml-schema.latest.json`
+                storeSchemaUrl = `${RESTRAML.pagesUrl}/routeros-app-yaml-store-schema.latest.json`
+            } else {
+                schemaUrl = `${RESTRAML.pagesUrl}/${version}/routeros-app-yaml-schema.json`
+                storeSchemaUrl = `${RESTRAML.pagesUrl}/${version}/routeros-app-yaml-store-schema.json`
+            }
+
+            try {
+                const [schema, storeSchema] = await Promise.all([
+                    fetch(schemaUrl).then(r => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json() }),
+                    fetch(storeSchemaUrl).then(r => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json() })
+                ])
+
+                // Build a fresh Ajv instance for this version's schemas
+                ajvInst = new Ajv({ allErrors: true, unknownFormats: 'ignore', schemaId: 'auto' })
+                // Register single schema first so store schema can $ref it
+                const singleId = schema.$id || schemaUrl
+                ajvInst.addSchema(schema, singleId)
+                validateSingle = ajvInst.compile(schema)
+                validateStore = ajvInst.compile(storeSchema)
+            } catch (e) {
+                showError(`Failed to load schema for ${version}: ${e.message}`)
+                validateSingle = null
+                validateStore = null
+            }
+        }
+
+        // --- Populate category and app-name dropdowns --------------------
+        function populateCategoryDropdown(apps) {
+            const cats = new Set(['all'])
+            for (const app of apps) {
+                if (app.category) cats.add(app.category)
+            }
+            const sorted = ['all', ...[...cats].filter(c => c !== 'all').sort()]
+
+            const prev = appCategorySelect.value
+            appCategorySelect.innerHTML = ''
+            for (const cat of sorted) {
+                appCategorySelect.appendChild(new Option(cat, cat))
+            }
+            appCategorySelect.value = sorted.includes(prev) ? prev : 'all'
+        }
+
+        function populateAppDropdown(apps, category) {
+            filteredApps = category === 'all' ? apps : apps.filter(a => a.category === category)
+            filteredApps = [...filteredApps].sort((a, b) => a.name.localeCompare(b.name))
+
+            const prev = appNameSelect.value
+            appNameSelect.innerHTML = ''
+            for (const app of filteredApps) {
+                appNameSelect.appendChild(new Option(app.name, app.name))
+            }
+
+            // Try to restore previous selection, or default to DEFAULT_APP, or first in list
+            if (prev && [...appNameSelect.options].some(o => o.value === prev)) {
+                appNameSelect.value = prev
+            } else if (!prev && filteredApps.some(a => a.name === DEFAULT_APP)) {
+                appNameSelect.value = DEFAULT_APP
+            } else if (appNameSelect.options.length > 0) {
+                appNameSelect.value = appNameSelect.options[0].value
+            }
+        }
+
+        // --- Version changed handler -------------------------------------
+        async function onVersionChanged() {
+            const version = verSelect.value
+            if (!version) return
+
+            hideError()
+
+            appNameSelect.disabled = true
+            appCategorySelect.disabled = true
+
+            // Load schemas and app data in parallel
+            const [apps] = await Promise.all([
+                loadAppJson(version),
+                loadSchemas(version)
+            ])
+
+            allApps = apps
+
+            populateCategoryDropdown(allApps)
+            populateAppDropdown(allApps, appCategorySelect.value)
+
+            appNameSelect.disabled = false
+            appCategorySelect.disabled = false
+
+            // Reload editor content for current mode
+            if (sourceMode === 'example') {
+                await loadExampleApp(appNameSelect.value)
+            } else {
+                // Revalidate custom content against new schema
+                runValidation()
+            }
+
+            setControlsDisabled(false)
+        }
+
+        // --- Load example app into editor --------------------------------
+        async function loadExampleApp(appName) {
+            const app = allApps.find(a => a.name === appName)
+            if (!app || !editor) return
+            suppressChangeEvent = true
+            editor.setValue(app.yaml || '')
+            suppressChangeEvent = false
+            runValidation()
+            plausible?.('App Example Load', { props: { app: appName } })
+        }
+
+        // --- Source mode switch ------------------------------------------
+        function setSourceMode(mode, keepContent = false) {
+            sourceMode = mode
+            sourceSelect.value = mode
+
+            if (mode === 'example') {
+                exampleControls.hidden = false
+                customControls.hidden = true
+                storeToggle.disabled = true
+                storeToggle.checked = false
+                useStoreSchema = false
+                // Load selected example
+                loadExampleApp(appNameSelect.value)
+            } else {
+                exampleControls.hidden = true
+                customControls.hidden = false
+                storeToggle.disabled = false
+                if (!keepContent) {
+                    // User explicitly selected custom: restore from localStorage
+                    const saved = localStorage.getItem(CUSTOM_KEY) || ''
+                    suppressChangeEvent = true
+                    if (editor) editor.setValue(saved)
+                    suppressChangeEvent = false
+                } else {
+                    // Auto-switch from example edit: save current content to localStorage
+                    if (editor) localStorage.setItem(CUSTOM_KEY, editor.getValue())
+                }
+                runValidation()
+            }
+        }
+
+        // --- Validation --------------------------------------------------
+        let validateDebounce = null
+
+        function scheduleValidation() {
+            clearTimeout(validateDebounce)
+            validateDebounce = setTimeout(runValidation, 300)
+        }
+
+        function runValidation() {
+            if (!editor || !monacoReady) return
+            const content = editor.getValue()
+            validationErrors = []
+            const markers = []
+
+            // YAML syntax parse
+            let parsed
+            try {
+                parsed = jsyaml.load(content)
+            } catch (e) {
+                const mark = e.mark || {}
+                const line = (mark.line || 0) + 1
+                const col = (mark.column || 0) + 1
+                validationErrors.push({ line, col, message: `YAML syntax error: ${e.reason || e.message}`, severity: 'error' })
+                markers.push({
+                    startLineNumber: line,
+                    startColumn: col,
+                    endLineNumber: line,
+                    endColumn: col + 1,
+                    message: `YAML syntax: ${e.reason || e.message}`,
+                    severity: monaco.MarkerSeverity.Error
+                })
+                applyMarkersAndUpdateUI(markers)
+                return
+            }
+
+            // Schema validation (skip if empty content)
+            if (parsed !== null && parsed !== undefined) {
+                const fn = useStoreSchema ? validateStore : validateSingle
+                if (fn) {
+                    fn(parsed)
+                    if (fn.errors) {
+                        for (const err of fn.errors) {
+                            const path = err.dataPath || err.instancePath || '/'
+                            const msg = `${path} ${err.message}`
+                            validationErrors.push({ line: 1, col: 1, message: msg, severity: 'error' })
+                            markers.push({
+                                startLineNumber: 1,
+                                startColumn: 1,
+                                endLineNumber: 1,
+                                endColumn: 1,
+                                message: msg,
+                                severity: monaco.MarkerSeverity.Error
+                            })
+                        }
+                    }
+                }
+            }
+
+            applyMarkersAndUpdateUI(markers)
+        }
+
+        function applyMarkersAndUpdateUI(markers) {
+            if (editor && monacoReady) {
+                monaco.editor.setModelMarkers(editor.getModel(), 'yaml-tikapp', markers)
+            }
+            updateValidationUI()
+        }
+
+        function updateValidationUI() {
+            const errCount = validationErrors.filter(e => e.severity === 'error').length
+            const warnCount = validationErrors.filter(e => e.severity === 'warning').length
+
+            // Update summary label and aria-invalid
+            if (validationErrors.length === 0) {
+                valLabel.textContent = '✓ Valid YAML'
+                valSummary.setAttribute('aria-invalid', 'false')
+            } else {
+                const parts = []
+                if (errCount > 0) parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`)
+                if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`)
+                valLabel.textContent = `✗ ${parts.join(', ')}`
+                valSummary.setAttribute('aria-invalid', 'true')
+            }
+
+            // Populate error list
+            valList.innerHTML = ''
+            for (const err of validationErrors) {
+                const li = document.createElement('li')
+                li.textContent = `Line ${err.line}: ${err.message}`
+                li.title = `Jump to line ${err.line}`
+                li.addEventListener('click', () => {
+                    if (editor) {
+                        editor.revealLineInCenter(err.line)
+                        editor.setPosition({ lineNumber: err.line, column: err.col || 1 })
+                        editor.focus()
+                    }
+                })
+                valList.appendChild(li)
+            }
+
+            // Auto-open dropdown when there are errors, close when valid
+            if (validationErrors.length > 0 && !valDropdown.open) {
+                valDropdown.open = true
+            } else if (validationErrors.length === 0 && valDropdown.open) {
+                valDropdown.open = false
+            }
+        }
+
+        // --- Download ----------------------------------------------------
+        function downloadYaml() {
+            const content = editor ? editor.getValue() : ''
+            let filename = 'app.tikapp.yaml'
+
+            // Try to get name from YAML
+            if (useStoreSchema) {
+                filename = 'app-store.tikappstore.yaml'
+            } else {
+                try {
+                    const parsed = jsyaml.load(content)
+                    if (parsed && typeof parsed === 'object' && parsed.name) {
+                        filename = `${parsed.name}.tikapp.yaml`
+                    }
+                } catch (_) { /* use default */ }
+            }
+
+            const blob = new Blob([content], { type: 'text/yaml' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            a.click()
+            URL.revokeObjectURL(url)
+            plausible?.('App YAML Download', { props: { mode: sourceMode } })
+        }
+
+        // --- Copy to clipboard ------------------------------------------
+        function copyYaml() {
+            const content = editor ? editor.getValue() : ''
+            navigator.clipboard.writeText(content).then(() => {
+                copyBtn.textContent = '✓ Copied!'
+                setTimeout(() => { copyBtn.textContent = '📋 Copy' }, 1800)
+            }).catch(() => {
+                // Fallback: select all in editor
+                if (editor) editor.getAction('editor.action.selectAll').run()
+            })
+            plausible?.('App YAML Copy', { props: { mode: sourceMode } })
+        }
+
+        // --- Copy as MikroTik command ------------------------------------
+        function copyAsCommand() {
+            const content = editor ? editor.getValue() : ''
+            const cmd = `/app add yaml=${content}`
+            navigator.clipboard.writeText(cmd).then(() => {
+                copyCmdBtn.querySelector('img[data-theme=light], img[data-theme=dark]') // re-use same button
+                const orig = copyCmdBtn.innerHTML
+                copyCmdBtn.textContent = '✓ Copied!'
+                setTimeout(() => { copyCmdBtn.innerHTML = orig }, 1800)
+            }).catch(() => {
+                if (editor) editor.getAction('editor.action.selectAll').run()
+            })
+            plausible?.('App YAML Copy Command', { props: { mode: sourceMode } })
+        }
+
+        // --- Paste from clipboard ----------------------------------------
+        async function pasteYaml() {
+            try {
+                const text = await navigator.clipboard.readText()
+                if (text && editor) {
+                    // Pasting triggers custom mode
+                    editor.setValue(text)
+                    if (sourceMode !== 'custom') {
+                        setSourceMode('custom')
+                    }
+                }
+            } catch (_) {
+                // Clipboard read permission denied — focus editor so user can paste manually
+                if (editor) editor.focus()
+            }
+            plausible?.('App YAML Paste', {})
+        }
+
+        // --- Monaco editor setup -----------------------------------------
+        function initMonaco() {
+            require.config({
+                paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
+            })
+            require(['vs/editor/editor.main'], () => {
+                monacoReady = true
+
+                editor = monaco.editor.create(editorContainer, {
+                    value: '',
+                    language: 'yaml',
+                    theme: getMonacoTheme(),
+                    automaticLayout: false,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    wordWrap: 'off',
+                    renderWhitespace: 'boundary',
+                    glyphMargin: true,
+                    folding: true,
+                })
+
+                // Track editor size with ResizeObserver
+                new ResizeObserver(() => { editor.layout() }).observe(editorContainer)
+
+                // On content change: validate and save custom
+                editor.onDidChangeModelContent(() => {
+                    if (suppressChangeEvent) return
+
+                    // Auto-switch to custom when user edits an example (keep current content)
+                    if (sourceMode === 'example') {
+                        setSourceMode('custom', true)
+                    }
+
+                    // Persist to localStorage in custom mode
+                    if (sourceMode === 'custom') {
+                        localStorage.setItem(CUSTOM_KEY, editor.getValue())
+                    }
+
+                    scheduleValidation()
+                })
+
+                // Enable action buttons
+                downloadBtn.disabled = false
+                copyBtn.disabled = false
+                copyCmdBtn.disabled = false
+                pasteBtn.disabled = false
+
+                // Initial validation
+                runValidation()
+                valLabel.textContent = 'Empty — start typing or load an example'
+
+                // Init the full page state now that Monaco is ready
+                initPage()
+            })
+        }
+
+        // --- Wire up event listeners -------------------------------------
+        verSelect.addEventListener('change', onVersionChanged)
+
+        sourceSelect.addEventListener('change', () => {
+            setSourceMode(sourceSelect.value)
+        })
+
+        appCategorySelect.addEventListener('change', () => {
+            populateAppDropdown(allApps, appCategorySelect.value)
+            loadExampleApp(appNameSelect.value)
+        })
+
+        appNameSelect.addEventListener('change', () => {
+            loadExampleApp(appNameSelect.value)
+        })
+
+        storeToggle.addEventListener('change', () => {
+            useStoreSchema = storeToggle.checked
+            runValidation()
+        })
+
+        downloadBtn.addEventListener('click', downloadYaml)
+        copyBtn.addEventListener('click', copyYaml)
+        copyCmdBtn.addEventListener('click', copyAsCommand)
+        pasteBtn.addEventListener('click', pasteYaml)
+
+        // --- Page initialization -----------------------------------------
+        async function initPage() {
+            // Wait for version dropdown to be ready
+            await initVersionDropdown()
+
+            if (schemaVersions.length === 0) return
+
+            // Set initial source mode (example by default)
+            // populateAppDropdown already defaulted to DEFAULT_APP
+            setSourceMode('example')
+        }
+
+        // Start Monaco loading (triggers initPage after Monaco is ready)
+        initMonaco()
+    </script>
+
+    <script>initThemeSwitcher()</script>
+
+</body>
+
+</html>
