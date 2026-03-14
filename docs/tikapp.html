@@ -122,6 +122,11 @@
 
         .toolbar input[type=checkbox] { width: auto; margin: 0; }
 
+        /* Fix: disabled switch still renders as a switch track, not a collapsed circle */
+        .toolbar input[type=checkbox][role=switch] {
+            width: 2.25em; height: 1.25em; flex-shrink: 0; margin: 0;
+        }
+
         .toolbar select, .example-row select {
             width: auto; margin: 0; padding: 0.12rem 0.45rem; font-size: 0.82rem; height: auto;
             border-radius: var(--pico-border-radius);
@@ -179,9 +184,22 @@
         /* --- Status line --- */
         .status-line {
             flex-shrink: 0; font-size: 0.75rem; color: var(--pico-muted-color);
-            margin: 0 0 0.2rem; transition: color 0.3s;
+            margin: 0 0 0.2rem; transition: color 0.3s; min-height: 1.2em;
         }
         .status-line.status-ok { color: var(--pico-ins-color, #2ecc71); }
+        .status-line.status-dirty { color: var(--pico-color); }
+        /* Inline action links in status line */
+        .status-action {
+            display: inline-block; margin-left: 0.4rem; font-size: 0.75rem;
+            color: var(--pico-primary); cursor: pointer; text-decoration: underline;
+            text-underline-offset: 2px; white-space: nowrap;
+        }
+        .status-action:hover { opacity: 0.8; }
+        /* Load-example-btn filled state when picker is open */
+        #load-example-btn.picker-open {
+            background: var(--pico-primary); color: var(--pico-primary-inverse);
+            border-color: var(--pico-primary);
+        }
     </style>
 </head>
 
@@ -204,12 +222,22 @@
                             <li><a href="lookup.html">Command Lookup</a></li>
                             <li><a href="diff.html">Schema Diff</a></li>
                             <li><a href="tikapp.html" aria-current="page">/app Editor</a></li>
+                            <li><a href="tikapp-manual.html">/app Editor Manual</a></li>
                         </ul>
                     </details>
                 </li>
             </ul>
         </nav>
-        <h1><code>/app</code> <mark>YAML Editor</mark></h1>
+        <h1 style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.2rem">
+            <span><code>/app</code> <mark>YAML Editor</mark></span>
+            <span style="margin-left:auto;font-size:0.72rem;font-weight:400;white-space:nowrap;opacity:0.65">
+                <a href="https://github.com/tikoci/restraml/blob/main/README.md#app-yaml-editor" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[about]</a>
+                ·
+                <a href="https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[/app docs]</a>
+                ·
+                <a href="tikapp-manual.html" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[manual]</a>
+            </span>
+        </h1>
     </header>
 
     <main class="container">
@@ -229,8 +257,8 @@
             <div class="toolbar-sep" aria-hidden="true"></div>
 
             <div class="toolbar-group">
-                <label class="toolbar-toggle" title="Validate as app-store-urls= array instead of single /app YAML">
-                    <input type="checkbox" id="store-toggle" role="switch" disabled>
+                <label class="toolbar-toggle" id="store-toggle-label" title="Switch between single /app definition and app-store-urls= array format. Requires a web server to host — cannot be added directly to RouterOS with /app add.">
+                    <input type="checkbox" id="store-toggle" role="switch" aria-checked="false" disabled>
                     <code>app-store-urls=</code>
                 </label>
             </div>
@@ -238,8 +266,9 @@
             <span class="toolbar-spacer"></span>
 
             <div class="toolbar-group">
-                <button id="load-example-btn" type="button" class="outline secondary toolbar-btn" disabled>
-                    Load Example</button>
+                <button id="load-example-btn" type="button" class="outline secondary toolbar-btn" disabled title="Browse built-in MikroTik /app examples">
+                    <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
+                    Examples</button>
                 <button id="recall-stash-btn" type="button" class="outline secondary toolbar-btn" disabled>
                     Recall Stash</button>
                 <input type="file" id="import-file-input" accept=".yaml,.yml" hidden>
@@ -291,35 +320,20 @@
             <button id="stash-btn" type="button" class="outline secondary" title="Save current YAML to stash (recall later with Recall Stash)" disabled>💾 Stash</button>
             <button id="download-btn" type="button" class="outline secondary" title="Download YAML file" disabled>⬇ Download</button>
             <button id="copy-btn" type="button" class="outline secondary" title="Copy YAML to clipboard" disabled>📋 Copy</button>
-            <button id="paste-btn" type="button" class="outline secondary" title="Paste YAML from clipboard" disabled>📥 Paste</button>
             <button id="copy-cmd-btn" type="button" class="outline secondary"
                 title="Copy as RouterOS /app add command" disabled>
-                Copy as
                 <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
-                command
+                Copy /app/add
             </button>
             <span style="flex:1"></span>
-            <a href="#" id="share-link" style="font-size:0.8em;white-space:nowrap">🔗 Share</a>
-            <small style="color:var(--pico-muted-color);font-size:0.72rem">
-                <em>Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.</em>
+            <small style="color:var(--pico-muted-color);font-size:0.72rem;align-self:center">
+                From <a href="https://github.com/tikoci/restraml">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.
             </small>
+            <button id="share-btn" type="button" class="outline secondary" title="Copy shareable URL to clipboard" disabled>🔗 Share</button>
+            <button id="clear-btn" type="button" class="outline secondary" title="Clear the editor" disabled>✕ Clear</button>
         </div>
 
     </main>
-
-    <!-- Share modal -->
-    <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">
-        <article style="margin:0">
-            <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
-                <strong>Share this editor</strong>
-                <a href="#" id="share-modal-close" aria-label="Close">✕</a>
-            </header>
-            <input id="share-url" type="text" readonly style="font-size:0.8em; font-family:var(--pico-font-family-monospace)" aria-label="Shareable URL">
-            <footer style="display:flex;justify-content:flex-end;margin-top:0.6rem">
-                <button id="share-copy" class="secondary" style="width:auto">Copy to clipboard</button>
-            </footer>
-        </article>
-    </dialog>
 
     <script src="restraml-shared.js"></script>
 
@@ -328,12 +342,13 @@
         // tikapp.html — RouterOS /app YAML Editor
         //
         // UX model:
-        //   Line 1 toolbar: version, app-store toggle | Load Example, Recall Stash, Import, New
+        //   Line 1 toolbar: version, app-store toggle | Examples, Recall Stash, Import, New
         //   Line 2 (on demand): example category/app picker with Load / Cancel
         //   Autosave (AUTOSAVE_KEY): every edit saved silently; restored on page reload
-        //   Stash (STASH_KEY): explicit "Stash" button in action row; "Recall Stash" restores it
+        //   Stash (STASH_KEY): explicit "💾 Stash" button; "Recall Stash" restores it
+        //   Dirty tracking: if content differs from loaded example → show stash/OK options
         //   Import: file picker → load YAML into editor
-        //   New: clear editor
+        //   New/Clear: clear editor
         // =================================================================
 
         // --- State -------------------------------------------------------
@@ -353,6 +368,12 @@
         let validationErrors = []
         let suppressChangeEvent = false
         let statusTimer = null
+
+        // Dirty-state tracking:
+        //   currentExampleName — name of the currently-loaded example, or null if user content
+        //   exampleContent     — the original YAML of the loaded example (for dirty comparison)
+        let currentExampleName = null
+        let exampleContent = ''
 
         // Two independent persistence keys:
         //   AUTOSAVE_KEY — written on every change; restored on page load (session continuity)
@@ -387,20 +408,60 @@
         const stashBtn             = document.getElementById('stash-btn')
         const downloadBtn          = document.getElementById('download-btn')
         const copyBtn              = document.getElementById('copy-btn')
-        const pasteBtn             = document.getElementById('paste-btn')
         const copyCmdBtn           = document.getElementById('copy-cmd-btn')
+        const shareBtn             = document.getElementById('share-btn')
+        const clearBtn             = document.getElementById('clear-btn')
+
+        // --- Dirty state helpers -----------------------------------------
+        function isDirty() {
+            if (!editor || currentExampleName === null) return false
+            return editor.getValue() !== exampleContent
+        }
+        function isExampleClean() {
+            return currentExampleName !== null && !isDirty()
+        }
+        function setCurrentExample(name, yaml) {
+            currentExampleName = name
+            exampleContent = yaml || ''
+        }
+        function clearCurrentExample() {
+            currentExampleName = null
+            exampleContent = ''
+        }
 
         // --- Status line -------------------------------------------------
-        function setStatus(msg, ok = false) {
+        // msg: string; ok: boolean for green color; actions: [{label, fn}] for inline links
+        function setStatus(msg, ok = false, actions = null) {
             clearTimeout(statusTimer)
-            statusLine.textContent = msg
-            statusLine.classList.toggle('status-ok', ok)
-            if (ok) {
+            statusLine.innerHTML = ''
+            statusLine.classList.remove('status-ok', 'status-dirty')
+
+            const textSpan = document.createElement('span')
+            textSpan.textContent = msg
+            statusLine.appendChild(textSpan)
+
+            if (actions && actions.length > 0) {
+                for (const action of actions) {
+                    const link = document.createElement('a')
+                    link.href = '#'
+                    link.className = 'status-action'
+                    link.textContent = `[${action.label}]`
+                    link.addEventListener('click', e => { e.preventDefault(); action.fn() })
+                    statusLine.appendChild(link)
+                }
+                statusLine.classList.add('status-dirty')
+            } else if (ok) {
+                statusLine.classList.add('status-ok')
                 statusTimer = setTimeout(() => {
                     statusLine.textContent = ''
                     statusLine.classList.remove('status-ok')
                 }, 3000)
             }
+        }
+        function clearStatus() {
+            clearTimeout(statusTimer)
+            statusLine.innerHTML = ''
+            statusLine.classList.remove('status-ok', 'status-dirty')
         }
 
         // --- Error banner ------------------------------------------------
@@ -411,10 +472,14 @@
         function showExampleRow() {
             exampleRow.hidden = false
             toolbar.classList.add('has-example-row')
+            loadExampleBtn.classList.add('picker-open')
+            loadExampleBtn.classList.remove('outline', 'secondary')
         }
         function hideExampleRow() {
             exampleRow.hidden = true
             toolbar.classList.remove('has-example-row')
+            loadExampleBtn.classList.remove('picker-open')
+            loadExampleBtn.classList.add('outline', 'secondary')
         }
 
         // --- Monaco theme sync -------------------------------------------
@@ -636,8 +701,20 @@
             stashBtn.disabled = disabled
             downloadBtn.disabled = disabled
             copyBtn.disabled = disabled
-            pasteBtn.disabled = disabled
             copyCmdBtn.disabled = disabled
+            shareBtn.disabled = disabled
+            clearBtn.disabled = disabled
+        }
+
+        // --- Update copy-cmd-btn based on store mode ---------------------
+        function updateCopyCmdBtn() {
+            if (useStoreSchema) {
+                copyCmdBtn.disabled = true
+                copyCmdBtn.title = 'app-store-urls= requires a web server — /app add only supports single apps, not the array form'
+            } else {
+                copyCmdBtn.disabled = !editor
+                copyCmdBtn.title = 'Copy as RouterOS /app add command'
+            }
         }
 
         // --- Load app.json -----------------------------------------------
@@ -716,19 +793,125 @@
 
             runValidation()
             setControlsDisabled(false)
+            updateCopyCmdBtn()
         }
 
-        // --- Load example into editor ------------------------------------
-        function loadExampleIntoEditor(appName) {
+        // --- Load example directly (no dirty check) ----------------------
+        function loadExampleDirect(appName) {
             const app = allApps.find(a => a.name === appName)
             if (!app || !editor) return
             suppressChangeEvent = true
             editor.setValue(app.yaml || '')
             suppressChangeEvent = false
+            setCurrentExample(appName, app.yaml || '')
+            localStorage.setItem(AUTOSAVE_KEY, app.yaml || '')
             runValidation()
-            setStatus(`Loaded example: ${appName}`)
+            setStatus(`Loaded example: ${appName}`, true)
             hideExampleRow()
             plausible?.('App Example Load', { props: { app: appName } })
+        }
+
+        // --- Load example into editor (with dirty check) -----------------
+        function loadExampleIntoEditor(appName) {
+            if (!editor) return
+            const app = allApps.find(a => a.name === appName)
+            if (!app) return
+
+            if (isDirty()) {
+                // Content was modified from the current example — offer choices
+                const hasStash = !!(localStorage.getItem(STASH_KEY) || '').trim()
+                const stashLabel = hasStash ? 'Stash (replace)' : 'Stash'
+                setStatus(`'${currentExampleName}' was edited — load '${appName}'?`, false, [
+                    { label: 'Load', fn: () => { loadExampleDirect(appName); clearStatus() } },
+                    {
+                        label: stashLabel, fn: () => {
+                            if (hasStash) {
+                                setStatus(`Replace existing stash with current changes?`, false, [
+                                    {
+                                        label: 'Replace & Load', fn: () => {
+                                            localStorage.setItem(STASH_KEY, editor.getValue())
+                                            loadExampleDirect(appName)
+                                            setStatus('Changes stashed. Example loaded.', true)
+                                        }
+                                    },
+                                    { label: 'Cancel', fn: () => showDirtyStatus(appName) }
+                                ])
+                            } else {
+                                localStorage.setItem(STASH_KEY, editor.getValue())
+                                loadExampleDirect(appName)
+                                setStatus('Changes stashed. Example loaded.', true)
+                            }
+                        }
+                    },
+                    { label: 'Cancel', fn: () => clearStatus() }
+                ])
+                return
+            }
+
+            // Custom content (not from example) — also offer stash option
+            if (currentExampleName === null) {
+                const content = editor.getValue().trim()
+                if (content) {
+                    const hasStash = !!(localStorage.getItem(STASH_KEY) || '').trim()
+                    const stashLabel = hasStash ? 'Stash (replace)' : 'Stash'
+                    setStatus(`Load example '${appName}'? Current content will be replaced.`, false, [
+                        { label: 'Load', fn: () => { loadExampleDirect(appName); clearStatus() } },
+                        {
+                            label: stashLabel, fn: () => {
+                                if (hasStash) {
+                                    setStatus('Replace existing stash?', false, [
+                                        {
+                                            label: 'Replace & Load', fn: () => {
+                                                localStorage.setItem(STASH_KEY, editor.getValue())
+                                                loadExampleDirect(appName)
+                                                setStatus('Changes stashed. Example loaded.', true)
+                                            }
+                                        },
+                                        { label: 'Cancel', fn: () => clearStatus() }
+                                    ])
+                                } else {
+                                    localStorage.setItem(STASH_KEY, editor.getValue())
+                                    loadExampleDirect(appName)
+                                    setStatus('Content stashed. Example loaded.', true)
+                                }
+                            }
+                        },
+                        { label: 'Cancel', fn: () => clearStatus() }
+                    ])
+                    return
+                }
+            }
+
+            // Clean state: load directly
+            loadExampleDirect(appName)
+        }
+
+        function showDirtyStatus(appName) {
+            const hasStash = !!(localStorage.getItem(STASH_KEY) || '').trim()
+            setStatus(`'${currentExampleName}' was edited — load '${appName}'?`, false, [
+                { label: 'Load', fn: () => { loadExampleDirect(appName); clearStatus() } },
+                {
+                    label: hasStash ? 'Stash (replace)' : 'Stash', fn: () => {
+                        if (hasStash) {
+                            setStatus('Replace existing stash?', false, [
+                                {
+                                    label: 'Replace & Load', fn: () => {
+                                        localStorage.setItem(STASH_KEY, editor.getValue())
+                                        loadExampleDirect(appName)
+                                        setStatus('Changes stashed. Example loaded.', true)
+                                    }
+                                },
+                                { label: 'Cancel', fn: () => showDirtyStatus(appName) }
+                            ])
+                        } else {
+                            localStorage.setItem(STASH_KEY, editor.getValue())
+                            loadExampleDirect(appName)
+                            setStatus('Changes stashed. Example loaded.', true)
+                        }
+                    }
+                },
+                { label: 'Cancel', fn: () => clearStatus() }
+            ])
         }
 
         // --- Validation --------------------------------------------------
@@ -745,7 +928,7 @@
         function findLineForPath(content, dataPath) {
             if (!dataPath || dataPath === '') return null
             const path = dataPath.startsWith('/') ? dataPath.slice(1) : dataPath.replace(/^\./, '')
-            const keys = path.split(/[.\/'"]|\[|\]/).filter(k => k && !/^\d+$/.test(k))
+            const keys = path.split(/[./'"]|\[|\]/).filter(k => k && !/^\d+$/.test(k))
             if (keys.length === 0) return null
             const searchKey = keys[keys.length - 1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             const lines = content.split('\n')
@@ -927,13 +1110,52 @@
                     // Auto-save on every change (session continuity on reload)
                     localStorage.setItem(AUTOSAVE_KEY, editor.getValue())
                     scheduleValidation()
+                    // If we're in example mode, update dirty status immediately
+                    if (currentExampleName !== null && isDirty()) {
+                        // Don't repeatedly spam status — only set if status is currently clear
+                        if (!statusLine.querySelector('.status-action')) {
+                            setStatus(`Editing '${currentExampleName}' example — changes not yet stashed.`, false, [
+                                {
+                                    label: 'Stash', fn: () => {
+                                        const hasStash = !!(localStorage.getItem(STASH_KEY) || '').trim()
+                                        if (hasStash) {
+                                            setStatus('Replace existing stash?', false, [
+                                                {
+                                                    label: 'Replace', fn: () => {
+                                                        localStorage.setItem(STASH_KEY, editor.getValue())
+                                                        clearCurrentExample()
+                                                        setStatus('Changes stashed.', true)
+                                                    }
+                                                },
+                                                { label: 'Cancel', fn: () => clearStatus() }
+                                            ])
+                                        } else {
+                                            localStorage.setItem(STASH_KEY, editor.getValue())
+                                            clearCurrentExample()
+                                            setStatus('Changes stashed. Use "Recall Stash" to restore.', true)
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Discard', fn: () => {
+                                        const app = allApps.find(a => a.name === currentExampleName)
+                                        if (app) loadExampleDirect(app.name)
+                                        else clearStatus()
+                                    }
+                                }
+                            ])
+                        }
+                    } else if (currentExampleName !== null && !isDirty()) {
+                        // Reverted to clean example state — clear dirty status
+                        clearStatus()
+                    }
                 })
 
                 stashBtn.disabled = false
                 downloadBtn.disabled = false
                 copyBtn.disabled = false
-                pasteBtn.disabled = false
-                copyCmdBtn.disabled = false
+                shareBtn.disabled = false
+                clearBtn.disabled = false
 
                 runValidation()
                 initPage()
@@ -945,11 +1167,131 @@
         verSelect.addEventListener('change', () => { onVersionChanged(); writeQueryParams() })
 
         storeToggle.addEventListener('change', () => {
-            useStoreSchema = storeToggle.checked
-            registerYamlCompletions()
-            runValidation()
-            writeQueryParams()
+            storeToggle.setAttribute('aria-checked', storeToggle.checked ? 'true' : 'false')
+            handleStoreToggleChange()
         })
+
+        // --- app-store-urls= toggle conversion ---------------------------
+        function setStoreToggle(checked) {
+            storeToggle.checked = checked
+            storeToggle.setAttribute('aria-checked', checked ? 'true' : 'false')
+        }
+
+        async function handleStoreToggleChange() {
+            const nowChecked = storeToggle.checked
+            const content = editor ? editor.getValue() : ''
+
+            if (nowChecked) {
+                // Toggling ON: try to convert valid single /app → array
+                if (!content.trim()) {
+                    // Empty editor: just switch schema
+                    useStoreSchema = true
+                    registerYamlCompletions()
+                    runValidation()
+                    writeQueryParams()
+                    updateCopyCmdBtn()
+                    setStatus('app-store-urls= schema enabled.', true)
+                    return
+                }
+                let parsed
+                try { parsed = jsyaml.load(content) } catch (_) { parsed = null }
+                const isValidSingle = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && validateSingle?.(parsed)
+
+                if (isValidSingle) {
+                    // Convert single app object → YAML array
+                    const newContent = jsyaml.dump([parsed], { indent: 2 })
+                    suppressChangeEvent = true
+                    editor.setValue(newContent)
+                    suppressChangeEvent = false
+                    localStorage.setItem(AUTOSAVE_KEY, newContent)
+                    clearCurrentExample()
+                    useStoreSchema = true
+                    registerYamlCompletions()
+                    runValidation()
+                    writeQueryParams()
+                    updateCopyCmdBtn()
+                    setStatus('Converted to app-store-urls= array format.', true)
+                } else {
+                    // Not a valid single app — ask user
+                    setStoreToggle(false)  // revert toggle visually
+                    setStatus('Content is not a valid single /app — enable app-store-urls= schema anyway?', false, [
+                        {
+                            label: 'Enable Anyway', fn: () => {
+                                setStoreToggle(true)
+                                useStoreSchema = true
+                                registerYamlCompletions()
+                                runValidation()
+                                writeQueryParams()
+                                updateCopyCmdBtn()
+                                setStatus('app-store-urls= schema enabled (content may need fixing).', true)
+                            }
+                        },
+                        { label: 'Cancel', fn: () => clearStatus() }
+                    ])
+                }
+            } else {
+                // Toggling OFF: try to convert array → single app
+                if (!content.trim()) {
+                    useStoreSchema = false
+                    registerYamlCompletions()
+                    runValidation()
+                    writeQueryParams()
+                    updateCopyCmdBtn()
+                    return
+                }
+                let parsed
+                try { parsed = jsyaml.load(content) } catch (_) { parsed = null }
+
+                if (Array.isArray(parsed)) {
+                    if (parsed.length === 1) {
+                        // Unwrap single-item array → single app
+                        const newContent = jsyaml.dump(parsed[0], { indent: 2 })
+                        suppressChangeEvent = true
+                        editor.setValue(newContent)
+                        suppressChangeEvent = false
+                        localStorage.setItem(AUTOSAVE_KEY, newContent)
+                        clearCurrentExample()
+                        useStoreSchema = false
+                        registerYamlCompletions()
+                        runValidation()
+                        writeQueryParams()
+                        updateCopyCmdBtn()
+                        setStatus('Converted back to single /app format.', true)
+                    } else if (parsed.length > 1) {
+                        // Multiple apps: can't auto-convert, offer schema-only switch
+                        setStoreToggle(true)  // revert toggle
+                        setStatus(`Store has ${parsed.length} apps — disable app-store-urls= schema only (keep content)?`, false, [
+                            {
+                                label: 'Disable Schema', fn: () => {
+                                    setStoreToggle(false)
+                                    useStoreSchema = false
+                                    registerYamlCompletions()
+                                    runValidation()
+                                    writeQueryParams()
+                                    updateCopyCmdBtn()
+                                    setStatus('app-store-urls= schema disabled.', true)
+                                }
+                            },
+                            { label: 'Cancel', fn: () => clearStatus() }
+                        ])
+                    } else {
+                        // Empty array: just switch schema
+                        useStoreSchema = false
+                        registerYamlCompletions()
+                        runValidation()
+                        writeQueryParams()
+                        updateCopyCmdBtn()
+                    }
+                } else {
+                    // Not an array (e.g. syntax error or single object already): just switch schema
+                    useStoreSchema = false
+                    registerYamlCompletions()
+                    runValidation()
+                    writeQueryParams()
+                    updateCopyCmdBtn()
+                }
+            }
+        }
 
         loadExampleBtn.addEventListener('click', () => {
             if (exampleRow.hidden) {
@@ -962,6 +1304,17 @@
 
         appCatSelect.addEventListener('change', () => {
             populateAppDropdown(allApps, appCatSelect.value)
+            // Auto-load if currently in a clean example state
+            if (isExampleClean() && appNameSelect.value) {
+                loadExampleDirect(appNameSelect.value)
+            }
+        })
+
+        // On app name change: auto-load if clean example state
+        appNameSelect.addEventListener('change', () => {
+            if (isExampleClean()) {
+                loadExampleDirect(appNameSelect.value)
+            }
         })
 
         loadExampleConfirmBtn.addEventListener('click', () => {
@@ -976,13 +1329,34 @@
 
         recallStashBtn.addEventListener('click', () => {
             const stash = localStorage.getItem(STASH_KEY)
-            if (stash && stash.trim()) {
-                suppressChangeEvent = true
-                editor.setValue(stash)
-                suppressChangeEvent = false
-                runValidation()
-                setStatus('Stash recalled.', true)
-                plausible?.('App YAML Recall Stash', {})
+            if (stash?.trim()) {
+                const content = editor ? editor.getValue().trim() : ''
+                if (content && content !== stash) {
+                    setStatus('Recall stash? Current editor content will be replaced.', false, [
+                        {
+                            label: 'Recall', fn: () => {
+                                suppressChangeEvent = true
+                                editor.setValue(stash)
+                                suppressChangeEvent = false
+                                localStorage.setItem(AUTOSAVE_KEY, stash)
+                                clearCurrentExample()
+                                runValidation()
+                                setStatus('Stash recalled.', true)
+                                plausible?.('App YAML Recall Stash', {})
+                            }
+                        },
+                        { label: 'Cancel', fn: () => clearStatus() }
+                    ])
+                } else {
+                    suppressChangeEvent = true
+                    editor.setValue(stash)
+                    suppressChangeEvent = false
+                    localStorage.setItem(AUTOSAVE_KEY, stash)
+                    clearCurrentExample()
+                    runValidation()
+                    setStatus('Stash recalled.', true)
+                    plausible?.('App YAML Recall Stash', {})
+                }
             } else {
                 setStatus('No stash yet — use "💾 Stash" in the action bar to save one.')
             }
@@ -994,63 +1368,130 @@
             if (!file || !editor) return
             editor.setValue(await file.text())
             importFileInput.value = ''
-            setStatus(`Imported: ${file.name}`)
+            clearCurrentExample()
+            setStatus(`Imported: ${file.name}`, true)
             plausible?.('App YAML Import File', {})
         })
 
         newBtn.addEventListener('click', () => {
             if (editor) {
-                suppressChangeEvent = true
-                editor.setValue('')
-                suppressChangeEvent = false
-                localStorage.removeItem(AUTOSAVE_KEY)
-                runValidation()
-                setStatus('New — editor cleared.')
-                editor.focus()
-                plausible?.('App YAML New', {})
+                const content = editor.getValue().trim()
+                if (isDirty() || (currentExampleName === null && content)) {
+                    setStatus('Clear editor? Current content will be lost.', false, [
+                        {
+                            label: 'Clear', fn: () => {
+                                suppressChangeEvent = true
+                                editor.setValue('')
+                                suppressChangeEvent = false
+                                clearCurrentExample()
+                                localStorage.removeItem(AUTOSAVE_KEY)
+                                runValidation()
+                                setStatus('Editor cleared.', true)
+                                editor.focus()
+                                plausible?.('App YAML New', {})
+                            }
+                        },
+                        { label: 'Cancel', fn: () => clearStatus() }
+                    ])
+                } else {
+                    suppressChangeEvent = true
+                    editor.setValue('')
+                    suppressChangeEvent = false
+                    clearCurrentExample()
+                    localStorage.removeItem(AUTOSAVE_KEY)
+                    runValidation()
+                    setStatus('New — editor cleared.', true)
+                    editor.focus()
+                    plausible?.('App YAML New', {})
+                }
             }
         })
 
         stashBtn.addEventListener('click', () => {
             if (!editor) return
-            localStorage.setItem(STASH_KEY, editor.getValue())
-            stashBtn.textContent = '✓ Stashed!'
-            setTimeout(() => { stashBtn.textContent = '💾 Stash' }, 1800)
-            setStatus('Stashed — use "Recall Stash" in the toolbar to restore.', true)
-            plausible?.('App YAML Stash', {})
+            const existing = localStorage.getItem(STASH_KEY)
+            const content = editor.getValue()
+            if (existing?.trim() && existing !== content) {
+                setStatus('Replace existing stash with current content?', false, [
+                    {
+                        label: 'Replace', fn: () => {
+                            localStorage.setItem(STASH_KEY, content)
+                            clearCurrentExample()
+                            setStatus('Stashed — use "Recall Stash" in the toolbar to restore.', true)
+                            plausible?.('App YAML Stash', {})
+                        }
+                    },
+                    { label: 'Cancel', fn: () => clearStatus() }
+                ])
+            } else {
+                localStorage.setItem(STASH_KEY, content)
+                clearCurrentExample()
+                stashBtn.textContent = '✓ Stashed!'
+                setTimeout(() => { stashBtn.textContent = '💾 Stash' }, 1800)
+                setStatus('Stashed — use "Recall Stash" in the toolbar to restore.', true)
+                plausible?.('App YAML Stash', {})
+            }
         })
 
         downloadBtn.addEventListener('click', downloadYaml)
         copyBtn.addEventListener('click', copyYaml)
         copyCmdBtn.addEventListener('click', copyAsCommand)
 
-        pasteBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText()
-                if (editor && text) {
-                    editor.setValue(text)
-                    setStatus('Pasted from clipboard.')
-                    plausible?.('App YAML Paste', {})
-                }
-            } catch (_) {
-                setStatus('Could not read clipboard — paste with Ctrl+V in the editor.')
-            }
+        // Share: build full URL with YAML and copy to clipboard (no modal, no history write)
+        shareBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(buildShareUrl()).then(() => {
+                const orig = shareBtn.textContent
+                shareBtn.textContent = '✓ Copied!'
+                setTimeout(() => { shareBtn.textContent = orig }, 1800)
+                plausible?.('App YAML Share', {})
+            }).catch(() => {
+                setStatus('Could not copy URL — copy it from the address bar.')
+            })
+        })
+
+        // Clear button
+        clearBtn.addEventListener('click', () => {
+            if (!editor) return
+            const content = editor.getValue().trim()
+            if (!content) return
+            setStatus('Clear editor? All current content will be lost.', false, [
+                {
+                    label: 'Clear', fn: () => {
+                        suppressChangeEvent = true
+                        editor.setValue('')
+                        suppressChangeEvent = false
+                        clearCurrentExample()
+                        localStorage.removeItem(AUTOSAVE_KEY)
+                        runValidation()
+                        setStatus('Editor cleared.', true)
+                        editor.focus()
+                        plausible?.('App YAML Clear', {})
+                    }
+                },
+                { label: 'Cancel', fn: () => clearStatus() }
+            ])
         })
 
         // --- Shareable URL query params ----------------------------------
-        // Max encoded YAML length to include in URL (longer = share without content)
-        const SHARE_YAML_MAX = 2000
-
         function writeQueryParams() {
             if (!editor) return
+            // Only persist version + store mode in the live URL — YAML is only included on
+            // explicit Share to avoid continuous URL rewrites and potential Referer leakage.
+            const params = new URLSearchParams()
+            if (verSelect.value) params.set('version', verSelect.value)
+            if (storeToggle.checked) params.set('store', '1')
+            const qs = params.toString()
+            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+        }
+
+        function buildShareUrl() {
             const params = new URLSearchParams()
             if (verSelect.value) params.set('version', verSelect.value)
             if (storeToggle.checked) params.set('store', '1')
             const content = editor ? editor.getValue() : ''
-            const encoded = encodeURIComponent(content)
-            if (content && encoded.length <= SHARE_YAML_MAX) params.set('yaml', content)
+            if (content) params.set('yaml', content)
             const qs = params.toString()
-            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+            return window.location.origin + window.location.pathname + (qs ? '?' + qs : '')
         }
 
         async function applyQueryParams() {
@@ -1065,16 +1506,18 @@
                 await onVersionChanged()
             }
             if (store === '1' && !storeToggle.checked) {
-                storeToggle.checked = true
+                setStoreToggle(true)
                 useStoreSchema = true
                 registerYamlCompletions()
+                updateCopyCmdBtn()
             }
             if (yaml && editor) {
                 suppressChangeEvent = true
                 editor.setValue(yaml)
                 suppressChangeEvent = false
+                clearCurrentExample()
                 runValidation()
-                setStatus('Loaded from shared URL.')
+                setStatus('Loaded from shared URL.', true)
             }
         }
 
@@ -1090,41 +1533,45 @@
             // If no yaml param: restore autosave from last session or load default example
             if (!hasYamlParam) {
                 const autosaved = localStorage.getItem(AUTOSAVE_KEY)
-                if (autosaved && autosaved.trim()) {
+                if (autosaved?.trim()) {
                     suppressChangeEvent = true
                     editor.setValue(autosaved)
                     suppressChangeEvent = false
+                    // Autosave is user's own content — not tracking as example
+                    clearCurrentExample()
                     runValidation()
                     setStatus('Last session restored.')
                 } else {
+                    // First init (no local storage) — load default example and open picker
                     const defaultApp = allApps.find(a => a.name === DEFAULT_APP) || allApps[0]
                     if (defaultApp) {
                         suppressChangeEvent = true
                         editor.setValue(defaultApp.yaml || '')
                         suppressChangeEvent = false
+                        setCurrentExample(defaultApp.name, defaultApp.yaml || '')
+                        localStorage.setItem(AUTOSAVE_KEY, defaultApp.yaml || '')
                         runValidation()
+                    }
+                    // Open the example picker on first load so user sees examples immediately
+                    showExampleRow()
+                    if (appNameSelect.value !== DEFAULT_APP) {
+                        appNameSelect.value = DEFAULT_APP
                     }
                 }
             }
 
             writeQueryParams()
+            updateCopyCmdBtn()
 
             // Show stash hint if one exists (separate from autosave)
             const stash = localStorage.getItem(STASH_KEY)
-            if (stash && stash.trim()) {
+            if (stash?.trim() && !statusLine.querySelector('.status-action')) {
                 const current = statusLine.textContent
                 setStatus((current ? current + ' ' : '') + '💾 Stash available — click "Recall Stash" to load it.')
             }
         }
 
         initMonaco()
-
-        // Share modal (wired up via restraml-shared.js)
-        initShareModal({
-            linkId: 'share-link', modalId: 'share-modal',
-            closeId: 'share-modal-close', copyId: 'share-copy', urlId: 'share-url',
-            beforeShow: writeQueryParams
-        })
     </script>
 
     <script>initThemeSwitcher()</script>

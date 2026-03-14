@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>/app YAML Editor — User Manual</title>
+
+    <!-- Pico CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <!-- Fonts and favicon -->
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+
+    <!-- Privacy-friendly analytics by Plausible -->
+    <script async src="https://plausible.io/js/pa-ubWop5eYckoDPVbIjXU4_.js"></script>
+    <script>
+      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+      plausible.init()
+    </script>
+
+    <style>
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+
+        /* MikroTik logo swap */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+        }
+        header nav img[data-theme] { height: 2rem; width: auto; }
+
+        header nav li a svg { width: var(--font-size); height: var(--font-size); color: var(--contrast); }
+
+        /* LTR items in dropdown */
+        details.dropdown ul li { direction: ltr; }
+
+        /* Manual-specific styles */
+        .manual-hero {
+            background: var(--pico-form-element-background-color);
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius);
+            padding: 2rem; margin-bottom: 2rem; text-align: center;
+        }
+        .manual-hero h2 { margin-bottom: 0.5rem; }
+        .manual-hero p { color: var(--pico-muted-color); margin-bottom: 1rem; }
+        .manual-hero a[role=button] { margin: 0.3rem; }
+
+        .tip-box {
+            border-left: 3px solid var(--pico-primary);
+            padding: 0.8rem 1.2rem; margin: 1rem 0;
+            background: var(--pico-form-element-background-color);
+            border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+        }
+        .tip-box p { margin: 0; font-size: 0.9rem; }
+
+        .kbd {
+            display: inline-block; padding: 0.1em 0.4em;
+            font-family: var(--pico-font-family-monospace); font-size: 0.85em;
+            background: var(--pico-form-element-background-color);
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: 3px;
+        }
+
+        .section-anchor { color: inherit; text-decoration: none; }
+        .section-anchor:hover { text-decoration: underline; }
+
+        table { font-size: 0.88rem; }
+
+        .arch-diagram {
+            font-family: var(--pico-font-family-monospace); font-size: 0.78rem;
+            background: var(--pico-form-element-background-color);
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius);
+            padding: 1.2rem; overflow-x: auto; white-space: pre;
+            line-height: 1.6; color: var(--pico-color);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg" alt="MikroTik logo">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" alt="MikroTik logo">
+            </ul>
+            <ul></ul>
+            <ul>
+                <li><a id="theme_switcher" href="#" aria-label="Toggle theme"></a></li>
+                <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html">Schema Downloads</a></li>
+                            <li><a href="lookup.html">Command Lookup</a></li>
+                            <li><a href="diff.html">Schema Diff</a></li>
+                            <li><a href="tikapp.html">/app Editor</a></li>
+                            <li><a href="tikapp-manual.html" aria-current="page">/app Editor Manual</a></li>
+                        </ul>
+                    </details>
+                </li>
+            </ul>
+        </nav>
+        <h1><code>/app</code> <mark>Editor</mark> — User Manual</h1>
+    </header>
+
+    <main class="container">
+
+        <!-- Hero -->
+        <div class="manual-hero">
+            <h2>RouterOS <code>/app</code> YAML Editor</h2>
+            <p>A browser-based editor for writing and validating RouterOS container app definitions.<br>
+               Powered by Monaco (the VS Code editor engine) with live schema validation.</p>
+            <a href="tikapp.html" role="button">Open the Editor</a>
+            <a href="https://help.mikrotik.com/docs/spaces/ROS/pages/343244823/Containerized+App+management"
+               role="button" class="secondary" target="_blank" rel="noopener">MikroTik Official Docs ↗</a>
+        </div>
+
+        <!-- Table of contents -->
+        <details open>
+            <summary><strong>Contents</strong></summary>
+            <ol>
+                <li><a href="#what-is-app">What is RouterOS <code>/app</code>?</a></li>
+                <li><a href="#getting-started">Getting Started</a></li>
+                <li><a href="#editor-interface">Editor Interface</a>
+                    <ul>
+                        <li><a href="#toolbar">Toolbar</a></li>
+                        <li><a href="#example-picker">Example Picker</a></li>
+                        <li><a href="#monaco">Monaco Editor Controls</a></li>
+                        <li><a href="#validation">Live Validation</a></li>
+                        <li><a href="#action-bar">Action Bar</a></li>
+                    </ul>
+                </li>
+                <li><a href="#examples-dirty">Examples, Stash &amp; Dirty Editing</a></li>
+                <li><a href="#store-mode">app-store-urls= Mode</a></li>
+                <li><a href="#sharing">Sharing &amp; Exporting</a></li>
+                <li><a href="#architecture">Behind the Scenes — How the Schema Gets Here</a></li>
+            </ol>
+        </details>
+
+        <hr>
+
+        <!-- Section 1 -->
+        <section id="what-is-app">
+            <h2><a class="section-anchor" href="#what-is-app">1. What is RouterOS <code>/app</code>?</a></h2>
+            <p>
+                RouterOS 7.22+ introduced <code>/app</code> — a YAML-based format for packaging
+                and deploying containerized applications directly on a MikroTik router. Think of it
+                as a lightweight <code>docker-compose</code> — but RouterOS-specific, with its own
+                networking model, placeholder system, and deployment lifecycle.
+            </p>
+            <p>
+                A single <code>/app</code> definition bundles everything a container needs: which
+                image to pull, which ports to expose, which volumes to mount, and optional metadata
+                like a name, description, category icon, and even a default web-UI page.
+                MikroTik ships a growing library of built-in apps (Home Assistant, code-server,
+                Pi-hole, and more) that can be explored and customized using this editor.
+            </p>
+            <div class="tip-box">
+                <p>
+                    📖 <strong>Official reference:</strong>
+                    <a href="https://help.mikrotik.com/docs/spaces/ROS/pages/343244823/Containerized+App+management"
+                       target="_blank" rel="noopener">Containerized App management — MikroTik Help</a>
+                </p>
+            </div>
+            <p>
+                The <code>/app</code> YAML format is <em>not</em> compatible with standard
+                <code>docker-compose</code> — the port notation, networking model, and placeholder
+                tokens are RouterOS-specific. This editor and schema are designed specifically
+                for the RouterOS dialect.
+            </p>
+        </section>
+
+        <!-- Section 2 -->
+        <section id="getting-started">
+            <h2><a class="section-anchor" href="#getting-started">2. Getting Started</a></h2>
+            <p>
+                Open <a href="tikapp.html">tikapp.html</a>. On your very first visit (no saved
+                session), the editor loads the <strong>code-server</strong> built-in example and
+                opens the example picker automatically so you can browse all available apps.
+            </p>
+            <ol>
+                <li><strong>Browse examples</strong> — use the category and app dropdowns to explore built-in MikroTik apps. Switching app when the editor is unmodified loads it instantly.</li>
+                <li><strong>Customize</strong> — edit the YAML in the Monaco editor. Schema validation runs live. Errors appear below the editor.</li>
+                <li><strong>Deploy</strong> — copy the resulting YAML to your router via the <em>Copy /app/add</em> button, or download the file and use the RouterOS Files menu.</li>
+            </ol>
+            <div class="tip-box">
+                <p>
+                    💡 RouterOS <strong>does not allow editing built-in apps</strong> directly
+                    (<code>/app set</code> is read-only for built-ins). To customise one, copy
+                    its YAML from the editor and import it as a new custom app via
+                    <code>/app add yaml="…"</code>.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 3 -->
+        <section id="editor-interface">
+            <h2><a class="section-anchor" href="#editor-interface">3. Editor Interface</a></h2>
+
+            <h3 id="toolbar">Toolbar (Line 1)</h3>
+            <table>
+                <thead><tr><th>Control</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>Version</strong></td><td>RouterOS schema version used for validation. Choose a specific version (e.g. <code>7.22</code>) or <code>latest</code>.</td></tr>
+                    <tr><td><strong>app-store-urls=</strong> toggle</td><td>Switch between single <code>/app</code> schema and the array format used by <code>app-store-urls=</code>. See <a href="#store-mode">§5</a>.</td></tr>
+                    <tr><td><strong>Examples</strong></td><td>Opens/closes the example picker (line 2). Button fills in when picker is open; outlined when closed.</td></tr>
+                    <tr><td><strong>Recall Stash</strong></td><td>Restore the most recently stashed YAML.</td></tr>
+                    <tr><td><strong>Import</strong></td><td>Load a <code>.yaml</code> / <code>.yml</code> file from your computer into the editor.</td></tr>
+                    <tr><td><strong>New</strong></td><td>Clear the editor to start from scratch (prompts if content would be lost).</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="example-picker">Example Picker (Line 2)</h3>
+            <p>
+                When the <strong>Examples</strong> button is active, a second row appears with
+                a category dropdown and an app dropdown. Changing either when your current content
+                is a <em>clean</em> (unmodified) example will immediately load the new example —
+                no extra click needed. If you have edited the current example, the editor asks
+                before replacing it. See <a href="#examples-dirty">§4</a> for full details.
+            </p>
+            <p>
+                Double-clicking an app name in the picker also loads it immediately.
+            </p>
+
+            <h3 id="monaco">Monaco Editor Controls</h3>
+            <p>
+                The editor is Monaco — the same engine that powers VS Code. All standard
+                keyboard shortcuts work. Here are the most useful ones:
+            </p>
+            <table>
+                <thead><tr><th>Action</th><th>Windows / Linux</th><th>macOS</th></tr></thead>
+                <tbody>
+                    <tr><td>Save to file</td><td colspan="2"><em>Use the Download button instead (browser security)</em></td></tr>
+                    <tr><td>Undo</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Z</span></td><td><span class="kbd">⌘</span>+<span class="kbd">Z</span></td></tr>
+                    <tr><td>Redo</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">Z</span></td><td><span class="kbd">⌘</span>+<span class="kbd">Shift</span>+<span class="kbd">Z</span></td></tr>
+                    <tr><td>Paste from clipboard</td><td><span class="kbd">Ctrl</span>+<span class="kbd">V</span></td><td><span class="kbd">⌘</span>+<span class="kbd">V</span></td></tr>
+                    <tr><td>Select all</td><td><span class="kbd">Ctrl</span>+<span class="kbd">A</span></td><td><span class="kbd">⌘</span>+<span class="kbd">A</span></td></tr>
+                    <tr><td>Find / Replace</td><td><span class="kbd">Ctrl</span>+<span class="kbd">H</span></td><td><span class="kbd">⌘</span>+<span class="kbd">H</span></td></tr>
+                    <tr><td>Format document</td><td><span class="kbd">Shift</span>+<span class="kbd">Alt</span>+<span class="kbd">F</span></td><td><span class="kbd">⇧</span>+<span class="kbd">⌥</span>+<span class="kbd">F</span></td></tr>
+                    <tr><td>Trigger suggestions</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Space</span></td><td><span class="kbd">⌃</span>+<span class="kbd">Space</span></td></tr>
+                    <tr><td>Go to line</td><td><span class="kbd">Ctrl</span>+<span class="kbd">G</span></td><td><span class="kbd">⌃</span>+<span class="kbd">G</span></td></tr>
+                    <tr><td>Toggle comment</td><td><span class="kbd">Ctrl</span>+<span class="kbd">/</span></td><td><span class="kbd">⌘</span>+<span class="kbd">/</span></td></tr>
+                    <tr><td>Indent selection</td><td><span class="kbd">Tab</span></td><td><span class="kbd">Tab</span></td></tr>
+                    <tr><td>Fold region</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">[</span></td><td><span class="kbd">⌘</span>+<span class="kbd">⌥</span>+<span class="kbd">[</span></td></tr>
+                </tbody>
+            </table>
+            <div class="tip-box">
+                <p>
+                    🖱 <strong>YAML autocompletion</strong> is powered by the loaded JSON schema.
+                    Press <span class="kbd">Ctrl/⌘</span>+<span class="kbd">Space</span> anywhere
+                    to see available keys. Required fields sort to the top.
+                </p>
+            </div>
+            <p>
+                <strong>Browser differences:</strong> On some browsers (especially Firefox),
+                <span class="kbd">Ctrl</span>+<span class="kbd">W</span> closes the tab instead of
+                triggering an editor action — be careful. On macOS, <span class="kbd">⌘</span>
+                shortcuts are used instead of <span class="kbd">Ctrl</span>.
+            </p>
+
+            <h3 id="validation">Live Validation</h3>
+            <p>
+                Every change is validated against the JSON Schema for the selected RouterOS version.
+                The validation summary below the editor turns <span style="color:var(--pico-ins-color)">green</span>
+                when valid, <span style="color:var(--pico-del-color)">red</span> when there are
+                errors. Click the summary to expand the error list — click any error to jump to
+                that line in the editor.
+            </p>
+
+            <h3 id="action-bar">Action Bar (Bottom)</h3>
+            <table>
+                <thead><tr><th>Button</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>💾 Stash</strong></td><td>Explicitly save the current YAML to a separate "stash" slot in browser storage. Warns before replacing an existing stash.</td></tr>
+                    <tr><td><strong>⬇ Download</strong></td><td>Download the YAML as a <code>.tikapp.yaml</code> or <code>.tikappstore.yaml</code> file.</td></tr>
+                    <tr><td><strong>📋 Copy</strong></td><td>Copy the raw YAML to your clipboard.</td></tr>
+                    <tr><td><strong>Copy /app/add</strong></td><td>Copy a ready-to-paste RouterOS CLI command: <code>/app add yaml="…"</code>. Disabled in app-store-urls= mode (array format is not supported by <code>/app add</code>).</td></tr>
+                    <tr><td><strong>🔗 Share</strong></td><td>Copy a shareable URL that encodes the current version, mode, and YAML content to your clipboard. Share the link — anyone who opens it gets the same editor state.</td></tr>
+                    <tr><td><strong>✕ Clear</strong></td><td>Clear the editor (prompts for confirmation).</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section 4 -->
+        <section id="examples-dirty">
+            <h2><a class="section-anchor" href="#examples-dirty">4. Examples, Stash &amp; Dirty Editing</a></h2>
+            <p>
+                Understanding the <em>dirty state</em> model is the key to moving smoothly from
+                browsing examples to editing your own app.
+            </p>
+
+            <h3>Clean vs. Dirty</h3>
+            <p>
+                The editor tracks whether the current content was loaded from a built-in example
+                and whether it has been modified. Content is <strong>clean</strong> if it exactly
+                matches the loaded example; it becomes <strong>dirty</strong> as soon as you make
+                any change.
+            </p>
+
+            <h3>Browsing Examples (Clean State)</h3>
+            <p>
+                When the editor is in a <em>clean example state</em> — meaning you haven't edited
+                anything yet — switching the app dropdown instantly loads the newly selected
+                example. No extra click needed. This makes it easy to quickly preview any of
+                MikroTik's built-in apps.
+            </p>
+
+            <h3>What Happens When You Edit an Example?</h3>
+            <p>
+                The moment you change anything, the status bar shows:
+            </p>
+            <blockquote>
+                <em>Editing 'code-server' example — changes not yet stashed.</em>
+                <strong>[Stash]</strong> <strong>[Discard]</strong>
+            </blockquote>
+            <ul>
+                <li><strong>[Stash]</strong> — saves your changes to the stash slot, then clears the "example mode" so you can browse freely. If a stash already exists, you'll be asked to confirm before replacing it.</li>
+                <li><strong>[Discard]</strong> — reverts the editor back to the original example YAML, discarding your changes.</li>
+            </ul>
+            <p>
+                If you try to load a different example while the content is dirty, the same
+                <strong>Load / Stash / Cancel</strong> choice appears:
+            </p>
+            <blockquote>
+                <em>'code-server' was edited — load 'pihole'?</em>
+                <strong>[Load]</strong> <strong>[Stash]</strong> <strong>[Cancel]</strong>
+            </blockquote>
+
+            <h3>Stash — Your Scratch Pad</h3>
+            <p>
+                The stash is a single named slot in your browser's <code>localStorage</code>.
+                Use it to:
+            </p>
+            <ul>
+                <li>Preserve work-in-progress while you quickly look at another example</li>
+                <li>Temporarily park a half-finished custom app before browsing</li>
+                <li>Keep a "last good" version handy while experimenting</li>
+            </ul>
+            <p>
+                Restore the stash at any time with <strong>Recall Stash</strong> in the toolbar.
+                The stash persists across page reloads until you explicitly replace it. Stashing
+                again when a stash already exists prompts for confirmation.
+            </p>
+
+            <h3>Autosave</h3>
+            <p>
+                Every keystroke is silently autosaved to a separate <code>localStorage</code>
+                key. On reload, your last session is restored automatically, so you never
+                lose unsaved work. This autosave is independent of the stash.
+            </p>
+
+            <h3>Going from Example to Custom App</h3>
+            <p>
+                A typical workflow for building a custom app from an existing example:
+            </p>
+            <ol>
+                <li>Browse examples to find a similar app (e.g. <em>code-server</em>)</li>
+                <li>Start editing — the dirty indicator appears</li>
+                <li>Click <strong>[Stash]</strong> in the status bar to save a checkpoint</li>
+                <li>Keep editing; use <strong>Recall Stash</strong> to roll back if needed</li>
+                <li>When satisfied, use <strong>⬇ Download</strong> or <strong>Copy /app/add</strong> to deploy</li>
+            </ol>
+            <div class="tip-box">
+                <p>
+                    🔒 RouterOS <strong>does not allow editing built-in apps</strong>.
+                    To deploy a customized version, use <code>/app add yaml="…"</code>
+                    (not <code>/app set</code>). The <em>Copy /app/add</em> button generates
+                    the correct command for you.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 5 -->
+        <section id="store-mode">
+            <h2><a class="section-anchor" href="#store-mode">5. app-store-urls= Mode</a></h2>
+            <p>
+                RouterOS supports hosting a collection of app definitions on a web server and
+                referencing them with <code>/app set app-store-urls=http://…</code>. The store
+                file is an <strong>array</strong> of individual <code>/app</code> definitions in
+                a single YAML document.
+            </p>
+            <p>
+                The <strong>app-store-urls=</strong> toggle in the toolbar switches the editor
+                between single-app mode and store mode. It does more than change the validation
+                schema:
+            </p>
+            <ul>
+                <li>
+                    <strong>Toggling ON (single → store):</strong> if the current content is a
+                    valid single <code>/app</code> definition, it is automatically wrapped in a
+                    YAML array. If the content is not valid, you are offered the choice to
+                    <em>Enable Anyway</em> (schema only, no conversion) or <em>Cancel</em>.
+                </li>
+                <li>
+                    <strong>Toggling OFF (store → single):</strong> if the store contains exactly
+                    one app, it is automatically unwrapped to a single definition. If it contains
+                    multiple apps, you are asked whether to disable just the schema (keeping the
+                    array content) or cancel.
+                </li>
+            </ul>
+            <div class="tip-box">
+                <p>
+                    🌐 <strong>app-store-urls= requires a web server.</strong>
+                    The array YAML must be hosted at a URL accessible to the router. It cannot
+                    be added with <code>/app add</code> (which only accepts a single definition).
+                    The <em>Copy /app/add</em> button is disabled in store mode for this reason.
+                </p>
+            </div>
+            <p>
+                Filenames for download use <code>.tikapp.yaml</code> for single apps and
+                <code>.tikappstore.yaml</code> for store files. These extensions are recognised by
+                the VS Code YAML extension when the schemas are configured — see
+                <a href="https://github.com/tikoci/restraml/blob/main/README.md#using-the-app-yaml-schema-in-vscode"
+                   target="_blank" rel="noopener">README → VSCode setup</a>.
+            </p>
+        </section>
+
+        <!-- Section 6 -->
+        <section id="sharing">
+            <h2><a class="section-anchor" href="#sharing">6. Sharing &amp; Exporting</a></h2>
+
+            <h3>🔗 Share</h3>
+            <p>
+                Click <strong>Share</strong> in the action bar. The current URL — which encodes
+                the selected version, schema mode, and the full YAML content — is copied to your
+                clipboard. Share the link with anyone: opening it in a browser restores the exact
+                editor state.
+            </p>
+            <p>
+                The YAML is encoded directly in the URL query string. Typical <code>/app</code>
+                definitions share reliably; very large configs may hit browser or server URL
+                length limits, in which case Download or Copy YAML are good fallbacks.
+            </p>
+
+            <h3>⬇ Download</h3>
+            <p>
+                Saves the YAML as a local file. The filename uses the app's <code>name</code>
+                field when available (e.g. <code>my-app.tikapp.yaml</code>).
+            </p>
+
+            <h3>📋 Copy</h3>
+            <p>Copies the raw YAML text to your clipboard.</p>
+
+            <h3>Copy /app/add</h3>
+            <p>
+                Generates and copies the complete RouterOS CLI command:
+            </p>
+            <pre><code>/app add yaml="name: my-app
+services:
+  server:
+    image: …"</code></pre>
+            <p>
+                Paste this directly into a RouterOS terminal or the WinBox terminal.
+                Only available in single-app mode.
+            </p>
+        </section>
+
+        <!-- Section 7 -->
+        <section id="architecture">
+            <h2><a class="section-anchor" href="#architecture">7. Behind the Scenes — How the Schema Gets Here</a></h2>
+            <p>
+                The editor's live validation is powered by a JSON Schema that is generated
+                automatically from a real RouterOS router. Here is how the pipeline works —
+                a quick look behind the curtain.
+            </p>
+
+            <div class="arch-diagram">MikroTik releases a new RouterOS version
+         │
+         ▼
+GitHub Actions (auto.yaml — runs daily)
+  Detects new version on upgrade.mikrotik.com
+         │
+         ▼
+RouterOS CHR (.vdi disk image) downloaded from MikroTik CDN
+         │
+         ▼
+QEMU boots the CHR on a GitHub Actions runner (with KVM acceleration)
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Live RouterOS instance (7.22+, with container package)    │
+  │   └── GET /rest/app  →  all built-in /app YAML definitions │
+  └─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+appyamlvalidate.js (Bun)
+  Generates per-version JSON Schema from routeros-app-yaml-schema.latest.json
+  Validates every built-in /app YAML against the schema
+  Writes docs/{version}/routeros-app-yaml-schema.json
+  Writes docs/{version}/app.json  (built-in app YAMLs)
+         │
+         ▼
+Git commit → GitHub Pages
+  Published at https://tikoci.github.io/restraml/{version}/…
+         │
+         ▼
+tikapp.html loads schema + app.json from GitHub Pages
+  Monaco editor + AJV validate your YAML in real-time
+  Autocompletion driven by the JSON Schema</div>
+            <p>
+                The schema files at <code>routeros-app-yaml-schema.latest.json</code> and
+                <code>routeros-app-yaml-store-schema.latest.json</code> are also available
+                as stable public URLs, making them suitable for use with the
+                <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml"
+                   target="_blank" rel="noopener">VS Code YAML extension</a> and potentially
+                <a href="https://www.schemastore.org" target="_blank" rel="noopener">SchemaStore</a>
+                (which would auto-apply the schema in editors without any configuration).
+            </p>
+            <p>
+                All of this infrastructure is open source in the
+                <a href="https://github.com/tikoci/restraml" target="_blank" rel="noopener">tikoci/restraml</a>
+                repository. The project is not affiliated with MikroTik — it is a community tool
+                built to make RouterOS app development more approachable.
+            </p>
+
+            <div class="tip-box">
+                <p>
+                    🛠 Want to contribute or report an issue? Open a
+                    <a href="https://github.com/tikoci/restraml/issues/new/choose" target="_blank" rel="noopener">GitHub issue</a>.
+                </p>
+            </div>
+        </section>
+
+        <hr>
+        <p style="color:var(--pico-muted-color);font-size:0.85rem;text-align:center">
+            From <a href="https://github.com/tikoci/restraml">TIKOCI</a>. Not affiliated with
+            <a href="https://mikrotik.com">MikroTik</a>.
+        </p>
+
+    </main>
+
+    <script src="restraml-shared.js"></script>
+    <script>initThemeSwitcher()</script>
+
+</body>
+
+</html>
