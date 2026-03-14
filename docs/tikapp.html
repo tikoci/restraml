@@ -231,11 +231,11 @@
         <h1 style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.2rem">
             <span><code>/app</code> <mark>YAML Editor</mark></span>
             <span style="margin-left:auto;font-size:0.72rem;font-weight:400;white-space:nowrap;opacity:0.65">
-                <a href="https://github.com/tikoci/restraml/blob/main/README.md#app-yaml-editor" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[about]</a>
+                <a href="https://github.com/tikoci/restraml/blob/main/README.md#app-yaml-editor" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[about]</a>
                 ·
-                <a href="https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[/app docs]</a>
+                <a href="https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[/app docs]</a>
                 ·
-                <a href="tikapp-manual.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[manual]</a>
+                <a href="tikapp-manual.html" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[manual]</a>
             </span>
         </h1>
     </header>
@@ -1437,10 +1437,9 @@
         copyBtn.addEventListener('click', copyYaml)
         copyCmdBtn.addEventListener('click', copyAsCommand)
 
-        // Share: just copy the current URL to clipboard (no modal)
+        // Share: build full URL with YAML and copy to clipboard (no modal, no history write)
         shareBtn.addEventListener('click', () => {
-            writeQueryParams()
-            navigator.clipboard.writeText(window.location.href).then(() => {
+            navigator.clipboard.writeText(buildShareUrl()).then(() => {
                 const orig = shareBtn.textContent
                 shareBtn.textContent = '✓ Copied!'
                 setTimeout(() => { shareBtn.textContent = orig }, 1800)
@@ -1476,13 +1475,23 @@
         // --- Shareable URL query params ----------------------------------
         function writeQueryParams() {
             if (!editor) return
+            // Only persist version + store mode in the live URL — YAML is only included on
+            // explicit Share to avoid continuous URL rewrites and potential Referer leakage.
+            const params = new URLSearchParams()
+            if (verSelect.value) params.set('version', verSelect.value)
+            if (storeToggle.checked) params.set('store', '1')
+            const qs = params.toString()
+            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+        }
+
+        function buildShareUrl() {
             const params = new URLSearchParams()
             if (verSelect.value) params.set('version', verSelect.value)
             if (storeToggle.checked) params.set('store', '1')
             const content = editor ? editor.getValue() : ''
             if (content) params.set('yaml', content)
             const qs = params.toString()
-            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+            return window.location.origin + window.location.pathname + (qs ? '?' + qs : '')
         }
 
         async function applyQueryParams() {

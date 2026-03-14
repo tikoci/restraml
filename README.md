@@ -48,7 +48,7 @@ A **browser-based YAML editor** at [tikoci.github.io/restraml/tikapp.html](https
 * Support for both single `/app` definitions and `app-store-urls=` array format
 * Download as `.tikapp.yaml` / `.tikappstore.yaml`, or copy YAML to clipboard
 * Copy directly as a RouterOS `/app add yaml=` command
-* Shareable URLs — version, schema mode, and full YAML content encoded in the URL
+* Shareable URLs — version, schema mode, and YAML content encoded on explicit Share
 
 📖 **[Full user manual →](https://tikoci.github.io/restraml/tikapp-manual.html)**
 
