@@ -33,6 +33,8 @@ restraml/
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
 │   ├── index.html        # Main SPA: version list, diff tool, download links
 │   ├── lookup.html       # RouterOS command search tool (fully event-driven, no buttons)
+│   ├── diff.html          # Schema diff tool (side-by-side / line-by-line diff between versions)
+│   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
 │   ├── routeros-app-yaml-schema.latest.json       # /app YAML schema (stable, public URL)
 │   ├── routeros-app-yaml-schema.dev.json          # /app YAML schema (dev/testing)
 │   ├── routeros-app-yaml-store-schema.latest.json # /app store schema (array of /app YAMLs)
@@ -234,6 +236,10 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   `<details>`, `<summary>`, etc. No `<div>` soup.
 - **No web frameworks** — no React, Vue, Angular, Svelte, etc. Vanilla JS only.
 - **No build tools** — no webpack, Vite, npm scripts for the HTML page itself. Single `.html` file.
+- **`restraml-shared.js`** — shared JS utilities (version parsing, theme switcher, share modal,
+  GitHub API fetch). All `docs/*.html` pages load this via `<script src="restraml-shared.js"></script>`.
+  When modifying shared behavior, change this file — not inline copies. When creating a new page,
+  include this script before page-specific code.
 - **Avoid submit buttons** — prefer JS event listeners (`input`, `change`, `keydown`) over explicit
   submit/lookup buttons. Use debouncing (~400 ms) for text inputs; fire immediately on `change`
   events for checkboxes and `<select>` elements. Cancellation tokens (incrementing counter compared
@@ -263,8 +269,8 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 
 `docs/index.html` is the primary SPA. Key patterns future agents should follow:
 
-- **GitHub API for content**: fetches `https://api.github.com/repos/{owner}/{repo}/contents/docs`
-  to get the list of built versions, then dispatches a custom `builddir` event for each directory.
+- **GitHub API for content**: uses `fetchVersionList()` from `restraml-shared.js` to get the list
+  of built versions, then dispatches a custom `builddir` event for each directory.
   Custom events (`builddir`, `inspectdownload`) decouple data fetching from UI updates.
 - **Early-event queue**: a `_pendingBuildDirs` array queues `builddir` events that fire before
   `DOMContentLoaded`. Process the queue in `DOMContentLoaded` to avoid missing events.
@@ -290,8 +296,6 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   toggled by a `toggle` event listener on the `<details>` element.
 - **Plausible analytics**: `plausible("Event Name", { props: { key: value } })` for tracking
   user interactions. Always include event tracking for new interactive features.
-- **`module` shim**: because `json-diff` is ESM-only, the page uses a global `const module = {}`
-  shim before a `<script type="module">` that assigns `module.diffString = diffString`.
 
 ### docs/lookup.html — RouterOS Command Search Tool
 
@@ -332,6 +336,9 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
   `https://tikoci.github.io/restraml/{version}/schema.raml`.
 - No server-side code, no backend, no build step.
 - **Include the shared Tools nav dropdown** (see "Tools Nav Dropdown" section below) for consistent navigation.
+- Include `<script src="restraml-shared.js"></script>` before page-specific scripts. Call
+  `initThemeSwitcher()` and optionally `initShareModal({...})`. Use `fetchVersionList()` and
+  `RESTRAML.pagesUrl` from the shared utilities.
 - Keep JavaScript in the single `.html` file (no separate `.js` files unless there is a very
   strong reason for separation).
 - Issues requesting custom views will typically describe a desired user-facing feature (e.g.,
@@ -372,45 +379,20 @@ providing consistent navigation between tools. The dropdown lists all tools; mar
 
 ### Dark Mode — Correct Pattern for All `docs/` Pages
 
-All pages support three states: explicit light, explicit dark, and auto (follow OS).
+Dark mode is handled by `initThemeSwitcher()` in `restraml-shared.js`. All pages call this function.
 
-**Critical Pico v2 gotcha**: `data-theme='auto'` is **not** a valid Pico CSS v2 value. Setting it
-silently forces light mode. The correct approach for the "auto" state is to **remove the attribute**:
-
-```javascript
-// Theme switcher — three-state cycle: auto → light → dark → auto
-let themeState = 'auto'
-// On DOMContentLoaded: do NOT set data-theme at all (leave unset = auto)
-switchTheme.addEventListener('click', (e) => {
-    e.preventDefault()
-    if (themeState === 'auto') {
-        themeState = 'light'; html.setAttribute('data-theme', 'light')
-    } else if (themeState === 'light') {
-        themeState = 'dark'; html.setAttribute('data-theme', 'dark')
-    } else {
-        themeState = 'auto'; html.removeAttribute('data-theme')  // ← NOT setAttribute('auto')
-    }
-})
-```
+**Critical Pico v2 gotcha**: `data-theme='auto'` is **not** a valid Pico CSS v2 value — it silently
+forces light mode. The shared code handles this correctly by removing the attribute for "auto" state.
 
 **CSS pattern for third-party components in dark mode** (covers auto+OS-dark AND explicit dark):
 ```css
-/* Light defaults */
-#mycomponent { --color-bg: #ffffff; --color-text: #24292f; }
-
 /* Auto mode + OS dark */
 @media (prefers-color-scheme: dark) {
-    :root:not([data-theme=light]) #mycomponent {
-        --color-bg: #0d1117; --color-text: #c9d1d9;
-    }
+    :root:not([data-theme=light]) #mycomponent { /* dark styles */ }
 }
 /* Explicit dark */
-[data-theme=dark] #mycomponent {
-    --color-bg: #0d1117; --color-text: #c9d1d9;
-}
+[data-theme=dark] #mycomponent { /* dark styles */ }
 ```
-Use CSS custom properties + `var()` to avoid duplicating property rules in both dark selectors.
-Use an `#id` prefix on all overrides to guarantee higher specificity than Pico's attribute selectors.
 
 ### diff2html Integration — Gotchas and Patterns
 
@@ -581,3 +563,4 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `qemu-utils` | CI workflows (apt) | Provides `qemu-img` for VDI→qcow2 disk conversion |
 | `qemu-system-x86_64` | `Dockerfile.chr-qemu` (Alpine apk) | Runs RouterOS CHR VM in local Docker |
 | `qemu-img` | `Dockerfile.chr-qemu` (Alpine apk) | Provides `qemu-img` for VDI→qcow2 conversion |
+| `restraml-shared.js` | `docs/*.html` pages | Shared JS: version parsing, theme switcher, share modal, GitHub API fetch |

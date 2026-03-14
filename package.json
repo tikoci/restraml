@@ -1,0 +1,23 @@
+{
+  "name": "restraml",
+  "description": "RouterOS REST API schema generator — RAML 1.0 (and future OpenAPI 3) from live RouterOS CHR",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "schema": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js [path...]'",
+    "schema:version": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js --version'",
+    "validate:raml": "node validraml.cjs",
+    "validate:app-yaml": "echo 'Usage: bun appyamlvalidate.js <version>'",
+    "lint": "bunx @biomejs/biome check .",
+    "lint:fix": "bunx @biomejs/biome check --write ."
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0",
+    "webapi-parser": "^0.5.0"
+  }
+}

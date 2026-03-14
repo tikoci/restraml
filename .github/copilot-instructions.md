@@ -20,6 +20,7 @@ the `/docs/` directory in this repository.
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
 - **`Dockerfile.chr-qemu`** — Alpine image that runs RouterOS CHR in QEMU
 - **`docs/`** — Published schema files, one subdirectory per RouterOS version
+- **`docs/restraml-shared.js`** — Shared JS utilities for all docs/*.html pages (version parsing, theme switcher, share modal, GitHub API)
 - **`docs/routeros-app-yaml-schema.latest.json`** — /app YAML JSON Schema (public, do not rename)
 - **`docs/routeros-app-yaml-store-schema.latest.json`** — /app store JSON Schema (public, do not rename)
 
@@ -30,6 +31,7 @@ the `/docs/` directory in this repository.
 - **Stable** RouterOS releases (e.g. `7.22`) are on `download.mikrotik.com`; **beta/rc** (e.g. `7.22rc2`) are on `cdn.mikrotik.com` — the Dockerfile handles both with a primary+fallback wget
 - A version is considered "built" when `docs/{version}/schema.raml` exists
 - A version's /app YAML schemas are "built" when `docs/{version}/routeros-app-yaml-schema.json` exists
+- All `docs/*.html` pages load `restraml-shared.js` for shared utilities — modify shared behavior there, not inline
 - `auto.yaml` runs daily and checks MikroTik's `NEWESTa7.{stable,testing,development,long-term}` channels
 - **`routeros-app-yaml-schema.latest.json`** and **`routeros-app-yaml-store-schema.latest.json`** are
   publicly known URLs linked externally — **never rename or move these files**
