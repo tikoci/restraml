@@ -544,7 +544,8 @@
                 ])
 
                 // Build a fresh Ajv instance for this version's schemas
-                ajvInst = new Ajv({ allErrors: true, unknownFormats: 'ignore', schemaId: 'auto' })
+                // Use schemaId '$id' for JSON Schema draft-07 consistency
+                ajvInst = new Ajv({ allErrors: true, unknownFormats: 'ignore', schemaId: '$id' })
                 // Register single schema first so store schema can $ref it
                 const singleId = schema.$id || schemaUrl
                 ajvInst.addSchema(schema, singleId)
@@ -821,10 +822,11 @@
         // --- Copy as MikroTik command ------------------------------------
         function copyAsCommand() {
             const content = editor ? editor.getValue() : ''
-            const cmd = `/app add yaml=${content}`
+            // RouterOS CLI: wrap YAML in double quotes, escape internal double quotes
+            const escaped = content.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+            const cmd = `/app add yaml="${escaped}"`
+            const orig = copyCmdBtn.innerHTML
             navigator.clipboard.writeText(cmd).then(() => {
-                copyCmdBtn.querySelector('img[data-theme=light], img[data-theme=dark]') // re-use same button
-                const orig = copyCmdBtn.innerHTML
                 copyCmdBtn.textContent = '✓ Copied!'
                 setTimeout(() => { copyCmdBtn.innerHTML = orig }, 1800)
             }).catch(() => {
@@ -838,11 +840,8 @@
             try {
                 const text = await navigator.clipboard.readText()
                 if (text && editor) {
-                    // Pasting triggers custom mode
                     editor.setValue(text)
-                    if (sourceMode !== 'custom') {
-                        setSourceMode('custom')
-                    }
+                    // onDidChangeModelContent handles mode switch to 'custom'
                 }
             } catch (_) {
                 // Clipboard read permission denied — focus editor so user can paste manually
@@ -863,6 +862,8 @@
                     value: '',
                     language: 'yaml',
                     theme: getMonacoTheme(),
+                    // automaticLayout disabled: ResizeObserver below calls editor.layout()
+                    // for precise control and better performance in flex container
                     automaticLayout: false,
                     minimap: { enabled: false },
                     scrollBeyondLastLine: false,
@@ -918,11 +919,11 @@
 
         appCategorySelect.addEventListener('change', () => {
             populateAppDropdown(allApps, appCategorySelect.value)
-            loadExampleApp(appNameSelect.value)
+            if (sourceMode === 'example') loadExampleApp(appNameSelect.value)
         })
 
         appNameSelect.addEventListener('change', () => {
-            loadExampleApp(appNameSelect.value)
+            if (sourceMode === 'example') loadExampleApp(appNameSelect.value)
         })
 
         storeToggle.addEventListener('change', () => {
