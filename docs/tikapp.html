@@ -289,6 +289,7 @@
             <button id="stash-btn" type="button" class="outline secondary" title="Save current YAML to stash (recall later with Recall Stash)" disabled>💾 Stash</button>
             <button id="download-btn" type="button" class="outline secondary" title="Download YAML file" disabled>⬇ Download</button>
             <button id="copy-btn" type="button" class="outline secondary" title="Copy YAML to clipboard" disabled>📋 Copy</button>
+            <button id="paste-btn" type="button" class="outline secondary" title="Paste YAML from clipboard" disabled>📥 Paste</button>
             <button id="copy-cmd-btn" type="button" class="outline secondary"
                 title="Copy as RouterOS /app add command" disabled>
                 Copy as
@@ -296,12 +297,27 @@
                 command
             </button>
             <span style="flex:1"></span>
+            <a href="#" id="share-link" style="font-size:0.8em;white-space:nowrap">🔗 Share</a>
             <small style="color:var(--pico-muted-color);font-size:0.72rem">
                 <em>Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.</em>
             </small>
         </div>
 
     </main>
+
+    <!-- Share modal -->
+    <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">
+        <article style="margin:0">
+            <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
+                <strong>Share this editor</strong>
+                <a href="#" id="share-modal-close" aria-label="Close">✕</a>
+            </header>
+            <input id="share-url" type="text" readonly style="font-size:0.8em; font-family:var(--pico-font-family-monospace)" aria-label="Shareable URL">
+            <footer style="display:flex;justify-content:flex-end;margin-top:0.6rem">
+                <button id="share-copy" class="secondary" style="width:auto">Copy to clipboard</button>
+            </footer>
+        </article>
+    </dialog>
 
     <script src="restraml-shared.js"></script>
 
@@ -369,6 +385,7 @@
         const stashBtn             = document.getElementById('stash-btn')
         const downloadBtn          = document.getElementById('download-btn')
         const copyBtn              = document.getElementById('copy-btn')
+        const pasteBtn             = document.getElementById('paste-btn')
         const copyCmdBtn           = document.getElementById('copy-cmd-btn')
 
         // --- Status line -------------------------------------------------
@@ -546,7 +563,7 @@
             })
         }
 
-        // --- Version list: only include versions with schema + app.json --
+        // --- Version list: only include versions with both schemas + app.json --
         async function loadSchemaVersions() {
             let allVersions
             try { allVersions = await fetchVersionList() }
@@ -558,15 +575,22 @@
                 return []
             }
 
+            // /app schemas only exist from RouterOS 7.22+ — skip older versions
+            const candidates = allVersions.filter(v => {
+                const p = parseVersion(v.name)
+                return p && (p.major > 7 || (p.major === 7 && p.minor >= 22))
+            })
+
             const results = await Promise.allSettled(
-                allVersions.map(async v => {
+                candidates.map(async v => {
                     try {
-                        const [schemaR, appR] = await Promise.all([
+                        const [schemaR, storeR, appR] = await Promise.all([
                             fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-schema.json`, { method: 'HEAD' }),
+                            fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-store-schema.json`, { method: 'HEAD' }),
                             fetch(`${RESTRAML.pagesUrl}/${v.name}/app.json`, { method: 'HEAD' })
                         ])
                         if (schemaR.status === 403) showError('GitHub Pages rate limit hit — some versions may be missing.')
-                        return (schemaR.ok && appR.ok) ? v : null
+                        return (schemaR.ok && storeR.ok && appR.ok) ? v : null
                     } catch (_) { return null }
                 })
             )
@@ -610,6 +634,7 @@
             stashBtn.disabled = disabled
             downloadBtn.disabled = disabled
             copyBtn.disabled = disabled
+            pasteBtn.disabled = disabled
             copyCmdBtn.disabled = disabled
         }
 
@@ -709,7 +734,23 @@
 
         function scheduleValidation() {
             clearTimeout(validateDebounce)
-            validateDebounce = setTimeout(runValidation, 300)
+            validateDebounce = setTimeout(() => { runValidation(); writeQueryParams() }, 300)
+        }
+
+        // Try to find an approximate line number in YAML text for an AJV error path.
+        // AJV v6 dataPath looks like '.services.server.image' or '.name'.
+        // We search for the last meaningful key segment to give a best-effort line.
+        function findLineForPath(content, dataPath) {
+            if (!dataPath || dataPath === '') return null
+            const path = dataPath.startsWith('/') ? dataPath.slice(1) : dataPath.replace(/^\./, '')
+            const keys = path.split(/[.\/'"]|\[|\]/).filter(k => k && !/^\d+$/.test(k))
+            if (keys.length === 0) return null
+            const searchKey = keys[keys.length - 1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const lines = content.split('\n')
+            for (let i = 0; i < lines.length; i++) {
+                if (new RegExp(`^\\s*${searchKey}\\s*:`).test(lines[i])) return i + 1
+            }
+            return null
         }
 
         function runValidation() {
@@ -740,15 +781,23 @@
                     fn(parsed)
                     if (fn.errors) {
                         for (const err of fn.errors) {
-                            const path = err.dataPath || err.instancePath || '/'
-                            const msg = `${path} ${err.message}`
-                            validationErrors.push({ line: 1, col: 1, message: msg, severity: 'error' })
-                            markers.push({
-                                startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1,
-                                message: msg, severity: monaco.MarkerSeverity.Error
-                            })
+                            const path = err.dataPath || err.instancePath || ''
+                            const msg = path ? `${path}: ${err.message}` : err.message
+                            // Approximate line via path lookup; fall back to no line marker
+                            const line = findLineForPath(content, path)
+                            validationErrors.push({ line, col: 1, message: msg, severity: 'error' })
+                            if (line) {
+                                const lineLen = content.split('\n')[line - 1]?.length ?? 999
+                                markers.push({
+                                    startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: lineLen + 1,
+                                    message: msg, severity: monaco.MarkerSeverity.Error
+                                })
+                            }
                         }
                     }
+                } else {
+                    // Schema validators not ready — warn user, don't show false "Valid YAML"
+                    validationErrors.push({ line: null, col: 1, message: 'Schema not loaded — validation unavailable', severity: 'warning' })
                 }
             }
 
@@ -772,21 +821,26 @@
                 if (errCount > 0) parts.push(`✗ ${errCount} error${errCount !== 1 ? 's' : ''}`)
                 if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`)
                 valLabel.textContent = parts.join(', ')
-                valSummary.setAttribute('aria-invalid', 'true')
+                valSummary.setAttribute('aria-invalid', errCount > 0 ? 'true' : 'false')
             }
 
             valList.innerHTML = ''
             for (const err of validationErrors) {
                 const li = document.createElement('li')
-                li.textContent = `Line ${err.line}: ${err.message}`
-                li.title = `Jump to line ${err.line}`
-                li.addEventListener('click', () => {
-                    if (editor) {
-                        editor.revealLineInCenter(err.line)
-                        editor.setPosition({ lineNumber: err.line, column: err.col || 1 })
-                        editor.focus()
-                    }
-                })
+                if (err.line) {
+                    li.textContent = `Line ${err.line}: ${err.message}`
+                    li.title = `Jump to line ${err.line}`
+                    li.addEventListener('click', () => {
+                        if (editor) {
+                            editor.revealLineInCenter(err.line)
+                            editor.setPosition({ lineNumber: err.line, column: err.col || 1 })
+                            editor.focus()
+                        }
+                    })
+                } else {
+                    li.textContent = err.message
+                    li.style.cursor = 'default'
+                }
                 valList.appendChild(li)
             }
 
@@ -799,7 +853,7 @@
             const content = editor ? editor.getValue() : ''
             let filename = 'app.tikapp.yaml'
             if (useStoreSchema) {
-                filename = 'app-store.tikappstore.yaml'
+                filename = 'tikappstore.yaml'
             } else {
                 try {
                     const parsed = jsyaml.load(content)
@@ -810,7 +864,7 @@
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url; a.download = filename; a.click()
-            URL.revokeObjectURL(url)
+            setTimeout(() => URL.revokeObjectURL(url), 5000)
             plausible?.('App YAML Download', { props: { store: useStoreSchema } })
         }
 
@@ -875,6 +929,7 @@
                 stashBtn.disabled = false
                 downloadBtn.disabled = false
                 copyBtn.disabled = false
+                pasteBtn.disabled = false
                 copyCmdBtn.disabled = false
 
                 runValidation()
@@ -884,12 +939,13 @@
 
         // --- Toolbar button listeners ------------------------------------
 
-        verSelect.addEventListener('change', onVersionChanged)
+        verSelect.addEventListener('change', () => { onVersionChanged(); writeQueryParams() })
 
         storeToggle.addEventListener('change', () => {
             useStoreSchema = storeToggle.checked
             registerYamlCompletions()
             runValidation()
+            writeQueryParams()
         })
 
         loadExampleBtn.addEventListener('click', () => {
@@ -965,28 +1021,90 @@
         copyBtn.addEventListener('click', copyYaml)
         copyCmdBtn.addEventListener('click', copyAsCommand)
 
+        pasteBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText()
+                if (editor && text) {
+                    editor.setValue(text)
+                    setStatus('Pasted from clipboard.')
+                    plausible?.('App YAML Paste', {})
+                }
+            } catch (_) {
+                setStatus('Could not read clipboard — paste with Ctrl+V in the editor.')
+            }
+        })
+
+        // --- Shareable URL query params ----------------------------------
+        // Max encoded YAML length to include in URL (longer = share without content)
+        const SHARE_YAML_MAX = 2000
+
+        function writeQueryParams() {
+            if (!editor) return
+            const params = new URLSearchParams()
+            if (verSelect.value) params.set('version', verSelect.value)
+            if (storeToggle.checked) params.set('store', '1')
+            const content = editor ? editor.getValue() : ''
+            const encoded = encodeURIComponent(content)
+            if (content && encoded.length <= SHARE_YAML_MAX) params.set('yaml', content)
+            const qs = params.toString()
+            history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
+        }
+
+        async function applyQueryParams() {
+            const params = new URLSearchParams(window.location.search)
+            const version = params.get('version')
+            const store = params.get('store')
+            const yaml = params.get('yaml')
+
+            // If URL specifies a different version than the default, reload schemas for it
+            if (version && [...verSelect.options].some(o => o.value === version) && verSelect.value !== version) {
+                verSelect.value = version
+                await onVersionChanged()
+            }
+            if (store === '1' && !storeToggle.checked) {
+                storeToggle.checked = true
+                useStoreSchema = true
+                registerYamlCompletions()
+            }
+            if (yaml && editor) {
+                suppressChangeEvent = true
+                editor.setValue(yaml)
+                suppressChangeEvent = false
+                runValidation()
+                setStatus('Loaded from shared URL.')
+            }
+        }
+
         // --- Page initialization -----------------------------------------
         async function initPage() {
             await initVersionDropdown()
             if (schemaVersions.length === 0) return
 
-            // Restore autosave from last session if present; otherwise load default example
-            const autosaved = localStorage.getItem(AUTOSAVE_KEY)
-            if (autosaved && autosaved.trim()) {
-                suppressChangeEvent = true
-                editor.setValue(autosaved)
-                suppressChangeEvent = false
-                runValidation()
-                setStatus('Last session restored.')
-            } else {
-                const defaultApp = allApps.find(a => a.name === DEFAULT_APP) || allApps[0]
-                if (defaultApp) {
+            // Apply URL query params first (version/store/yaml from shared URL)
+            const hasYamlParam = new URLSearchParams(window.location.search).has('yaml')
+            await applyQueryParams()
+
+            // If no yaml param: restore autosave from last session or load default example
+            if (!hasYamlParam) {
+                const autosaved = localStorage.getItem(AUTOSAVE_KEY)
+                if (autosaved && autosaved.trim()) {
                     suppressChangeEvent = true
-                    editor.setValue(defaultApp.yaml || '')
+                    editor.setValue(autosaved)
                     suppressChangeEvent = false
                     runValidation()
+                    setStatus('Last session restored.')
+                } else {
+                    const defaultApp = allApps.find(a => a.name === DEFAULT_APP) || allApps[0]
+                    if (defaultApp) {
+                        suppressChangeEvent = true
+                        editor.setValue(defaultApp.yaml || '')
+                        suppressChangeEvent = false
+                        runValidation()
+                    }
                 }
             }
+
+            writeQueryParams()
 
             // Show stash hint if one exists (separate from autosave)
             const stash = localStorage.getItem(STASH_KEY)
@@ -997,6 +1115,13 @@
         }
 
         initMonaco()
+
+        // Share modal (wired up via restraml-shared.js)
+        initShareModal({
+            linkId: 'share-link', modalId: 'share-modal',
+            closeId: 'share-modal-close', copyId: 'share-copy', urlId: 'share-url',
+            beforeShow: writeQueryParams
+        })
     </script>
 
     <script>initThemeSwitcher()</script>
