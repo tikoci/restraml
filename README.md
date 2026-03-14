@@ -42,11 +42,15 @@ A **browser-based YAML editor** at [tikoci.github.io/restraml/tikapp.html](https
 
 * Schema validation against any versioned schema (7.22+) or the latest schema
 * Built-in examples from MikroTik's app library, filterable by category
-* Custom YAML saved to browser local storage (auto-restored on reload)
+* Dirty-state tracking — edit examples safely with Stash / Recall / Discard workflow
+* `app-store-urls=` toggle that auto-converts single app ↔ array format
+* Custom YAML autosaved to browser local storage (restored on reload)
 * Support for both single `/app` definitions and `app-store-urls=` array format
-* Download as `.tikapp.yaml` / `.tikappstore.yaml`, copy to clipboard, or paste from clipboard
+* Download as `.tikapp.yaml` / `.tikappstore.yaml`, or copy YAML to clipboard
 * Copy directly as a RouterOS `/app add yaml=` command
-* Shareable URLs — version, schema mode, and YAML content (if small enough) are encoded in the URL, so you can share a pre-loaded editor session with a link
+* Shareable URLs — version, schema mode, and full YAML content encoded in the URL
+
+📖 **[Full user manual →](https://tikoci.github.io/restraml/tikapp-manual.html)**
 
 ---
 
