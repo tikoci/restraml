@@ -37,6 +37,10 @@
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
 
+        /* Tools dropdown: force LTR on items so leading slash in "/app Editor"
+           doesn't migrate to end in the RTL-aligned container */
+        details.dropdown ul li { direction: ltr; }
+
         /* Dark mode theme switcher icon sizing */
         header nav li a svg {
             width: var(--font-size);
@@ -173,6 +177,7 @@
                             <li><a href="index.html">Schema Downloads</a></li>
                             <li><a href="lookup.html">Command Lookup</a></li>
                             <li><a href="diff.html" aria-current="page">Schema Diff</a></li>
+                            <li><a href="tikapp.html">/app Editor</a></li>
                         </ul>
                     </details>
                 </li>

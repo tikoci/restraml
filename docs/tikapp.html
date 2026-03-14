@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouterOS /app YAML Editor</title>
+
+    <!-- Pico CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <!-- Fonts and favicon -->
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Manrope:wght@200..800&display=swap"
+        rel="stylesheet">
+
+    <!-- Plausible analytics -->
+    <script defer data-domain="tikoci.github.io/restraml"
+        src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+
+    <!-- js-yaml for YAML parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+
+    <!-- Ajv v6 for JSON Schema draft-07 validation (browser UMD bundle) -->
+    <script src="https://cdn.jsdelivr.net/npm/ajv@6.12.6/dist/ajv.min.js"></script>
+
+    <!-- Monaco editor AMD loader -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+
+    <style>
+        /* --- Font overrides (matches other docs/*.html pages) --- */
+        :root {
+            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+        }
+
+        /* --- No-scroll full-viewport layout --- */
+        html, body { height: 100%; overflow: hidden; margin: 0; }
+
+        body { display: flex; flex-direction: column; height: 100dvh; }
+
+        header.container { flex-shrink: 0; padding-top: 0.6rem; padding-bottom: 0.2rem; }
+
+        header h1 { margin-bottom: 0.2rem; font-size: 1.4rem; }
+
+        main.container {
+            flex: 1; min-height: 0; display: flex; flex-direction: column;
+            overflow: hidden; padding-top: 0.3rem; padding-bottom: 0.4rem;
+        }
+
+        /* --- Theme switcher icon sizing --- */
+        header nav li a svg { width: var(--font-size); height: var(--font-size); color: var(--contrast); }
+
+        /* --- MikroTik logo swap (light/dark) --- */
+        img[data-theme=dark] { display: none; }
+        [data-theme=dark] img[data-theme=dark] { display: inline; }
+        [data-theme=dark] img[data-theme=light] { display: none; }
+        [data-theme=light] img[data-theme=dark] { display: none; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+        }
+        header nav img[data-theme] { height: 2rem; width: auto; }
+
+        /* --- Tools dropdown: LTR items so "/app Editor" slash stays at start --- */
+        details.dropdown ul li { direction: ltr; }
+
+        /* --- Toolbar (line 1) --- */
+        .toolbar {
+            flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap;
+            gap: 0; margin-bottom: 0; background: var(--pico-form-element-background-color);
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius) var(--pico-border-radius) 0 0;
+            padding: 0.2rem 0.4rem; min-height: 2.3rem; font-size: 0.82rem;
+        }
+
+        /* --- Example row (line 2, shown only when Load Example is active) --- */
+        .example-row {
+            flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap;
+            gap: 0.35rem; padding: 0.2rem 0.7rem;
+            background: var(--pico-form-element-background-color);
+            border: 1px solid var(--pico-form-element-border-color);
+            border-top: none;
+            border-radius: 0 0 var(--pico-border-radius) var(--pico-border-radius);
+            margin-bottom: 0.4rem; font-size: 0.82rem;
+        }
+        .example-row[hidden] { display: none; }
+        /* When example row is visible, remove bottom border radius from toolbar */
+        .toolbar:has(+ .example-row:not([hidden])) {
+            border-bottom: none;
+            border-radius: var(--pico-border-radius) var(--pico-border-radius) 0 0;
+        }
+        /* Fallback: JS adds .has-example-row class to toolbar when row is shown */
+        .toolbar.has-example-row {
+            border-bottom: none;
+            border-radius: var(--pico-border-radius) var(--pico-border-radius) 0 0;
+            margin-bottom: 0;
+        }
+        .toolbar:not(.has-example-row) { border-radius: var(--pico-border-radius); margin-bottom: 0.4rem; }
+
+        .toolbar-group { display: flex; align-items: center; gap: 0.35rem; padding: 0 0.3rem; }
+
+        .toolbar-label { color: var(--pico-muted-color); font-size: 0.78rem; white-space: nowrap; }
+
+        .toolbar-sep {
+            width: 1px; align-self: stretch; background: var(--pico-form-element-border-color);
+            margin: 0.2rem 0.1rem; flex-shrink: 0; opacity: 0.4;
+        }
+
+        .toolbar-spacer { flex: 1; min-width: 0.25rem; }
+
+        .toolbar label.toolbar-toggle {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            margin: 0; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+        }
+
+        .toolbar input[type=checkbox] { width: auto; margin: 0; }
+
+        .toolbar select, .example-row select {
+            width: auto; margin: 0; padding: 0.12rem 0.45rem; font-size: 0.82rem; height: auto;
+            border-radius: var(--pico-border-radius);
+            border: var(--pico-border-width) solid var(--pico-form-element-border-color);
+            background-color: transparent; color: var(--pico-color);
+        }
+
+        .toolbar-btn {
+            padding: 0.1rem 0.55rem; font-size: 0.78rem; margin: 0; height: auto;
+        }
+
+        .example-row-label { color: var(--pico-muted-color); font-size: 0.78rem; white-space: nowrap; }
+
+        /* --- Editor container fills all remaining space --- */
+        #editor-container {
+            flex: 1; min-height: 0;
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius); overflow: hidden;
+        }
+
+        /* --- Validation dropdown --- */
+        #val-dropdown { flex-shrink: 0; margin-top: 0.3rem; margin-bottom: 0; }
+        #val-dropdown > summary { font-size: 0.8rem; padding: 0.25rem 0.6rem; }
+        #val-summary[aria-invalid="false"] { color: var(--pico-ins-color, #2ecc71); }
+        #val-summary[aria-invalid="true"]  { color: var(--pico-del-color, #e74c3c); }
+        #val-dropdown ul { margin: 0; padding: 0.3rem 0; max-height: 8rem; overflow-y: auto; font-size: 0.78rem; }
+        #val-dropdown ul li { padding: 0.1rem 0.6rem; cursor: pointer; list-style: none; }
+        #val-dropdown ul li:hover { background: var(--pico-form-element-focus-color, rgba(100,100,255,0.1)); }
+
+        /* --- Action buttons row --- */
+        .action-row {
+            flex-shrink: 0; display: flex; gap: 0.4rem; flex-wrap: wrap;
+            align-items: center; margin-top: 0.3rem;
+        }
+        .action-row button { margin: 0; padding: 0.25rem 0.7rem; font-size: 0.78rem; }
+
+        /* MikroTik symbol SVG: invert to white in dark mode */
+        .mt-symbol { height: 0.9em; width: auto; vertical-align: middle; margin: 0 2px; }
+        @media (prefers-color-scheme: dark) { :root:not([data-theme=light]) .mt-symbol { filter: invert(1); } }
+        [data-theme=dark] .mt-symbol { filter: invert(1); }
+
+        /* --- Error/rate-limit banner --- */
+        #error-banner {
+            display: none; background: var(--pico-del-color, #e74c3c); color: white;
+            padding: 0.5rem 0.8rem; border-radius: var(--pico-border-radius);
+            font-size: 0.85rem; margin-bottom: 0.4rem;
+        }
+
+        /* --- No-schema message --- */
+        #no-schema-msg {
+            display: none; flex: 1; align-items: center; justify-content: center;
+            text-align: center; padding: 2rem;
+        }
+
+        /* --- Status line --- */
+        .status-line {
+            flex-shrink: 0; font-size: 0.75rem; color: var(--pico-muted-color);
+            margin: 0 0 0.2rem; transition: color 0.3s;
+        }
+        .status-line.status-ok { color: var(--pico-ins-color, #2ecc71); }
+    </style>
+</head>
+
+<body>
+
+    <header class="container">
+        <nav>
+            <ul>
+                <img data-theme="dark" src="https://mikrotik.com/logo/assets/logo-colors-white-E8duxH7y.svg" alt="MikroTik logo">
+                <img data-theme="light" src="https://mikrotik.com/logo/assets/logo-colors-dark-ToiqSI6u.svg" alt="MikroTik logo">
+            </ul>
+            <ul></ul>
+            <ul>
+                <li><a id="theme_switcher" href="#" aria-label="Toggle theme"></a></li>
+                <li>
+                    <details class="dropdown">
+                        <summary>Tools</summary>
+                        <ul dir="rtl">
+                            <li><a href="index.html">Schema Downloads</a></li>
+                            <li><a href="lookup.html">Command Lookup</a></li>
+                            <li><a href="diff.html">Schema Diff</a></li>
+                            <li><a href="tikapp.html" aria-current="page">/app Editor</a></li>
+                        </ul>
+                    </details>
+                </li>
+            </ul>
+        </nav>
+        <h1><code>/app</code> <mark>YAML Editor</mark></h1>
+    </header>
+
+    <main class="container">
+
+        <div id="error-banner"></div>
+
+        <!-- Toolbar line 1 -->
+        <div class="toolbar" id="toolbar">
+            <div class="toolbar-group">
+                <code class="toolbar-label">/app</code>
+                <span class="toolbar-label">Version</span>
+                <select id="ver-select" title="RouterOS schema version" disabled>
+                    <option value="">loading…</option>
+                </select>
+            </div>
+
+            <div class="toolbar-sep" aria-hidden="true"></div>
+
+            <div class="toolbar-group">
+                <label class="toolbar-toggle" title="Validate as app-store-urls= array instead of single /app YAML">
+                    <input type="checkbox" id="store-toggle" role="switch" disabled>
+                    <code>app-store-urls=</code>
+                </label>
+            </div>
+
+            <span class="toolbar-spacer"></span>
+
+            <div class="toolbar-group">
+                <button id="load-example-btn" type="button" class="outline secondary toolbar-btn" disabled>
+                    Load Example</button>
+                <button id="recall-stash-btn" type="button" class="outline secondary toolbar-btn" disabled>
+                    Recall Stash</button>
+                <input type="file" id="import-file-input" accept=".yaml,.yml" hidden>
+                <button id="import-btn" type="button" class="outline secondary toolbar-btn" disabled>
+                    Import</button>
+                <button id="new-btn" type="button" class="outline secondary toolbar-btn" disabled>
+                    New</button>
+            </div>
+        </div>
+
+        <!-- Toolbar line 2: example picker (shown only after clicking Load Example) -->
+        <div class="example-row" id="example-row" hidden>
+            <select id="app-category-select" title="Filter by category" disabled>
+                <option value="all">all</option>
+            </select>
+            <span class="example-row-label">/</span>
+            <select id="app-name-select" title="Built-in app example" disabled>
+                <option value="">loading…</option>
+            </select>
+            <button id="load-example-confirm-btn" type="button" class="outline toolbar-btn" disabled>Load</button>
+            <button id="cancel-example-btn" type="button" class="outline secondary toolbar-btn">Cancel</button>
+        </div>
+
+        <!-- Status line -->
+        <p class="status-line" id="status-line"></p>
+
+        <!-- No-schema fallback -->
+        <div id="no-schema-msg">
+            <article>
+                <hgroup>
+                    <h3>No schema versions found</h3>
+                    <p>No RouterOS versions with <code>/app</code> YAML schemas were found.</p>
+                </hgroup>
+                <p><a href="https://github.com/tikoci/restraml/issues/new/choose" role="button">Open a GitHub issue</a></p>
+            </article>
+        </div>
+
+        <!-- Monaco editor -->
+        <div id="editor-container"></div>
+
+        <!-- Validation dropdown -->
+        <details id="val-dropdown">
+            <summary id="val-summary"><span id="val-label">Initializing…</span></summary>
+            <ul id="val-list"></ul>
+        </details>
+
+        <!-- Action buttons -->
+        <div class="action-row">
+            <button id="stash-btn" type="button" class="outline secondary" title="Save current YAML to stash (recall later with Recall Stash)" disabled>💾 Stash</button>
+            <button id="download-btn" type="button" class="outline secondary" title="Download YAML file" disabled>⬇ Download</button>
+            <button id="copy-btn" type="button" class="outline secondary" title="Copy YAML to clipboard" disabled>📋 Copy</button>
+            <button id="copy-cmd-btn" type="button" class="outline secondary"
+                title="Copy as RouterOS /app add command" disabled>
+                Copy as
+                <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
+                command
+            </button>
+            <span style="flex:1"></span>
+            <small style="color:var(--pico-muted-color);font-size:0.72rem">
+                <em>Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.</em>
+            </small>
+        </div>
+
+    </main>
+
+    <script src="restraml-shared.js"></script>
+
+    <script>
+        // =================================================================
+        // tikapp.html — RouterOS /app YAML Editor
+        //
+        // UX model:
+        //   Line 1 toolbar: version, app-store toggle | Load Example, Recall Stash, Import, New
+        //   Line 2 (on demand): example category/app picker with Load / Cancel
+        //   Autosave (AUTOSAVE_KEY): every edit saved silently; restored on page reload
+        //   Stash (STASH_KEY): explicit "Stash" button in action row; "Recall Stash" restores it
+        //   Import: file picker → load YAML into editor
+        //   New: clear editor
+        // =================================================================
+
+        // --- State -------------------------------------------------------
+        let editor = null
+        let monacoReady = false
+        let ajvInst = null
+        let validateSingle = null
+        let validateStore = null
+        let singleSchemaObj = null      // raw JSON schema (for completions)
+        let storeSchemaObj = null
+        let completionDisposable = null
+        let allApps = []
+        let filteredApps = []
+        let useStoreSchema = false
+        let latestStableVer = null
+        let schemaVersions = []
+        let validationErrors = []
+        let suppressChangeEvent = false
+        let statusTimer = null
+
+        // Two independent persistence keys:
+        //   AUTOSAVE_KEY — written on every change; restored on page load (session continuity)
+        //   STASH_KEY    — written only by the "Stash" button; recalled by "Recall Stash"
+        const AUTOSAVE_KEY = 'restraml_tikapp_autosave'
+        const STASH_KEY = 'restraml_tikapp_stash'
+        const DEFAULT_VERSION = '7.22'
+        const DEFAULT_APP = 'code-server'
+
+        // --- DOM refs ----------------------------------------------------
+        const toolbar              = document.getElementById('toolbar')
+        const verSelect            = document.getElementById('ver-select')
+        const storeToggle          = document.getElementById('store-toggle')
+        const loadExampleBtn       = document.getElementById('load-example-btn')
+        const recallStashBtn       = document.getElementById('recall-stash-btn')
+        const importBtn            = document.getElementById('import-btn')
+        const importFileInput      = document.getElementById('import-file-input')
+        const newBtn               = document.getElementById('new-btn')
+        const exampleRow           = document.getElementById('example-row')
+        const appCatSelect         = document.getElementById('app-category-select')
+        const appNameSelect        = document.getElementById('app-name-select')
+        const loadExampleConfirmBtn = document.getElementById('load-example-confirm-btn')
+        const cancelExampleBtn     = document.getElementById('cancel-example-btn')
+        const statusLine           = document.getElementById('status-line')
+        const errorBanner          = document.getElementById('error-banner')
+        const editorContainer      = document.getElementById('editor-container')
+        const noSchemaMsg          = document.getElementById('no-schema-msg')
+        const valDropdown          = document.getElementById('val-dropdown')
+        const valSummary           = document.getElementById('val-summary')
+        const valLabel             = document.getElementById('val-label')
+        const valList              = document.getElementById('val-list')
+        const stashBtn             = document.getElementById('stash-btn')
+        const downloadBtn          = document.getElementById('download-btn')
+        const copyBtn              = document.getElementById('copy-btn')
+        const copyCmdBtn           = document.getElementById('copy-cmd-btn')
+
+        // --- Status line -------------------------------------------------
+        function setStatus(msg, ok = false) {
+            clearTimeout(statusTimer)
+            statusLine.textContent = msg
+            statusLine.classList.toggle('status-ok', ok)
+            if (ok) {
+                statusTimer = setTimeout(() => {
+                    statusLine.textContent = ''
+                    statusLine.classList.remove('status-ok')
+                }, 3000)
+            }
+        }
+
+        // --- Error banner ------------------------------------------------
+        function showError(msg) { errorBanner.textContent = msg; errorBanner.style.display = 'block' }
+        function hideError() { errorBanner.style.display = 'none' }
+
+        // --- Example row show/hide ---------------------------------------
+        function showExampleRow() {
+            exampleRow.hidden = false
+            toolbar.classList.add('has-example-row')
+        }
+        function hideExampleRow() {
+            exampleRow.hidden = true
+            toolbar.classList.remove('has-example-row')
+        }
+
+        // --- Monaco theme sync -------------------------------------------
+        function getMonacoTheme() {
+            const t = document.documentElement.getAttribute('data-theme')
+            if (t === 'dark') return 'vs-dark'
+            if (t === 'light') return 'vs'
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs'
+        }
+        function syncMonacoTheme() { if (editor && monacoReady) monaco.editor.setTheme(getMonacoTheme()) }
+        new MutationObserver(syncMonacoTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncMonacoTheme)
+
+        // --- YAML completion from schema ---------------------------------
+        // Walk the schema tree resolving $ref pointers
+        function resolveRef(root, node) {
+            if (!node || typeof node !== 'object') return node
+            if (node.$ref) {
+                const parts = node.$ref.replace(/^#\//, '').split('/')
+                let r = root
+                for (const p of parts) r = r?.[decodeURIComponent(p.replace(/~1/g, '/').replace(/~0/g, '~'))]
+                return resolveRef(root, r)
+            }
+            return node
+        }
+
+        // Get the schema node at a given key-path, following properties/additionalProperties/items
+        function schemaAtPath(root, pathKeys) {
+            let node = resolveRef(root, root)
+            for (const key of pathKeys) {
+                if (!node) return null
+                node = resolveRef(root, node)
+                // Merge allOf/anyOf/oneOf for property lookup
+                const merged = mergeSchema(root, node)
+                const props = merged?.properties || {}
+                if (props[key]) {
+                    node = resolveRef(root, props[key])
+                } else if (merged?.additionalProperties && typeof merged.additionalProperties === 'object') {
+                    node = resolveRef(root, merged.additionalProperties)
+                } else if (merged?.items) {
+                    // inside array; subsequent key is array item property
+                    const items = resolveRef(root, merged.items)
+                    const itemProps = mergeSchema(root, items)?.properties || {}
+                    node = itemProps[key] ? resolveRef(root, itemProps[key]) : null
+                } else {
+                    node = null
+                }
+            }
+            return node ? resolveRef(root, node) : null
+        }
+
+        // Shallow-merge allOf/anyOf/oneOf into one object for property extraction
+        function mergeSchema(root, node) {
+            if (!node) return null
+            const resolved = resolveRef(root, node)
+            if (!resolved) return null
+            const branches = [
+                ...(resolved.allOf || []),
+                ...(resolved.anyOf || []),
+                ...(resolved.oneOf || []),
+            ]
+            if (branches.length === 0) return resolved
+            const merged = { ...resolved }
+            for (const b of branches) {
+                const rb = resolveRef(root, b)
+                if (rb?.properties) merged.properties = { ...(merged.properties || {}), ...rb.properties }
+                if (rb?.required) merged.required = [...(merged.required || []), ...rb.required]
+            }
+            return merged
+        }
+
+        function registerYamlCompletions() {
+            if (completionDisposable) { completionDisposable.dispose(); completionDisposable = null }
+            if (!monacoReady) return
+            const root = useStoreSchema ? storeSchemaObj : singleSchemaObj
+            if (!root) return
+
+            completionDisposable = monaco.languages.registerCompletionItemProvider('yaml', {
+                triggerCharacters: [' ', '\n', '-'],
+                provideCompletionItems(model, position) {
+                    const line = model.getLineContent(position.lineNumber)
+                    const lineBefore = line.substring(0, position.column - 1)
+                    const indent = lineBefore.match(/^(\s*)/)[1].length
+
+                    // Only suggest keys at start of key-value position (after indentation)
+                    const trimmed = lineBefore.trim()
+                    if (trimmed !== '' && !/^[\w-]*$/.test(trimmed)) return { suggestions: [] }
+
+                    // Walk up lines to build parent key path
+                    const parentKeys = []
+                    let targetIndent = indent - 2
+                    const lines = model.getLinesContent()
+                    for (let i = position.lineNumber - 2; i >= 0 && targetIndent >= 0; i--) {
+                        const l = lines[i]
+                        const li = l.match(/^(\s*)/)[1].length
+                        if (li === targetIndent) {
+                            const m = l.trim().match(/^([\w-]+):\s*$/)
+                            if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
+                            else if (l.trim().startsWith('- ') || l.trim() === '-') {
+                                // array item context; don't add a key, just go up
+                                targetIndent -= 2
+                            }
+                        }
+                    }
+
+                    // Resolve schema at the current path
+                    let node = schemaAtPath(root, parentKeys)
+                    // For array root (store schema), get items schema
+                    if (!node && parentKeys.length === 0) {
+                        const rootResolved = resolveRef(root, root)
+                        if (rootResolved?.type === 'array' && rootResolved.items) {
+                            node = resolveRef(root, rootResolved.items)
+                        }
+                    }
+
+                    const merged = mergeSchema(root, node)
+                    const props = merged?.properties || {}
+
+                    const word = model.getWordUntilPosition(position)
+                    const range = {
+                        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn, endColumn: word.endColumn,
+                    }
+
+                    const required = new Set(merged?.required || [])
+                    const suggestions = Object.entries(props).map(([key, propDef]) => {
+                        const resolved = resolveRef(root, propDef)
+                        const rm = mergeSchema(root, resolved)
+                        const type = rm?.type || (rm?.properties ? 'object' : undefined)
+                        let insertText = `${key}: `
+                        if (type === 'object') insertText = `${key}:\n${' '.repeat(indent + 2)}`
+                        else if (type === 'array') insertText = `${key}:\n${' '.repeat(indent + 2)}- `
+                        const doc = rm?.description || rm?.title || ''
+                        return {
+                            label: key,
+                            kind: monaco.languages.CompletionItemKind.Property,
+                            documentation: doc ? { value: doc } : undefined,
+                            detail: type || '',
+                            insertText,
+                            range,
+                            // Required properties sort first
+                            sortText: required.has(key) ? `0${key}` : `1${key}`,
+                        }
+                    })
+
+                    return { suggestions }
+                }
+            })
+        }
+
+        // --- Version list: only include versions with schema + app.json --
+        async function loadSchemaVersions() {
+            let allVersions
+            try { allVersions = await fetchVersionList() }
+            catch (e) {
+                const msg = e.message || String(e)
+                showError(msg.includes('403')
+                    ? 'GitHub API rate limit exceeded — version list unavailable.'
+                    : `Failed to load version list: ${msg}`)
+                return []
+            }
+
+            const results = await Promise.allSettled(
+                allVersions.map(async v => {
+                    try {
+                        const [schemaR, appR] = await Promise.all([
+                            fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-schema.json`, { method: 'HEAD' }),
+                            fetch(`${RESTRAML.pagesUrl}/${v.name}/app.json`, { method: 'HEAD' })
+                        ])
+                        if (schemaR.status === 403) showError('GitHub Pages rate limit hit — some versions may be missing.')
+                        return (schemaR.ok && appR.ok) ? v : null
+                    } catch (_) { return null }
+                })
+            )
+            return results.filter(r => r.status === 'fulfilled' && r.value !== null).map(r => r.value)
+        }
+
+        // --- Version dropdown --------------------------------------------
+        async function initVersionDropdown() {
+            schemaVersions = await loadSchemaVersions()
+
+            if (schemaVersions.length === 0) {
+                editorContainer.style.display = 'none'
+                noSchemaMsg.style.display = 'flex'
+                setControlsDisabled(true)
+                return
+            }
+
+            latestStableVer = schemaVersions[0].name
+            verSelect.innerHTML = ''
+            verSelect.appendChild(new Option('latest', 'latest'))
+            for (const v of schemaVersions) verSelect.appendChild(new Option(v.name, v.name))
+
+            const hasDefault = [...verSelect.options].some(o => o.value === DEFAULT_VERSION)
+            verSelect.value = hasDefault ? DEFAULT_VERSION : schemaVersions[0].name
+            verSelect.disabled = false
+
+            await onVersionChanged()
+        }
+
+        // --- Disable/enable all controls ---------------------------------
+        function setControlsDisabled(disabled) {
+            verSelect.disabled = disabled
+            storeToggle.disabled = disabled
+            loadExampleBtn.disabled = disabled
+            recallStashBtn.disabled = disabled
+            importBtn.disabled = disabled
+            newBtn.disabled = disabled
+            appNameSelect.disabled = disabled
+            appCatSelect.disabled = disabled
+            loadExampleConfirmBtn.disabled = disabled
+            stashBtn.disabled = disabled
+            downloadBtn.disabled = disabled
+            copyBtn.disabled = disabled
+            copyCmdBtn.disabled = disabled
+        }
+
+        // --- Load app.json -----------------------------------------------
+        async function loadAppJson(version) {
+            const ver = version === 'latest' ? latestStableVer : version
+            if (!ver) return []
+            try {
+                const r = await fetch(`${RESTRAML.pagesUrl}/${ver}/app.json`)
+                return r.ok ? await r.json() : []
+            } catch (_) { return [] }
+        }
+
+        // --- Load and compile JSON schemas -------------------------------
+        async function loadSchemas(version) {
+            const base = version === 'latest' ? RESTRAML.pagesUrl : `${RESTRAML.pagesUrl}/${version}`
+            const suffix = version === 'latest' ? '.latest' : ''
+            const schemaUrl = `${base}/routeros-app-yaml-schema${suffix}.json`
+            const storeSchemaUrl = `${base}/routeros-app-yaml-store-schema${suffix}.json`
+
+            try {
+                const [schema, storeSchema] = await Promise.all([
+                    fetch(schemaUrl).then(r => { if (!r.ok) throw new Error(r.status); return r.json() }),
+                    fetch(storeSchemaUrl).then(r => { if (!r.ok) throw new Error(r.status); return r.json() })
+                ])
+                singleSchemaObj = schema
+                storeSchemaObj = storeSchema
+                ajvInst = new Ajv({ allErrors: true, unknownFormats: 'ignore', schemaId: '$id' })
+                ajvInst.addSchema(schema, schema.$id || schemaUrl)
+                validateSingle = ajvInst.compile(schema)
+                validateStore = ajvInst.compile(storeSchema)
+                registerYamlCompletions()
+            } catch (e) {
+                showError(`Failed to load schema for ${version}: ${e.message}`)
+                validateSingle = null; validateStore = null
+                singleSchemaObj = null; storeSchemaObj = null
+            }
+        }
+
+        // --- Category / app dropdowns ------------------------------------
+        function populateCategoryDropdown(apps) {
+            const cats = new Set(['all'])
+            for (const app of apps) { if (app.category) cats.add(app.category) }
+            const sorted = ['all', ...[...cats].filter(c => c !== 'all').sort()]
+            const prev = appCatSelect.value
+            appCatSelect.innerHTML = ''
+            for (const cat of sorted) appCatSelect.appendChild(new Option(cat, cat))
+            appCatSelect.value = sorted.includes(prev) ? prev : 'all'
+        }
+
+        function populateAppDropdown(apps, category) {
+            filteredApps = (category === 'all' ? apps : apps.filter(a => a.category === category))
+                .slice().sort((a, b) => a.name.localeCompare(b.name))
+            const prev = appNameSelect.value
+            appNameSelect.innerHTML = ''
+            for (const app of filteredApps) appNameSelect.appendChild(new Option(app.name, app.name))
+            if (prev && [...appNameSelect.options].some(o => o.value === prev)) appNameSelect.value = prev
+            else if (filteredApps.some(a => a.name === DEFAULT_APP)) appNameSelect.value = DEFAULT_APP
+            else if (appNameSelect.options.length > 0) appNameSelect.value = appNameSelect.options[0].value
+        }
+
+        // --- Version changed ---------------------------------------------
+        async function onVersionChanged() {
+            const version = verSelect.value
+            if (!version) return
+            hideError()
+            appNameSelect.disabled = true
+            appCatSelect.disabled = true
+
+            const [apps] = await Promise.all([loadAppJson(version), loadSchemas(version)])
+            allApps = apps
+            populateCategoryDropdown(allApps)
+            populateAppDropdown(allApps, appCatSelect.value)
+            appNameSelect.disabled = false
+            appCatSelect.disabled = false
+            loadExampleConfirmBtn.disabled = false
+
+            runValidation()
+            setControlsDisabled(false)
+        }
+
+        // --- Load example into editor ------------------------------------
+        function loadExampleIntoEditor(appName) {
+            const app = allApps.find(a => a.name === appName)
+            if (!app || !editor) return
+            suppressChangeEvent = true
+            editor.setValue(app.yaml || '')
+            suppressChangeEvent = false
+            runValidation()
+            setStatus(`Loaded example: ${appName}`)
+            hideExampleRow()
+            plausible?.('App Example Load', { props: { app: appName } })
+        }
+
+        // --- Validation --------------------------------------------------
+        let validateDebounce = null
+
+        function scheduleValidation() {
+            clearTimeout(validateDebounce)
+            validateDebounce = setTimeout(runValidation, 300)
+        }
+
+        function runValidation() {
+            if (!editor || !monacoReady) return
+            const content = editor.getValue()
+            validationErrors = []
+            const markers = []
+
+            let parsed
+            try {
+                parsed = jsyaml.load(content)
+            } catch (e) {
+                const mark = e.mark || {}
+                const line = (mark.line || 0) + 1
+                const col = (mark.column || 0) + 1
+                validationErrors.push({ line, col, message: `YAML syntax error: ${e.reason || e.message}`, severity: 'error' })
+                markers.push({
+                    startLineNumber: line, startColumn: col, endLineNumber: line, endColumn: col + 1,
+                    message: `YAML syntax: ${e.reason || e.message}`, severity: monaco.MarkerSeverity.Error
+                })
+                applyMarkersAndUpdateUI(markers)
+                return
+            }
+
+            if (parsed !== null && parsed !== undefined) {
+                const fn = useStoreSchema ? validateStore : validateSingle
+                if (fn) {
+                    fn(parsed)
+                    if (fn.errors) {
+                        for (const err of fn.errors) {
+                            const path = err.dataPath || err.instancePath || '/'
+                            const msg = `${path} ${err.message}`
+                            validationErrors.push({ line: 1, col: 1, message: msg, severity: 'error' })
+                            markers.push({
+                                startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1,
+                                message: msg, severity: monaco.MarkerSeverity.Error
+                            })
+                        }
+                    }
+                }
+            }
+
+            applyMarkersAndUpdateUI(markers)
+        }
+
+        function applyMarkersAndUpdateUI(markers) {
+            if (editor && monacoReady) monaco.editor.setModelMarkers(editor.getModel(), 'yaml-tikapp', markers)
+            updateValidationUI()
+        }
+
+        function updateValidationUI() {
+            const errCount = validationErrors.filter(e => e.severity === 'error').length
+            const warnCount = validationErrors.filter(e => e.severity === 'warning').length
+
+            if (validationErrors.length === 0) {
+                valLabel.textContent = '✓ Valid YAML'
+                valSummary.setAttribute('aria-invalid', 'false')
+            } else {
+                const parts = []
+                if (errCount > 0) parts.push(`✗ ${errCount} error${errCount !== 1 ? 's' : ''}`)
+                if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`)
+                valLabel.textContent = parts.join(', ')
+                valSummary.setAttribute('aria-invalid', 'true')
+            }
+
+            valList.innerHTML = ''
+            for (const err of validationErrors) {
+                const li = document.createElement('li')
+                li.textContent = `Line ${err.line}: ${err.message}`
+                li.title = `Jump to line ${err.line}`
+                li.addEventListener('click', () => {
+                    if (editor) {
+                        editor.revealLineInCenter(err.line)
+                        editor.setPosition({ lineNumber: err.line, column: err.col || 1 })
+                        editor.focus()
+                    }
+                })
+                valList.appendChild(li)
+            }
+
+            if (validationErrors.length > 0 && !valDropdown.open) valDropdown.open = true
+            else if (validationErrors.length === 0 && valDropdown.open) valDropdown.open = false
+        }
+
+        // --- Download ----------------------------------------------------
+        function downloadYaml() {
+            const content = editor ? editor.getValue() : ''
+            let filename = 'app.tikapp.yaml'
+            if (useStoreSchema) {
+                filename = 'app-store.tikappstore.yaml'
+            } else {
+                try {
+                    const parsed = jsyaml.load(content)
+                    if (parsed?.name) filename = `${parsed.name}.tikapp.yaml`
+                } catch (_) {}
+            }
+            const blob = new Blob([content], { type: 'text/yaml' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = filename; a.click()
+            URL.revokeObjectURL(url)
+            plausible?.('App YAML Download', { props: { store: useStoreSchema } })
+        }
+
+        // --- Copy to clipboard ------------------------------------------
+        function copyYaml() {
+            const content = editor ? editor.getValue() : ''
+            navigator.clipboard.writeText(content).then(() => {
+                copyBtn.textContent = '✓ Copied!'
+                setTimeout(() => { copyBtn.textContent = '📋 Copy' }, 1800)
+            }).catch(() => { if (editor) editor.getAction('editor.action.selectAll').run() })
+            plausible?.('App YAML Copy', {})
+        }
+
+        // --- Copy as MikroTik command ------------------------------------
+        function copyAsCommand() {
+            const content = editor ? editor.getValue() : ''
+            const escaped = content.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+            const cmd = `/app add yaml="${escaped}"`
+            const orig = copyCmdBtn.innerHTML
+            navigator.clipboard.writeText(cmd).then(() => {
+                copyCmdBtn.textContent = '✓ Copied!'
+                setTimeout(() => { copyCmdBtn.innerHTML = orig }, 1800)
+            }).catch(() => { if (editor) editor.getAction('editor.action.selectAll').run() })
+            plausible?.('App YAML Copy Command', {})
+        }
+
+        // --- Monaco setup ------------------------------------------------
+        function initMonaco() {
+            require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' } })
+            require(['vs/editor/editor.main'], () => {
+                monacoReady = true
+
+                editor = monaco.editor.create(editorContainer, {
+                    value: '',
+                    language: 'yaml',
+                    theme: getMonacoTheme(),
+                    automaticLayout: false,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 13,
+                    tabSize: 2,
+                    insertSpaces: true,
+                    detectIndentation: false,
+                    lineNumbers: 'on',
+                    wordWrap: 'off',
+                    renderWhitespace: 'boundary',
+                    glyphMargin: true,
+                    folding: true,
+                    quickSuggestions: { other: true, comments: false, strings: true },
+                    suggestOnTriggerCharacters: true,
+                })
+
+                new ResizeObserver(() => { editor.layout() }).observe(editorContainer)
+
+                editor.onDidChangeModelContent(() => {
+                    if (suppressChangeEvent) return
+                    // Auto-save on every change (session continuity on reload)
+                    localStorage.setItem(AUTOSAVE_KEY, editor.getValue())
+                    scheduleValidation()
+                })
+
+                stashBtn.disabled = false
+                downloadBtn.disabled = false
+                copyBtn.disabled = false
+                copyCmdBtn.disabled = false
+
+                runValidation()
+                initPage()
+            })
+        }
+
+        // --- Toolbar button listeners ------------------------------------
+
+        verSelect.addEventListener('change', onVersionChanged)
+
+        storeToggle.addEventListener('change', () => {
+            useStoreSchema = storeToggle.checked
+            registerYamlCompletions()
+            runValidation()
+        })
+
+        loadExampleBtn.addEventListener('click', () => {
+            if (exampleRow.hidden) {
+                showExampleRow()
+                appNameSelect.focus()
+            } else {
+                hideExampleRow()
+            }
+        })
+
+        appCatSelect.addEventListener('change', () => {
+            populateAppDropdown(allApps, appCatSelect.value)
+        })
+
+        loadExampleConfirmBtn.addEventListener('click', () => {
+            loadExampleIntoEditor(appNameSelect.value)
+        })
+
+        appNameSelect.addEventListener('dblclick', () => {
+            loadExampleIntoEditor(appNameSelect.value)
+        })
+
+        cancelExampleBtn.addEventListener('click', hideExampleRow)
+
+        recallStashBtn.addEventListener('click', () => {
+            const stash = localStorage.getItem(STASH_KEY)
+            if (stash && stash.trim()) {
+                suppressChangeEvent = true
+                editor.setValue(stash)
+                suppressChangeEvent = false
+                runValidation()
+                setStatus('Stash recalled.', true)
+                plausible?.('App YAML Recall Stash', {})
+            } else {
+                setStatus('No stash yet — use "💾 Stash" in the action bar to save one.')
+            }
+        })
+
+        importBtn.addEventListener('click', () => importFileInput.click())
+        importFileInput.addEventListener('change', async () => {
+            const file = importFileInput.files?.[0]
+            if (!file || !editor) return
+            editor.setValue(await file.text())
+            importFileInput.value = ''
+            setStatus(`Imported: ${file.name}`)
+            plausible?.('App YAML Import File', {})
+        })
+
+        newBtn.addEventListener('click', () => {
+            if (editor) {
+                suppressChangeEvent = true
+                editor.setValue('')
+                suppressChangeEvent = false
+                localStorage.removeItem(AUTOSAVE_KEY)
+                runValidation()
+                setStatus('New — editor cleared.')
+                editor.focus()
+                plausible?.('App YAML New', {})
+            }
+        })
+
+        stashBtn.addEventListener('click', () => {
+            if (!editor) return
+            localStorage.setItem(STASH_KEY, editor.getValue())
+            stashBtn.textContent = '✓ Stashed!'
+            setTimeout(() => { stashBtn.textContent = '💾 Stash' }, 1800)
+            setStatus('Stashed — use "Recall Stash" in the toolbar to restore.', true)
+            plausible?.('App YAML Stash', {})
+        })
+
+        downloadBtn.addEventListener('click', downloadYaml)
+        copyBtn.addEventListener('click', copyYaml)
+        copyCmdBtn.addEventListener('click', copyAsCommand)
+
+        // --- Page initialization -----------------------------------------
+        async function initPage() {
+            await initVersionDropdown()
+            if (schemaVersions.length === 0) return
+
+            // Restore autosave from last session if present; otherwise load default example
+            const autosaved = localStorage.getItem(AUTOSAVE_KEY)
+            if (autosaved && autosaved.trim()) {
+                suppressChangeEvent = true
+                editor.setValue(autosaved)
+                suppressChangeEvent = false
+                runValidation()
+                setStatus('Last session restored.')
+            } else {
+                const defaultApp = allApps.find(a => a.name === DEFAULT_APP) || allApps[0]
+                if (defaultApp) {
+                    suppressChangeEvent = true
+                    editor.setValue(defaultApp.yaml || '')
+                    suppressChangeEvent = false
+                    runValidation()
+                }
+            }
+
+            // Show stash hint if one exists (separate from autosave)
+            const stash = localStorage.getItem(STASH_KEY)
+            if (stash && stash.trim()) {
+                const current = statusLine.textContent
+                setStatus((current ? current + ' ' : '') + '💾 Stash available — click "Recall Stash" to load it.')
+            }
+        }
+
+        initMonaco()
+    </script>
+
+    <script>initThemeSwitcher()</script>
+
+</body>
+
+</html>
