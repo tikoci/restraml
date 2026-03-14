@@ -267,33 +267,14 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 
 ### docs/index.html — Architecture Reference
 
-`docs/index.html` is the primary SPA. Key patterns future agents should follow:
+`docs/index.html` is the primary SPA. Key page-specific patterns:
 
-- **GitHub API for content**: uses `fetchVersionList()` from `restraml-shared.js` to get the list
-  of built versions, then dispatches a custom `builddir` event for each directory.
-  Custom events (`builddir`, `inspectdownload`) decouple data fetching from UI updates.
-- **Early-event queue**: a `_pendingBuildDirs` array queues `builddir` events that fire before
-  `DOMContentLoaded`. Process the queue in `DOMContentLoaded` to avoid missing events.
-- **Pico CSS data-theme**: dark/light mode via `html[data-theme=dark|light]`. The theme
-  switcher cycles through OS default → light → dark using SVG icons inline in JS.
-  **Critical**: `data-theme='auto'` is NOT a valid Pico v2 value — it silently forces light mode.
-  For OS-following (auto) state, use `html.removeAttribute('data-theme')` so Pico's
-  `@media (prefers-color-scheme: dark)` rules apply natively. Never `setAttribute('data-theme', 'auto')`.
+- **Custom events**: `builddir` and `inspectdownload` events decouple data fetching from UI updates.
+- **Early-event queue**: `_pendingBuildDirs` queues events that fire before `DOMContentLoaded`.
 - **MikroTik logo trick**: two `<img>` tags with `data-theme="dark"` / `data-theme="light"` —
-  CSS rules `[data-theme=dark] img[data-theme=light] { display:none }` etc. swap which logo shows.
-- **Pico CSS font override**: Pico CSS uses CSS custom properties for fonts:
-  ```css
-  :root {
-    --pico-font-family: "JetBrains Mono", ...;
-    --pico-font-family-monospace: "JetBrains Mono", ...;
-  }
-  ```
-- **`inspect.json` is the data source** for diffs and stats. It's the raw RouterOS API tree.
-  Use `jsonpath` for structured queries (`$..*[?(@._type)]._type`). Use `json-diff` + `highlight.js`
-  for side-by-side textual diff. Use `deep-diff` for structured change statistics.
-- **Diff output defaults to closed**: After a comparison on `index.html`, the `<details id="diffcodedetails">`
-  element stays closed (`open = false`). The `<summary>` shows "Show JSON Diff" / "Hide JSON Diff"
-  toggled by a `toggle` event listener on the `<details>` element.
+  CSS rules swap which is visible based on the current theme.
+- **`inspect.json` is the data source** for diffs and stats. Use `jsonpath` for structured queries.
+  Use `json-diff` + `highlight.js` for textual diff. Use `deep-diff` for change statistics.
 - **Plausible analytics**: `plausible("Event Name", { props: { key: value } })` for tracking
   user interactions. Always include event tracking for new interactive features.
 
@@ -301,27 +282,12 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 
 `docs/lookup.html` is a fully event-driven command search tool. Key patterns:
 
-- **Combined path+cmd input**: a single text field accepts the full RouterOS path including the
-  command as the last segment (e.g. `/ip/address/set`). No separate path and command inputs.
-- **Dynamic, no submit button**: results update as the user types (400 ms debounce on the text
-  input, immediate on `change` events for `<select>` and checkboxes). The "Lookup" button was
-  intentionally removed — events drive all interactions.
-- **inspect.json cache**: fetched inspect JSON is cached per version+subdir in memory (`inspectCache`
-  object keyed by `ver` or `ver/extra`) so repeated lookups against the same version are instant.
-- **Cancellation tokens**: `runLookupId` counter is incremented at the start of each run and
-  checked after each `await`; stale runs exit early without updating the DOM.
-- **Extra-packages toggle**: `includeExtra` checkbox selects `{version}/extra/inspect.json` vs
-  the base `{version}/inspect.json`. Cache key includes the subdir suffix to avoid collisions.
-- **Checkbox implied behaviour**: toggling "include testing" automatically enables "check all
-  versions" (since testing implies checking all). Toggling "check all versions" triggers an
-  immediate lookup.
-- **`lookupInInspect` detail levels** (based on terminal node `_type`):
-  - `"dir"` / `"path"`: detail = comma-separated list of child `cmd` names
-  - `"cmd"` + no attribute: detail = comma-separated list of `arg` names
-  - `"cmd"` + attribute match: detail = the `desc` field of that arg (empty if absent)
-  - not found: detail shown in `<em>` italics; errors likewise in italics
-  - empty segments (`""`, `"/"`) → results hidden, no lookup fired
-  - unknown `_type`: `found: false` (avoids false positives from root-of-JSON edge case)
+- **Combined path+cmd input**: a single text field accepts the full path including the command
+  as the last segment (e.g. `/ip/address/set`). No separate path and command inputs.
+- **Dynamic, no submit button**: results update as the user types (400 ms debounce on text,
+  immediate on `change` for checkboxes/selects).
+- **inspect.json cache**: fetched data cached per version+subdir in `inspectCache`.
+- **Cancellation tokens**: `runLookupId` counter prevents stale async results from updating DOM.
 
 ### Custom / Derivative Pages (`docs/*.html`)
 
@@ -394,49 +360,16 @@ forces light mode. The shared code handles this correctly by removing the attrib
 [data-theme=dark] #mycomponent { /* dark styles */ }
 ```
 
-### diff2html Integration — Gotchas and Patterns
+### diff2html Integration — Gotchas
 
 `docs/diff.html` uses [diff2html](https://diff2html.xyz/) with [jsdiff](https://github.com/kpdecker/jsdiff).
+The CSS in `diff.html` already handles all these issues. If modifying the diff page:
 
-**Key gotchas:**
-
-1. **`colorScheme` option is a no-op in `Diff2Html.html()`** — only works with `Diff2HtmlUI`.
-   Dark mode _must_ be handled via CSS, not via the `colorScheme` option.
-
-2. **Classes are on `<td>` directly, not on `<tr>`** — correct selectors are `td.d2h-del`,
-   `td.d2h-ins`, `td.d2h-cntx`, `td.d2h-info`. Not `.d2h-del > td` or `.d2h-del td`.
-
-3. **diff2html CDN CSS sets opaque white backgrounds** — not just on `table` but also on `.d2h-file-wrapper`
-   and `.d2h-diff-table-wrapper`. These opaque backgrounds show through in dark mode as white blocks.
-   Reset all of them:
-   ```css
-   #diffoutput .d2h-file-wrapper,
-   #diffoutput .d2h-diff-table-wrapper { background-color: transparent; }
-   #diffoutput .d2h-wrapper table { background-color: unset; }
-   ```
-
-4. **Pico CSS v2 overrides all `td`/`th`** with padding, border, background-color, and color.
-   Reset within the diff container using an ID prefix for specificity:
-   ```css
-   #diffoutput .d2h-wrapper td,
-   #diffoutput .d2h-wrapper th {
-       padding: 0; border: none; background-color: unset; color: unset; line-height: 1.35;
-   }
-   #diffoutput .d2h-wrapper .d2h-code-line,
-   #diffoutput .d2h-wrapper .d2h-code-side-line {
-       padding-top: 1px; padding-bottom: 1px;
-   }
-   ```
-
-5. **Context lines are a jsdiff option (patch level), not a diff2html option (render level).**
-   Changing context requires regenerating the patch via
-   `Diff.createPatch(name, old, new, h1, h2, { context: N })`, not re-rendering the same patch.
-   Cache `_lastText1`/`_lastText2` to allow context re-renders without re-fetching data;
-   cache `_lastPatch` for format-only re-renders.
-
-6. **GitHub-style diff color palette** (use these for a familiar, accessible look):
-   - Light: del `#ffebe9` / `#ffd7d5`, ins `#e6ffec` / `#ccffd8`, info `#ddf4ff`
-   - Dark: del `#3d0e0e` / `#58191a`, ins `#0d2a16` / `#1b4428`, info `#0c2d6b`
+1. **`colorScheme` option is a no-op in `Diff2Html.html()`** — dark mode must use CSS overrides.
+2. **Pico CSS overrides all `td`/`th`** — reset within `#diffoutput` using ID-prefixed selectors.
+3. **diff2html CSS sets opaque white backgrounds** — reset `.d2h-file-wrapper` etc. to `transparent`.
+4. **Context lines are a jsdiff option (patch level)**, not diff2html (render level).
+   Cache `_lastText1`/`_lastText2` for context re-renders; cache `_lastPatch` for format-only.
 
 ---
 
@@ -513,7 +446,7 @@ INSPECTFILE=./ros-inspect-all.json URLBASE=http://unused/rest BASICAUTH=x: bun r
 ### "Validate the generated RAML"
 
 ```sh
-npm install webapi-parser
+# webapi-parser requires Node.js (not Bun)
 node validraml.cjs ros-rest-all.raml
 ```
 
@@ -531,11 +464,19 @@ node validraml.cjs ros-rest-all.raml
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
+## Runtime and Tooling
+
+- **Bun** is the primary runtime for all `.js` and `.ts` scripts. Use `bun` (not `node`) and
+  `bun install` (not `npm install`). The only exception is `validraml.cjs` which requires Node.js
+  for the `webapi-parser` package.
+- **Biome** is the linter/formatter: `bunx @biomejs/biome check .` (or `bun run lint`).
+- Dependencies are declared in `package.json` with `bun.lockb`.
+
 ---
 
 ## Things That Are Known-Broken or Incomplete
 
-- `--validate` flag in `rest2raml.js` is not implemented (TODO in code)
+(none currently)
 
 ---
 

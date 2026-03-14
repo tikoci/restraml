@@ -1,6 +1,5 @@
 const fs = require("fs")
 const YAML = require("js-yaml")
-// TODO const wap = require("webapi-parser").WebApiParser
 
 const rosSchemaFilename = "./ros-inspect"
 const ramlSchemaFilename = "./ros-rest"
@@ -19,11 +18,6 @@ async function main() {
   //       >  bun rest2raml.js ip address
   //  So, assuming, done getting version for router should work...
   const { opts, argPath } = parseArguments()
-  if (opts && opts.validate) {
-    // TODO
-    validateRaml(opts.validate)
-    return 1 // return error code since it's not implemented 
-  }
   const ver = await fetchVersion()
   if (opts && opts.version) {
     console.log(ver)
@@ -69,9 +63,6 @@ function parseArguments() {
       version: {
         type: "boolean",
       },
-      validate: {
-        type: "string",
-      },
       ramlspec: {
         type: "string",
         default: "1.0"
@@ -83,14 +74,6 @@ function parseArguments() {
   const [, , ...argPath] = positionals
   const opts = values
   return { opts, argPath }
-}
-
-async function validateRaml(filename) {
-  // const raml = fs.readFileSync(filename, { encoding: "utf-8" })
-  // const model = await wap.raml10.parse(raml)
-  // const report = await wap.raml10.validate(model)
-  // console.log("Validation errors:", report.toString())
-  console.warn("Not implemented.")
 }
 
 function generateRAMLPrefix(ver = "7.0", tag = "dev") {
