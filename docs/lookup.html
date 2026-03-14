@@ -28,6 +28,10 @@
             --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
         }
 
+        /* Tools dropdown: force LTR on items so leading slash in "/app Editor"
+           doesn't migrate to end in the RTL-aligned container */
+        details.dropdown ul li { direction: ltr; }
+
         header nav li a svg {
             width: var(--font-size);
             height: var(--font-size);
