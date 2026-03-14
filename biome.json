@@ -1,0 +1,45 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "files": {
+        "includes": [
+            "*.js",
+            "*.cjs",
+            "docs/*.js",
+            "docs/*.html"
+        ]
+    },
+    "formatter": {
+        "enabled": false
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "suspicious": {
+                "noConsole": "off",
+                "noDoubleEquals": "warn"
+            },
+            "style": {
+                "useNodejsImportProtocol": "off",
+                "useTemplate": "off"
+            }
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["docs/restraml-shared.js"],
+            "linter": {
+                "rules": {
+                    "correctness": {
+                        "noUnusedVariables": "off"
+                    }
+                }
+            }
+        }
+    ]
+}

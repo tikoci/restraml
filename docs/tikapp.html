@@ -589,7 +589,7 @@
                             fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-store-schema.json`, { method: 'HEAD' }),
                             fetch(`${RESTRAML.pagesUrl}/${v.name}/app.json`, { method: 'HEAD' })
                         ])
-                        if (schemaR.status === 403) showError('GitHub Pages rate limit hit — some versions may be missing.')
+                        if ([schemaR, storeR, appR].some(r => r.status === 403)) showError('GitHub Pages rate limit hit — some versions may be missing.')
                         return (schemaR.ok && storeR.ok && appR.ok) ? v : null
                     } catch (_) { return null }
                 })
@@ -780,6 +780,7 @@
                 if (fn) {
                     fn(parsed)
                     if (fn.errors) {
+                        const contentLines = content.split('\n')
                         for (const err of fn.errors) {
                             const path = err.dataPath || err.instancePath || ''
                             const msg = path ? `${path}: ${err.message}` : err.message
@@ -787,7 +788,7 @@
                             const line = findLineForPath(content, path)
                             validationErrors.push({ line, col: 1, message: msg, severity: 'error' })
                             if (line) {
-                                const lineLen = content.split('\n')[line - 1]?.length ?? 999
+                                const lineLen = contentLines[line - 1]?.length ?? 999
                                 markers.push({
                                     startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: lineLen + 1,
                                     message: msg, severity: monaco.MarkerSeverity.Error
@@ -853,7 +854,7 @@
             const content = editor ? editor.getValue() : ''
             let filename = 'app.tikapp.yaml'
             if (useStoreSchema) {
-                filename = 'tikappstore.yaml'
+                filename = 'app.tikappstore.yaml'
             } else {
                 try {
                     const parsed = jsyaml.load(content)

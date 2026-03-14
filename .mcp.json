@@ -1,0 +1,10 @@
+{
+    "_note": "Project-level MCP servers for restraml. VS Code Claude Code extension and CLI both read .mcp.json at the project root.",
+    "mcpServers": {
+        "context7": {
+            "type": "stdio",
+            "command": "/usr/local/bin/bun",
+            "args": ["x", "--bun", "@upstash/context7-mcp@latest"]
+        }
+    }
+}

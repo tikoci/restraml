@@ -469,8 +469,17 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 - **Bun** is the primary runtime for all `.js` and `.ts` scripts. Use `bun` (not `node`) and
   `bun install` (not `npm install`). The only exception is `validraml.cjs` which requires Node.js
   for the `webapi-parser` package.
-- **Biome** is the linter/formatter: `bunx @biomejs/biome check .` (or `bun run lint`).
-- Dependencies are declared in `package.json` with `bun.lockb`.
+- **Biome** (v2.x) is the linter: `bun run lint` (`bunx @biomejs/biome check .`). Run this after
+  modifying any `.js` or `.html` file and fix reported errors in your changed code before presenting
+  changes. Auto-fix fixable issues with `bun run lint:fix`. Formatter is intentionally disabled in
+  `biome.json` — linting only, no automated reformatting of existing code. Do not add Prettier.
+  Note: Biome 2.x lints inline JS in HTML files too. The Plausible analytics snippet (all HTML pages)
+  triggers `noAssignInExpressions` / `noArguments` — these are expected third-party boilerplate;
+  ignore them. Fix issues in any code you add or modify.
+- Dependencies are declared in `package.json` with `bun.lock`.
+- **context7 MCP** is configured in `.mcp.json`. Use it to fetch up-to-date documentation for
+  `bun`, `biome`, or any third-party CDN library rather than relying on training data. These
+  tools evolve quickly — prefer context7 when uncertain about an API, CLI flag, or config schema.
 
 ---
 

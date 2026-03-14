@@ -31,6 +31,23 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 - The apt package for QEMU is `qemu-system-x86` (not `qemu-system-x86_64`); also install
   `qemu-utils` for `qemu-img`.
 
+### Linting
+
+- **Biome** (v2.x) is the linter for all `.js` and `docs/*.html` files. Run `bun run lint` after
+  modifying any `.js` or `.html` file. Fix all reported errors before committing. Auto-fix: `bun run lint:fix`.
+- Formatter is disabled — biome is used for code quality checks only, not formatting.
+- Do not add Prettier or any other formatter/linter.
+
+### Documentation / context7
+
+- A **context7 MCP server** is configured in `.mcp.json`. Use it to look up current docs for
+  `bun`, `biome`, or any CDN library (Monaco, Ajv, js-yaml, Pico CSS, diff2html, etc.) instead
+  of guessing from training data. Example: `use context7 to look up bun Bun.file API`.
+- Prefer context7 over WebFetch for library documentation — it returns structured, version-aware
+  content that's more reliable for API/config questions.
+
+---
+
 ### Schema Generation
 - `rest2raml.js` runs under **Bun** (not Node.js). Uses `Bun.argv` for CLI args.
 - `validraml.cjs` runs under **Node.js 18**.
