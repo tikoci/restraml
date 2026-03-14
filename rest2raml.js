@@ -152,7 +152,7 @@ async function fetchVersion() {
   return resp.ret.split(" ")[0] 
 }
 
-async function fetchInspect(what, path, input = "") {
+async function fetchInspect(what, path, _input = "") {
   const resturl = `${process.env.URLBASE}/console/inspect`
   const body = {
     request: what,
@@ -301,7 +301,6 @@ function parse(obj) {
         }
         if (key != "get") delete currentObj[key]
       } else if (typeof currentObj[key] === "object") {
-        const src = currentObj[key]
         currentObj[`/${key}`] = currentObj[key]
         if (
           currentObj[`/${key}`]._type == "path" ||

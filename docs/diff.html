@@ -153,6 +153,27 @@
             height: 2rem;
             width: auto;
         }
+
+        /* Diff guide (collapsed help section) */
+        #diff-guide summary {
+            font-size: 0.9rem;
+            letter-spacing: 0.02em;
+        }
+        #diff-guide article {
+            font-size: 0.88rem;
+            margin-top: 0.5rem;
+        }
+        #diff-guide article hr { margin: 0.8rem 0; }
+        #diff-guide pre {
+            font-size: 0.78rem;
+            border-left: 3px solid var(--pico-primary);
+        }
+        #diff-guide .behind-curtain {
+            border-left: 3px solid var(--pico-form-element-border-color);
+            border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+            padding: 0.6rem 1rem;
+            background: var(--pico-form-element-background-color);
+        }
     </style>
 </head>
 
@@ -276,17 +297,77 @@
             </div>
         </section>
 
-        <section>
-        <article>
-            <small>💬 <strong>Found a bug? Want a feature?</strong>
-                <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a> — bugs and ideas welcome.</small>
-        </article>
-        <p><small>
-            See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
-            for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
-            For additional tools — command search and version diff — check the <b>Tools</b> menu above.
-        </small></p>
-        </section>
+        <details id="diff-guide">
+            <summary><b>How to read this?</b> &hellip;</summary>
+            <article>
+                <header>
+                    <strong>Using the Diff</strong>
+                </header>
+                <p>
+                    Pick two versions &mdash; the diff fires on its own, no button needed.
+                    The <mark>extra-packages</mark> toggle adds commands from
+                    <kbd>container</kbd>, <kbd>iot</kbd>, <kbd>zerotier</kbd>, and other
+                    optional packages; <mark>testing</mark> includes beta and RC builds in
+                    the version list.
+                </p>
+                <p>
+                    Once results appear, tune the view: <b>side-by-side</b> or
+                    <b>line-by-line</b> layout, optional <b>context</b> lines around changes,
+                    and <b>hunk markers</b> (<code>@@</code>) shown or hidden. All options
+                    are captured in the shareable URL.
+                </p>
+                <hr>
+                <strong>The Notation</strong>
+                <p>
+                    Lines use a <mark>pseudo-CLI</mark> shorthand &mdash; not actual RouterOS
+                    export output, but a flat reading of the command tree. Each line is one of:
+                </p>
+                <figure>
+                    <pre><code>/ip/address/                             &larr; menu (trailing /)
+/ip/address/add                          &larr; command
+/ip/address/add address=(> "A.B.C.D/M") &larr; argument + type hint</code></pre>
+                    <figcaption>
+                        <small>Added lines appear as <ins>insertions</ins>, removed as
+                        <del>deletions</del> &mdash; standard unified diff.</small>
+                    </figcaption>
+                </figure>
+                <p>
+                    The <code>(> &quot;&hellip;&quot;)</code> is how RouterOS describes argument
+                    types internally &mdash; the same hint WinBox shows in its property sheet.
+                    No <code>(> &hellip;)</code>? That argument has no type metadata available.
+                </p>
+                <hr>
+                <div class="behind-curtain">
+                    <small>
+                        <b>How the sausage is made</b> &mdash;
+                        RouterOS exposes <code>/console/inspect</code> via REST &mdash; the
+                        same introspection endpoint that powers WinBox&rsquo;s sidebar tree and
+                        CLI <kbd>Tab</kbd>-completion. A real RouterOS CHR boots in CI, every
+                        API branch is walked via
+                        <code>POST&nbsp;/rest/console/inspect</code>,
+                        and the result is flattened into the notation above.
+                        We show CLI paths (<code>/ip/address</code>) instead of
+                        REST URLs (<code>/rest/ip/address/add</code>) &mdash;
+                        most admins think in terminal.
+                    </small>
+                </div>
+                <footer>
+                    <small>
+                        The <a href="index.html">Schema&nbsp;Downloads</a> page has a
+                        JSON-based inspect diff &mdash; same data, structured view.
+                        That may eventually migrate here as an alternate output format.
+                    </small>
+                    <hr style="margin:0.5rem 0">
+                    <small>
+                        💬 <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a>
+                        &mdash; bugs and ideas welcome.
+                        &nbsp;&middot;&nbsp;
+                        <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
+                        for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>
+                    </small>
+                </footer>
+            </article>
+        </details>
 
     </main>
 

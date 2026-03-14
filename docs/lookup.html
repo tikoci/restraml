@@ -57,6 +57,39 @@
             width: auto;
         }
 
+        /* Compact, consistent switch labels */
+        #lookup-controls label {
+            font-size: 0.78rem;
+            font-style: italic;
+            white-space: nowrap;
+        }
+        #lookup-controls label code {
+            font-style: normal;
+            font-size: inherit;
+        }
+        #lookup-controls ul:last-child li + li { margin-left: 0.5rem; }
+
+        /* Lookup guide (collapsed help section) */
+        #lookup-guide summary {
+            font-size: 0.9rem;
+            letter-spacing: 0.02em;
+        }
+        #lookup-guide article {
+            font-size: 0.88rem;
+            margin-top: 0.5rem;
+        }
+        #lookup-guide article hr { margin: 0.8rem 0; }
+        #lookup-guide pre {
+            font-size: 0.78rem;
+            border-left: 3px solid var(--pico-primary);
+        }
+        #lookup-guide .behind-curtain {
+            border-left: 3px solid var(--pico-form-element-border-color);
+            border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+            padding: 0.6rem 1rem;
+            background: var(--pico-form-element-background-color);
+        }
+
         #results-table td:first-child,
         #results-table th:first-child {
             white-space: nowrap;
@@ -123,10 +156,7 @@
         <!-- Intro -->
         <section>
             <p>Check which RouterOS versions include a specific command or attribute by searching the
-                <code>/console/inspect</code> data.
-                See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
-                for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
-            </p>
+                <code>/console/inspect</code> data.</p>
         </section>
 
         <!-- Search Form -->
@@ -146,7 +176,7 @@
                 </label>
             </div>
 
-            <nav>
+            <nav id="lookup-controls">
                 <ul>
                     <li>
                         <select id="version-select" aria-label="RouterOS version to check">
@@ -158,16 +188,16 @@
                     <li>
                         <label>
                             <input id="includeExtra" type="checkbox" role="switch" aria-label="Include extra-packages in search">
-                            <i>with</i> <code>extra-packages</code>
+                            with <code>extra-packages</code>
                         </label>
                     </li>
-                    <li style="margin-left:1rem">
+                    <li>
                         <label>
                             <input id="checkAllVersions" type="checkbox" role="switch">
                             check all versions
                         </label>
                     </li>
-                    <li style="margin-left:1rem">
+                    <li>
                         <label>
                             <input id="includeTesting" type="checkbox" role="switch">
                             include <code>testing</code>
@@ -198,18 +228,48 @@
             </div>
         </section>
 
-        <!-- Footer -->
-        <section>
+        <details id="lookup-guide">
+            <summary><b>How does this work?</b> &hellip;</summary>
             <article>
-                <small>💬 <strong>Found a bug? Want a feature?</strong>
-                    <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a> — bugs and ideas welcome.</small>
+                <p>
+                    Type a CLI path &mdash; results update as you type.
+                    The last segment determines what you get back:
+                </p>
+                <figure>
+                    <pre><code>/ip/address              &larr; path: lists commands
+/ip/address/set          &larr; command: lists attributes
+/ip/address/set + address  &larr; attribute: shows type hint</code></pre>
+                    <figcaption>
+                        <small>Path goes in the first field, attribute (if any) in the second.</small>
+                    </figcaption>
+                </figure>
+                <p>
+                    <mark>extra-packages</mark> includes <kbd>container</kbd>,
+                    <kbd>iot</kbd>, etc.
+                    <mark>check all versions</mark> scans every release.
+                    <mark>testing</mark> adds beta/RC builds.
+                </p>
+                <hr>
+                <div class="behind-curtain">
+                    <small>
+                        <b>Behind the curtain</b> &mdash;
+                        same <code>/console/inspect</code> data as
+                        <a href="diff.html">Schema&nbsp;Diff</a>.
+                        A real RouterOS CHR boots in CI, the command tree is walked
+                        via REST, and published as <code>inspect.json</code> per version.
+                    </small>
+                </div>
+                <footer>
+                    <small>
+                        💬 <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a>
+                        &mdash; bugs and ideas welcome.
+                        &nbsp;&middot;&nbsp;
+                        <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
+                        for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>
+                    </small>
+                </footer>
             </article>
-            <p><small>
-                See <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
-                for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a> for more info.
-                For additional tools — command search and version diff — check the <b>Tools</b> menu above.
-            </small></p>
-        </section>
+        </details>
 
     </main>
 

@@ -16,6 +16,9 @@
     "formatter": {
         "enabled": false
     },
+    "assist": {
+        "enabled": false
+    },
     "linter": {
         "enabled": true,
         "rules": {
@@ -37,6 +40,61 @@
                 "rules": {
                     "correctness": {
                         "noUnusedVariables": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["docs/*.html"],
+            "linter": {
+                "rules": {
+                    "complexity": {
+                        "noCommaOperator": "off",
+                        "noArguments": "off",
+                        "useArrowFunction": "off",
+                        "noUselessEscapeInRegex": "off",
+                        "useOptionalChain": "off"
+                    },
+                    "suspicious": {
+                        "noAssignInExpressions": "off",
+                        "noPrototypeBuiltins": "off",
+                        "useIterableCallbackReturn": "off"
+                    },
+                    "a11y": {
+                        "useAriaPropsForRole": "off",
+                        "useButtonType": "off",
+                        "useAnchorContent": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["rest2raml.js"],
+            "linter": {
+                "rules": {
+                    "complexity": {
+                        "useLiteralKeys": "off",
+                        "useOptionalChain": "off"
+                    },
+                    "suspicious": {
+                        "useIterableCallbackReturn": "off",
+                        "noAssignInExpressions": "off",
+                        "noDoubleEquals": "off",
+                        "noVar": "off"
+                    },
+                    "style": {
+                        "useConst": "off",
+                        "useDefaultSwitchClause": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["appyamlvalidate.js"],
+            "linter": {
+                "rules": {
+                    "complexity": {
+                        "useLiteralKeys": "off"
                     }
                 }
             }

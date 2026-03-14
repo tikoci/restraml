@@ -371,6 +371,78 @@ The CSS in `diff.html` already handles all these issues. If modifying the diff p
 4. **Context lines are a jsdiff option (patch level)**, not diff2html (render level).
    Cache `_lastText1`/`_lastText2` for context re-renders; cache `_lastPatch` for format-only.
 
+### Collapsible Guide Pattern — In-Page Help
+
+Tool pages (`diff.html`, `lookup.html`) include a collapsed `<details>` section that serves as
+lightweight in-page documentation. This avoids linking to external docs and keeps the single-HTML
+file pattern. The guide is collapsed by default so it doesn't clutter the UI for experienced users.
+
+**Structure:**
+
+```html
+<details id="page-guide">
+    <summary><b>How to read this?</b> &hellip;</summary>
+    <article>
+        <header><strong>Section Title</strong></header>
+        <!-- Usage explanation -->
+        <hr>
+        <!-- Notation / syntax explanation -->
+        <hr>
+        <div class="behind-curtain">
+            <small><b>Behind the curtain</b> &mdash; ...</small>
+        </div>
+        <footer>
+            <small>Bug/feature links, README link</small>
+        </footer>
+    </article>
+</details>
+```
+
+**Flow:** Explain *using* the tool first (controls, options), then the *notation/syntax*, then a
+brief "how the sausage is made" peek at the data source. Keep it tight — more trivia than
+architecture. The `<article>` gives Pico's card styling; `<header>` and `<footer>` add structure.
+
+**CSS required** (per page, scoped by ID):
+```css
+#page-guide summary { font-size: 0.9rem; letter-spacing: 0.02em; }
+#page-guide article { font-size: 0.88rem; margin-top: 0.5rem; }
+#page-guide article hr { margin: 0.8rem 0; }
+#page-guide pre { font-size: 0.78rem; border-left: 3px solid var(--pico-primary); }
+#page-guide .behind-curtain {
+    border-left: 3px solid var(--pico-form-element-border-color);
+    border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+    padding: 0.6rem 1rem;
+    background: var(--pico-form-element-background-color);
+}
+```
+
+**"Found a bug?" and README links** live inside the guide's `<footer>`, not as a standalone
+section — keeps the page clean when the guide is collapsed.
+
+### Pico CSS Semantic HTML Tricks — Quick Reference
+
+These Pico v2 patterns are used across `docs/*.html` pages. Prefer these over `<div>` + classes:
+
+| Element / Pattern | What Pico Does | Used For |
+|---|---|---|
+| `<article>` | Card with padding, border, rounded corners | Guide sections, callouts |
+| `<article>` + `<header>` / `<footer>` | Card with distinct header/footer sections | Structured cards |
+| `<details>` / `<summary>` | Native accordion, styled with arrow | Collapsible guide, TOC |
+| `<details>` + `name="group"` | Exclusive accordion (only one open) | Grouped sections |
+| `<summary role="button">` | Summary styled as a button | Prominent toggles |
+| `<mark>` | Highlighted inline text (yellow/primary) | Key terms, toggle names |
+| `<kbd>` | Keyboard-key styled inline | Package names, key combos |
+| `<figure>` + `<figcaption>` | Captioned content block | Code examples with notes |
+| `<ins>` / `<del>` | Green/red inline text | Showing diff semantics |
+| `<hr>` inside `<article>` | Subtle section divider within a card | Separating guide topics |
+| `role="switch"` on checkbox | Toggle switch appearance | Extra-packages, testing toggles |
+| `<nav>` with `<ul>` | Horizontal flex layout | Controls bar, toolbar |
+
+**Consistent switch labels:** When a `<nav>` has multiple `role="switch"` toggles, give the
+`<nav>` an ID and apply `font-size: 0.88rem; font-style: italic` to all labels via CSS. Use
+`<code>` (with `font-style: normal`) for technical terms within labels. Remove individual `<i>`
+tags — let CSS handle italic consistently.
+
 ---
 
 ## Agentic AI — GitHub Copilot in GitHub Actions
@@ -417,7 +489,7 @@ manually, dispatch `auto.yaml` via `workflow_dispatch` with no inputs. Alternati
 
 ### "Add support for a new RouterOS version format"
 RouterOS versions follow `MAJOR.MINOR[QUALIFIER]` where qualifier is one of:
-- _(none)_ — stable release, e.g. `7.22`
+- *(none)* — stable release, e.g. `7.22`
 - `beta1`, `beta2`, ... — beta builds, on cdn.mikrotik.com
 - `rc1`, `rc2`, ... — release candidates, on cdn.mikrotik.com
 
@@ -471,11 +543,20 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
   for the `webapi-parser` package.
 - **Biome** (v2.x) is the linter: `bun run lint` (`bunx @biomejs/biome check .`). Run this after
   modifying any `.js` or `.html` file and fix reported errors in your changed code before presenting
-  changes. Auto-fix fixable issues with `bun run lint:fix`. Formatter is intentionally disabled in
-  `biome.json` — linting only, no automated reformatting of existing code. Do not add Prettier.
-  Note: Biome 2.x lints inline JS in HTML files too. The Plausible analytics snippet (all HTML pages)
-  triggers `noAssignInExpressions` / `noArguments` — these are expected third-party boilerplate;
-  ignore them. Fix issues in any code you add or modify.
+  changes. Auto-fix fixable issues with `bun run lint:fix`. Formatter and assist (import sorting)
+  are intentionally disabled in `biome.json` — linting only, no automated reformatting. Do not
+  add Prettier. `bun run lint` should produce **zero errors** on a clean checkout.
+  **Biome overrides in `biome.json`** suppress pre-existing patterns in legacy code:
+  - `docs/*.html`: Plausible analytics boilerplate (`noCommaOperator`, `noArguments`, etc.),
+    Pico CSS `role="switch"` without static `aria-checked` (`useAriaPropsForRole`),
+    `forEach` callbacks with implicit returns (`useIterableCallbackReturn`)
+  - `rest2raml.js`: `noDoubleEquals` (string comparisons), `useLiteralKeys` (bracket notation
+    for `"get"`), `useConst`/`noVar` (legacy style). Note: `noUnusedVariables` and
+    `noUnusedFunctionParameters` are intentionally kept **on** — they catch real issues and
+    provide valuable double-check discipline in agentic workflows
+  - `appyamlvalidate.js`: `useLiteralKeys`
+  - `docs/restraml-shared.js`: `noUnusedVariables` (exports consumed by other pages)
+  Fix issues in any code you add or modify. Do not add new suppressions without justification.
 - Dependencies are declared in `package.json` with `bun.lock`.
 - **context7 MCP** is configured in `.mcp.json`. Use it to fetch up-to-date documentation for
   `bun`, `biome`, or any third-party CDN library rather than relying on training data. These
