@@ -1170,6 +1170,11 @@
         })
 
         // --- app-store-urls= toggle conversion ---------------------------
+        function setStoreToggle(checked) {
+            storeToggle.checked = checked
+            storeToggle.setAttribute('aria-checked', checked ? 'true' : 'false')
+        }
+
         async function handleStoreToggleChange() {
             const nowChecked = storeToggle.checked
             const content = editor ? editor.getValue() : ''
@@ -1188,7 +1193,7 @@
                 }
                 let parsed
                 try { parsed = jsyaml.load(content) } catch (_) { parsed = null }
-                const isValidSingle = parsed && typeof parsed === 'object' && !Array.isArray(parsed)&& validateSingle?.(parsed)
+                const isValidSingle = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && validateSingle?.(parsed)
 
                 if (isValidSingle) {
                     // Convert single app object → YAML array
@@ -1206,11 +1211,11 @@
                     setStatus('Converted to app-store-urls= array format.', true)
                 } else {
                     // Not a valid single app — ask user
-                    storeToggle.checked = false  // revert toggle visually
+                    setStoreToggle(false)  // revert toggle visually
                     setStatus('Content is not a valid single /app — enable app-store-urls= schema anyway?', false, [
                         {
                             label: 'Enable Anyway', fn: () => {
-                                storeToggle.checked = true
+                                setStoreToggle(true)
                                 useStoreSchema = true
                                 registerYamlCompletions()
                                 runValidation()
@@ -1252,11 +1257,11 @@
                         setStatus('Converted back to single /app format.', true)
                     } else if (parsed.length > 1) {
                         // Multiple apps: can't auto-convert, offer schema-only switch
-                        storeToggle.checked = true  // revert toggle
+                        setStoreToggle(true)  // revert toggle
                         setStatus(`Store has ${parsed.length} apps — disable app-store-urls= schema only (keep content)?`, false, [
                             {
                                 label: 'Disable Schema', fn: () => {
-                                    storeToggle.checked = false
+                                    setStoreToggle(false)
                                     useStoreSchema = false
                                     registerYamlCompletions()
                                     runValidation()
@@ -1490,7 +1495,7 @@
                 await onVersionChanged()
             }
             if (store === '1' && !storeToggle.checked) {
-                storeToggle.checked = true
+                setStoreToggle(true)
                 useStoreSchema = true
                 registerYamlCompletions()
                 updateCopyCmdBtn()
