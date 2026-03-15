@@ -170,6 +170,13 @@ async function fetchChild(path = []) {
   return await fetchInspect("child", path.toString())
 }
 
+async function fetchCompletion(path = []) {
+  return await fetchInspect("completion", path.toString())
+}
+
+// Paths that crash the RouterOS REST server when inspected
+const CRASH_PATHS = ["where", "do", "else", "rule", "command", "on-error"]
+
 async function parseChildren(rpath = [], memo = {}) {
   let start = memo
   let children = await fetchChild(rpath)
@@ -179,19 +186,26 @@ async function parseChildren(rpath = [], memo = {}) {
       memo[child.name] = { _type: child["node-type"] }
       // try {
       if (child["node-type"] == "arg") {
-        if (
-          newpath.includes("where") ||
-          newpath.includes("do") ||
-          newpath.includes("else") ||
-          newpath.includes("rule") ||
-          newpath.includes("command") ||
-          newpath.includes("on-error")
-        ) {
+        if (newpath.some((p) => CRASH_PATHS.includes(p))) {
           // these crash the REST server, skipping
         } else {
           const syntax = await fetchSyntax(newpath)
           if (syntax.length == 1 && syntax[0].text.length > 0) {
             memo[child.name].desc = syntax[0].text
+          }
+          const completions = await fetchCompletion(newpath)
+          // RouterOS may return `show` as boolean true or string "yes" depending on version
+          const shown = completions.filter(
+            (c) => c.show === true || c.show === "yes"
+          )
+          if (shown.length > 0) {
+            memo[child.name]._completion = Object.fromEntries(
+              shown.map((c) => {
+                const entry = { style: c.style, preference: c.preference }
+                if (c.text && c.text.length > 0) entry.desc = c.text
+                return [c.completion, entry]
+              })
+            )
           }
         }
       }
@@ -226,11 +240,17 @@ function cmdToGetQueryParams(obj) {
   Object.entries(obj)
     .filter((i) => i[1]._type == "arg")
     .map((j) => {
-      props[j[0]] = {
+      const arg = j[1]
+      const prop = {
         type: "any",
         required: false,
-        description: j[1].description,
+        description: arg.description,
       }
+      if (arg._completion) {
+        prop.type = "string"
+        prop.enum = Object.keys(arg._completion)
+      }
+      props[j[0]] = prop
     })
   return props
 }
@@ -244,11 +264,17 @@ function cmdToPostSchema(obj) {
   Object.entries(obj)
     .filter((i) => i[1]._type == "arg")
     .map((j) => {
-      props[j[0]] = {
+      const arg = j[1]
+      const prop = {
         type: "any",
         required: false,
-        description: j[1].description,
+        description: arg.description,
       }
+      if (arg._completion) {
+        prop.type = "string"
+        prop.enum = Object.keys(arg._completion)
+      }
+      props[j[0]] = prop
       //delete obj[j[0]]
       //delete obj.type
     })
