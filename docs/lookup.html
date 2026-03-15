@@ -53,6 +53,12 @@
         #results-table td:last-child small {
             word-break: break-word;
         }
+
+        /* Lighten text-input placeholders so they're clearly distinct from typed values */
+        input[type="text"]::placeholder {
+            opacity: 0.4;
+            font-style: italic;
+        }
     </style>
 </head>
 
@@ -103,7 +109,7 @@
             <div class="grid" style="grid-template-columns: 55% 27% 17%; gap: 0.5rem;">
                 <label>
                     CLI Path <small>(with <em>optional</em> command)</small>
-                    <input type="text" id="input-cmdpath" placeholder="/ip/address/set" value="/ip/address/set"
+                    <input type="text" id="input-cmdpath" placeholder="e.g. /ip/address/set"
                         aria-label="RouterOS path and command, e.g. /ip/address/set">
                 </label>
                 <label>
@@ -120,7 +126,12 @@
             </div>
 
             <nav id="lookup-controls" class="switch-controls">
-                <ul></ul>
+                <ul>
+                    <li>
+                        <button id="clear-btn" type="button" class="outline secondary"
+                            style="width:auto;margin:0;padding:0.2rem 0.6rem;font-size:0.82rem;">✕ Clear</button>
+                    </li>
+                </ul>
                 <ul>
                     <li>
                         <label>
@@ -150,7 +161,7 @@
                 <h3 style="margin:0">Results</h3>
                 <button id="share-btn" type="button" class="outline secondary"
                     title="Copy shareable URL to clipboard"
-                    style="width:auto;margin:0;padding:0.3rem 0.7rem;font-size:0.82rem;">Share</button>
+                    style="width:auto;margin:0;padding:0.3rem 0.7rem;font-size:0.82rem;">🔗 Share</button>
             </nav>
             <div id="results-summary" aria-live="polite"></div>
             <div class="overflow-auto">
@@ -168,26 +179,35 @@
         </section>
 
         <details id="lookup-guide" class="page-guide">
-            <summary><b>Usage</b> &hellip;</summary>
+            <summary><b>How to use RouterOS Command Lookup</b> &hellip;</summary>
+
             <article>
-                <header><strong>Controls</strong></header>
+                <header><strong>Lookup</strong></header>
                 <p>
-                    Enter a CLI path in <b>CLI Path</b> &mdash; results update automatically
-                    as you type (about 400&nbsp;ms after you stop typing). Press <kbd>Enter</kbd>
-                    to search immediately. The last segment of the path determines what comes back:
+                    Type a RouterOS CLI path &mdash; results appear as you type, about
+                    400&nbsp;ms after you stop. Press <kbd>Enter</kbd> to search immediately.
+                    The last segment determines what you get back:
                 </p>
                 <figure>
                     <pre><code>/ip/address              &larr; path: lists available commands
 /ip/address/set          &larr; command: lists its attributes
 /ip/address/set + address  &larr; attribute: shows the type hint</code></pre>
                     <figcaption>
-                        <small>Path goes in <b>CLI Path</b>, attribute (if any) in <b>Attribute</b>.</small>
+                        <small>Path goes in <b>CLI Path</b>. If you want to inspect a
+                        specific attribute, enter its name in <b>Attribute</b>.</small>
                     </figcaption>
                 </figure>
                 <p>
-                    <b>Version</b> picks which RouterOS release to search. Toggle
-                    <mark>check all versions</mark> to scan every published release at once.
-                    <mark>include testing</mark> adds beta and RC builds to the version list.
+                    <b>Clear</b> resets both fields so you can start a new search.
+                    <b>Share</b> copies a direct link capturing your path, attribute,
+                    version, and all toggles.
+                </p>
+            </article>
+
+            <article>
+                <header><strong>Version Checking</strong></header>
+                <p>
+                    <b>Version</b> picks which RouterOS release to search.
                 </p>
                 <p>
                     <mark>extra-packages</mark> searches schemas built with the full
@@ -197,11 +217,22 @@
                     <kbd>rose-storage</kbd>, <kbd>ups</kbd>, <kbd>wifi-qcom</kbd>,
                     <kbd>wifi-qcom-ac</kbd>, <kbd>zerotier</kbd>, <kbd>calea</kbd>,
                     and <kbd>gps</kbd> (package list as of 7.22).
-                    Without this toggle, results reflect the base CHR image only.
+                    Without this toggle, only the base CHR image is searched.
                 </p>
                 <p>
-                    The <b>Share</b> button copies a direct link to your current search
-                    &mdash; version, path, attribute, and all toggle states are captured in the URL.
+                    <mark>check all versions</mark> scans every published release at once.
+                    <mark>include testing</mark> adds beta and RC builds to the version list
+                    and automatically enables all-version scanning.
+                </p>
+            </article>
+
+            <article>
+                <header><strong>Understanding Results</strong></header>
+                <p>
+                    Each version links to its MikroTik release notes. The last column
+                    shows what the lookup found &mdash; child <b>commands</b> when you
+                    search a path, <b>attributes</b> when you search a command, or a
+                    <b>type hint</b> when you search a specific attribute.
                 </p>
                 <footer>
                     <small>
@@ -664,6 +695,17 @@
             // Return version to apply after rebuildVersionSelect()
             return (version && !checkAllVersions.checked) ? version : null
         }
+
+        // Clear button: reset inputs and hide results
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            cmdPathInput.value = ''
+            attrInput.value = ''
+            resultsSection.hidden = true
+            resultsSummary.innerHTML = ''
+            resultsBody.innerHTML = ''
+            history.replaceState(null, '', window.location.pathname)
+            cmdPathInput.focus()
+        })
 
         // Share button: copy URL to clipboard with "Copied!" feedback
         const shareBtn = document.getElementById('share-btn')
