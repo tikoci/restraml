@@ -491,11 +491,15 @@
             for (const key of pathKeys) {
                 if (!node) return null
                 node = resolveRef(root, node)
-                // Merge allOf/anyOf/oneOf for property lookup
                 const merged = mergeSchema(root, node)
                 const props = merged?.properties || {}
                 if (props[key]) {
                     node = resolveRef(root, props[key])
+                } else if (merged?.patternProperties) {
+                    // Arbitrary-key objects (services, configs, volumes): match against patterns
+                    const patEntries = Object.entries(merged.patternProperties)
+                    const match = patEntries.find(([pat]) => { try { return new RegExp(pat).test(key) } catch (_) { return false } })
+                    node = resolveRef(root, (match ?? patEntries[0])?.[1])
                 } else if (merged?.additionalProperties && typeof merged.additionalProperties === 'object') {
                     node = resolveRef(root, merged.additionalProperties)
                 } else if (merged?.items) {
@@ -537,7 +541,7 @@
             if (!root) return
 
             completionDisposable = monaco.languages.registerCompletionItemProvider('yaml', {
-                triggerCharacters: [' ', '\n', '-'],
+                triggerCharacters: [' ', '-'],
                 provideCompletionItems(model, position) {
                     const line = model.getLineContent(position.lineNumber)
                     const lineBefore = line.substring(0, position.column - 1)
@@ -1080,6 +1084,9 @@
                     renderWhitespace: 'boundary',
                     glyphMargin: true,
                     folding: true,
+                    wordBasedSuggestions: 'off',
+                    acceptSuggestionOnEnter: 'on',
+                    tabCompletion: 'on',
                     quickSuggestions: { other: true, comments: false, strings: true },
                     suggestOnTriggerCharacters: true,
                 })
