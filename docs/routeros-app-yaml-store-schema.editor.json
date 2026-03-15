@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tikoci.github.io/restraml/routeros-app-yaml-store-schema.editor.json",
+  "title": "RouterOS /app Store YAML",
+  "description": "Array of RouterOS /app definitions for use with `app-store-urls=`. Editor-friendly variant: relaxed port validation, case-insensitive env var names.",
+  "$comment": "SchemaStore submission target. Each array item validates against routeros-app-yaml-schema.editor.json.",
+  "type": "array",
+  "items": {
+    "$ref": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.editor.json"
+  }
+}

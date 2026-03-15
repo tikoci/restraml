@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.editor.json",
+  "title": "RouterOS /app YAML",
+  "description": "MikroTik RouterOS /app container application definition (7.22+). Editor-friendly variant: relaxed port validation (no regex), case-insensitive env var names. Use routeros-app-yaml-schema.latest.json for strict CI validation.",
+  "$comment": "SchemaStore submission target. Differences from .latest.json: (1) ports items have no pattern (see per-item $comment for strict regex); (2) environment patternProperties allows lowercase names.",
+  "type": "object",
+  "required": ["services"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique /app identifier"
+    },
+    "descr": {
+      "type": "string",
+      "description": "Human-readable description shown in the app UI"
+    },
+    "page": {
+      "type": "string",
+      "format": "uri",
+      "description": "Project homepage URL"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "productivity",
+        "storage",
+        "networking",
+        "development",
+        "communication",
+        "file-management",
+        "search",
+        "video",
+        "media",
+        "media-management",
+        "home-automation",
+        "monitoring",
+        "database",
+        "automation",
+        "ai",
+        "messaging",
+        "radio",
+        "security"
+      ],
+      "description": "App store category. Validated against RouterOS-accepted values; build CI raises an issue when new categories appear."
+    },
+    "icon": {
+      "type": "string",
+      "format": "uri",
+      "description": "Icon image URL. With `show-in-webfig=yes`, displayed on the WebFig login screen."
+    },
+    "default-credentials": {
+      "type": ["string", "null"],
+      "description": "Credentials shown in the app UI. Format: `username:password`. Use `null` for no credentials.",
+      "examples": ["admin:admin", "admin:", null]
+    },
+    "url-path": {
+      "type": "string",
+      "description": "URL path suffix appended to the access URL for browser access",
+      "examples": ["/", "/ui", "/admin"]
+    },
+    "auto-update": {
+      "type": "boolean",
+      "description": "Pull and restart all service containers on every router boot"
+    },
+    "services": {
+      "type": "object",
+      "description": "Container services. At least one entry required.",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image"],
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image reference. Omit registry to use `registry-url` from `/container/config`.",
+              "examples": ["nginx:alpine", "ghcr.io/owner/app:latest"]
+            },
+            "container_name": {
+              "type": "string",
+              "description": "Explicit container name; also used as the base for file paths under `/container`"
+            },
+            "hostname": {
+              "type": "string",
+              "description": "Container hostname"
+            },
+            "command": {
+              "oneOf": [
+                {"type": "string"},
+                {"type": "array", "items": {"type": "string"}}
+              ],
+              "description": "Override the default container command (string or list)"
+            },
+            "ports": {
+              "type": "array",
+              "description": "Port mappings",
+              "items": {
+                "type": "string",
+                "description": "Format: `[ip:]host-port:container-port[/proto][:label]`. RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — unlike OCI/Docker where port labels are comments, in RouterOS `web` marks this port for browser forwarding and includes it in the admin URL shown in Winbox/WebFig.",
+                "$comment": "Strict pattern (used in .latest.json): ^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$",
+                "examples": [
+                  "80:80",
+                  "80:80:web",
+                  "8080:8080/tcp:rest api",
+                  "[accessIP]:[accessPort]:80:web",
+                  "127.0.0.1:9000:9000"
+                ]
+              }
+            },
+            "environment": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Map of env var name → value. Keys: letters, digits, underscore (case-sensitive).",
+                  "patternProperties": {
+                    "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+                      "oneOf": [
+                        {"type": "string"},
+                        {"type": "number"},
+                        {"type": "boolean"},
+                        {"type": "null"}
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "`KEY=value` string"
+                  }
+                },
+                {"type": "null"}
+              ],
+              "description": "Service environment variables (object, KEY=value array, or null)"
+            },
+            "volumes": {
+              "type": "array",
+              "description": "Volume mounts",
+              "items": {
+                "type": "string",
+                "description": "Format: `source:target[:options]`",
+                "examples": ["mydata:/data", "/host/path:/container/path:ro"]
+              }
+            },
+            "configs": {
+              "type": "array",
+              "description": "Config file mounts. Each `source` must match a top-level `configs` key.",
+              "items": {
+                "type": "object",
+                "required": ["source", "target"],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "description": "Top-level `configs` key name"
+                  },
+                  "target": {
+                    "type": "string",
+                    "description": "Absolute path inside the container"
+                  },
+                  "mode": {
+                    "type": ["integer", "string"],
+                    "description": "File permissions, octal (e.g. `0644`)"
+                  }
+                }
+              }
+            },
+            "restart": {
+              "type": "string",
+              "enum": ["no", "always", "on-failure", "unless-stopped"],
+              "description": "Container restart policy"
+            },
+            "depends_on": {
+              "oneOf": [
+                {"type": "array", "items": {"type": "string"}},
+                {"type": "object"}
+              ],
+              "description": "Start after these named services"
+            },
+            "user": {
+              "type": "string",
+              "description": "Run container as this user (name or `uid:gid`)"
+            },
+            "security_opt": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Security options (e.g. `no-new-privileges:true`)"
+            },
+            "shm_size": {
+              "type": "string",
+              "description": "Shared memory size (e.g. `128m`, `1g`)"
+            },
+            "stop_grace_period": {
+              "type": "string",
+              "description": "Wait this long before sending SIGKILL (e.g. `10s`, `1m30s`)"
+            }
+          }
+        }
+      }
+    },
+    "volumes": {
+      "type": "object",
+      "description": "Named volume definitions. Referenced by service `volumes` entries.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": ["object", "null"]
+        }
+      }
+    },
+    "networks": {
+      "type": "object",
+      "description": "Network definitions",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Network name on the router"
+            },
+            "external": {
+              "type": "boolean",
+              "description": "Reference a pre-existing network rather than creating one"
+            }
+          }
+        }
+      }
+    },
+    "configs": {
+      "type": "object",
+      "description": "Config file content definitions. Each key is referenced by a service's `configs[].source`.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Inline file content injected into the container at deploy time"
+            }
+          }
+        }
+      }
+    }
+  }
+}

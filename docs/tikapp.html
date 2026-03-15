@@ -657,6 +657,7 @@
             latestStableVer = schemaVersions[0].name
             verSelect.innerHTML = ''
             verSelect.appendChild(new Option('latest', 'latest'))
+            verSelect.appendChild(new Option('editor (loose)', 'editor'))
             for (const v of schemaVersions) verSelect.appendChild(new Option(v.name, v.name))
 
             const hasDefault = [...verSelect.options].some(o => o.value === DEFAULT_VERSION)
@@ -698,7 +699,7 @@
 
         // --- Load app.json -----------------------------------------------
         async function loadAppJson(version) {
-            const ver = version === 'latest' ? latestStableVer : version
+            const ver = (version === 'latest' || version === 'editor') ? latestStableVer : version
             if (!ver) return []
             try {
                 const r = await fetch(`${RESTRAML.pagesUrl}/${ver}/app.json`)
@@ -708,8 +709,9 @@
 
         // --- Load and compile JSON schemas -------------------------------
         async function loadSchemas(version) {
-            const base = version === 'latest' ? RESTRAML.pagesUrl : `${RESTRAML.pagesUrl}/${version}`
-            const suffix = version === 'latest' ? '.latest' : ''
+            const isRoot = version === 'latest' || version === 'editor'
+            const base = isRoot ? RESTRAML.pagesUrl : `${RESTRAML.pagesUrl}/${version}`
+            const suffix = version === 'latest' ? '.latest' : version === 'editor' ? '.editor' : ''
             const schemaUrl = `${base}/routeros-app-yaml-schema${suffix}.json`
             const storeSchemaUrl = `${base}/routeros-app-yaml-store-schema${suffix}.json`
 
