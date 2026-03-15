@@ -35,6 +35,7 @@ restraml/
 │   ├── lookup.html       # RouterOS command search tool (fully event-driven, no buttons)
 │   ├── diff.html          # Schema diff tool (side-by-side / line-by-line diff between versions)
 │   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
+│   ├── restraml-shared.css # Shared CSS: fonts, logo, theme, guide, modal, utilities
 │   ├── routeros-app-yaml-schema.latest.json       # /app YAML schema (stable, public URL)
 │   ├── routeros-app-yaml-schema.dev.json          # /app YAML schema (dev/testing)
 │   ├── routeros-app-yaml-store-schema.latest.json # /app store schema (array of /app YAMLs)
@@ -240,6 +241,14 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   GitHub API fetch). All `docs/*.html` pages load this via `<script src="restraml-shared.js"></script>`.
   When modifying shared behavior, change this file — not inline copies. When creating a new page,
   include this script before page-specific code.
+- **`restraml-shared.css`** — shared CSS loaded by all pages via
+  `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`).
+  Contains: font overrides (JetBrains Mono + Manrope), inline code/kbd tightening (prevents
+  line-height bloat in paragraphs), MikroTik logo dark/light swap, theme switcher icon sizing,
+  Tools dropdown LTR fix, `.page-guide` pattern (collapsible help sections), `.share-modal`
+  styling, and utility classes (`.ml-1`, `.text-right`, `.mt-1`, `.inline-select`,
+  `.switch-controls`, `.grid-2fr-1fr`, `.share-link`). When adding shared visual patterns,
+  add them here — not as inline styles or duplicated `<style>` blocks.
 - **Avoid submit buttons** — prefer JS event listeners (`input`, `change`, `keydown`) over explicit
   submit/lookup buttons. Use debouncing (~400 ms) for text inputs; fire immediately on `change`
   events for checkboxes and `<select>` elements. Cancellation tokens (incrementing counter compared
@@ -260,8 +269,10 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
     `testing` (true), `extra` (true)
 - **Share modal — `<dialog>` pattern**: `diff.html` and `lookup.html` include a "Share" link
-  below results that opens a `<dialog>` modal showing the current URL with a "Copy to clipboard"
-  button. Use `dialog.showModal()` / `dialog.close()`. Clicking the backdrop (`e.target === dialog`)
+  below results that opens a `<dialog class="share-modal">` modal showing the current URL with a
+  "Copy to clipboard" button. All modal styling lives in `restraml-shared.css` — use the
+  `.share-modal`, `.share-url-input`, and `.share-copy-btn` classes instead of inline styles.
+  Use `dialog.showModal()` / `dialog.close()`. Clicking the backdrop (`e.target === dialog`)
   also closes it. Use `navigator.clipboard.writeText()` for copying (works on HTTPS).
   Call `writeQueryParams()` before showing the modal in `diff.html` to ensure the URL is current.
 
@@ -302,6 +313,9 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
   `https://tikoci.github.io/restraml/{version}/schema.raml`.
 - No server-side code, no backend, no build step.
 - **Include the shared Tools nav dropdown** (see "Tools Nav Dropdown" section below) for consistent navigation.
+- Include `<link rel="stylesheet" href="restraml-shared.css">` after Pico CSS and Google Fonts,
+  before any page-specific `<style>` block. This provides fonts, logo swap, theme switcher,
+  page-guide, share-modal, and utility classes — no need to duplicate these in page styles.
 - Include `<script src="restraml-shared.js"></script>` before page-specific scripts. Call
   `initThemeSwitcher()` and optionally `initShareModal({...})`. Use `fetchVersionList()` and
   `RESTRAML.pagesUrl` from the shared utilities.
@@ -380,7 +394,7 @@ file pattern. The guide is collapsed by default so it doesn't clutter the UI for
 **Structure:**
 
 ```html
-<details id="page-guide">
+<details id="my-guide" class="page-guide">
     <summary><b>How to read this?</b> &hellip;</summary>
     <article>
         <header><strong>Section Title</strong></header>
@@ -402,19 +416,9 @@ file pattern. The guide is collapsed by default so it doesn't clutter the UI for
 brief "how the sausage is made" peek at the data source. Keep it tight — more trivia than
 architecture. The `<article>` gives Pico's card styling; `<header>` and `<footer>` add structure.
 
-**CSS required** (per page, scoped by ID):
-```css
-#page-guide summary { font-size: 0.9rem; letter-spacing: 0.02em; }
-#page-guide article { font-size: 0.88rem; margin-top: 0.5rem; }
-#page-guide article hr { margin: 0.8rem 0; }
-#page-guide pre { font-size: 0.78rem; border-left: 3px solid var(--pico-primary); }
-#page-guide .behind-curtain {
-    border-left: 3px solid var(--pico-form-element-border-color);
-    border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
-    padding: 0.6rem 1rem;
-    background: var(--pico-form-element-background-color);
-}
-```
+**CSS:** The `.page-guide` class in `restraml-shared.css` provides all guide styling (summary font,
+article sizing, `pre` left-border, `.behind-curtain` callout). No per-page CSS needed — just add
+`class="page-guide"` to the `<details>` element.
 
 **"Found a bug?" and README links** live inside the guide's `<footer>`, not as a standalone
 section — keeps the page clean when the guide is collapsed.
@@ -595,3 +599,4 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `qemu-system-x86_64` | `Dockerfile.chr-qemu` (Alpine apk) | Runs RouterOS CHR VM in local Docker |
 | `qemu-img` | `Dockerfile.chr-qemu` (Alpine apk) | Provides `qemu-img` for VDI→qcow2 conversion |
 | `restraml-shared.js` | `docs/*.html` pages | Shared JS: version parsing, theme switcher, share modal, GitHub API fetch |
+| `restraml-shared.css` | `docs/*.html` pages | Shared CSS: fonts, logo swap, theme icon, page-guide, share-modal, utility classes |

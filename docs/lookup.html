@@ -23,73 +23,10 @@
       plausible.init()
     </script>
 
+    <!-- Shared styles (fonts, logo, theme switcher, utilities) -->
+    <link rel="stylesheet" href="restraml-shared.css">
+
     <style>
-        :root {
-            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
-            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
-            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
-        }
-
-        /* Tools dropdown: force LTR on items so leading slash in "/app Editor"
-           doesn't migrate to end in the RTL-aligned container */
-        details.dropdown ul li { direction: ltr; }
-
-        header nav li a svg {
-            width: var(--font-size);
-            height: var(--font-size);
-            color: var(--contrast);
-        }
-
-        /* MikroTik logo: always left-aligned; default shows light logo only.
-           Dark logo appears only in explicit dark or OS-dark auto mode. */
-        img[data-theme=dark] { display: none; }
-        [data-theme=dark] img[data-theme=dark] { display: inline; }
-        [data-theme=dark] img[data-theme=light] { display: none; }
-        [data-theme=light] img[data-theme=dark] { display: none; }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
-        }
-
-        /* MikroTik logo sizing */
-        header nav img[data-theme] {
-            height: 2rem;
-            width: auto;
-        }
-
-        /* Compact, consistent switch labels */
-        #lookup-controls label {
-            font-size: 0.78rem;
-            font-style: italic;
-            white-space: nowrap;
-        }
-        #lookup-controls label code {
-            font-style: normal;
-            font-size: inherit;
-        }
-        #lookup-controls ul:last-child li + li { margin-left: 0.5rem; }
-
-        /* Lookup guide (collapsed help section) */
-        #lookup-guide summary {
-            font-size: 0.9rem;
-            letter-spacing: 0.02em;
-        }
-        #lookup-guide article {
-            font-size: 0.88rem;
-            margin-top: 0.5rem;
-        }
-        #lookup-guide article hr { margin: 0.8rem 0; }
-        #lookup-guide pre {
-            font-size: 0.78rem;
-            border-left: 3px solid var(--pico-primary);
-        }
-        #lookup-guide .behind-curtain {
-            border-left: 3px solid var(--pico-form-element-border-color);
-            border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
-            padding: 0.6rem 1rem;
-            background: var(--pico-form-element-background-color);
-        }
-
         #results-table td:first-child,
         #results-table th:first-child {
             white-space: nowrap;
@@ -163,7 +100,7 @@
         <section>
             <h3>Lookup RouterOS Command</h3>
 
-            <div class="grid" style="grid-template-columns: 2fr 1fr">
+            <div class="grid grid-2fr-1fr">
                 <label>
                     CLI Path <small>(with <em>optional</em> command)</small>
                     <input type="text" id="input-cmdpath" placeholder="/ip/address/set" value="/ip/address/set"
@@ -176,7 +113,7 @@
                 </label>
             </div>
 
-            <nav id="lookup-controls">
+            <nav id="lookup-controls" class="switch-controls">
                 <ul>
                     <li>
                         <select id="version-select" aria-label="RouterOS version to check">
@@ -223,12 +160,12 @@
                     <tbody id="results-body"></tbody>
                 </table>
             </div>
-            <div style="margin-top:1rem; text-align:right">
-                <a href="#" id="share-link" style="font-size:0.9em">🔗 Share this lookup</a>
+            <div class="mt-1 text-right">
+                <a href="#" id="share-link" class="share-link">🔗 Share this lookup</a>
             </div>
         </section>
 
-        <details id="lookup-guide">
+        <details id="lookup-guide" class="page-guide">
             <summary><b>How does this work?</b> &hellip;</summary>
             <article>
                 <p>
@@ -278,15 +215,15 @@
     </footer>
 
     <!-- Share modal -->
-    <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">
-        <article style="margin:0">
-            <header style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.75rem">
+    <dialog id="share-modal" class="share-modal">
+        <article>
+            <header>
                 <strong>Share this lookup</strong>
                 <a href="#" id="share-modal-close" aria-label="Close">✕</a>
             </header>
-            <input id="share-url" type="text" readonly style="font-size:0.8em; font-family:var(--pico-font-family-monospace)" aria-label="Shareable URL">
-            <footer style="display:flex; justify-content:flex-end; gap:0.5rem; padding-top:0.75rem">
-                <button id="share-copy" class="secondary" style="width:auto">Copy to clipboard</button>
+            <input id="share-url" class="share-url-input" type="text" readonly aria-label="Shareable URL">
+            <footer>
+                <button id="share-copy" class="secondary share-copy-btn">Copy to clipboard</button>
             </footer>
         </article>
     </dialog>

@@ -23,28 +23,10 @@
       plausible.init()
     </script>
 
+    <!-- Shared styles (fonts, logo, theme switcher, utilities) -->
+    <link rel="stylesheet" href="restraml-shared.css">
+
     <style>
-        :root {
-            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
-            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
-            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
-        }
-
-        /* MikroTik logo swap */
-        img[data-theme=dark] { display: none; }
-        [data-theme=dark] img[data-theme=dark] { display: inline; }
-        [data-theme=dark] img[data-theme=light] { display: none; }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
-        }
-        header nav img[data-theme] { height: 2rem; width: auto; }
-
-        header nav li a svg { width: var(--font-size); height: var(--font-size); color: var(--contrast); }
-
-        /* LTR items in dropdown */
-        details.dropdown ul li { direction: ltr; }
-
         /* Manual-specific styles */
         .manual-hero {
             background: var(--pico-form-element-background-color);

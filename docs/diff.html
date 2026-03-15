@@ -32,35 +32,10 @@
     <!-- diff2html for side-by-side HTML rendering -->
     <script src="https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/js/diff2html.min.js"></script>
 
+    <!-- Shared styles (fonts, logo, theme switcher, utilities) -->
+    <link rel="stylesheet" href="restraml-shared.css">
+
     <style>
-        :root {
-            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
-            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
-            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
-        }
-
-        /* Tools dropdown: force LTR on items so leading slash in "/app Editor"
-           doesn't migrate to end in the RTL-aligned container */
-        details.dropdown ul li { direction: ltr; }
-
-        /* Dark mode theme switcher icon sizing */
-        header nav li a svg {
-            width: var(--font-size);
-            height: var(--font-size);
-            color: var(--contrast);
-        }
-
-        /* MikroTik logo: always left-aligned; default shows light logo only.
-           Dark logo appears only in explicit dark or OS-dark auto mode. */
-        img[data-theme=dark] { display: none; }
-        [data-theme=dark] img[data-theme=dark] { display: inline; }
-        [data-theme=dark] img[data-theme=light] { display: none; }
-        [data-theme=light] img[data-theme=dark] { display: none; }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
-        }
-
         /* diff2html font overrides */
         .d2h-wrapper {
             font-family: var(--pico-font-family-monospace);
@@ -148,32 +123,6 @@
         /* Hide @@ hunk marker rows when .hide-markers is active */
         #diffoutput.hide-markers tr:has(td.d2h-info) { display: none; }
 
-        /* MikroTik logo sizing */
-        header nav img[data-theme] {
-            height: 2rem;
-            width: auto;
-        }
-
-        /* Diff guide (collapsed help section) */
-        #diff-guide summary {
-            font-size: 0.9rem;
-            letter-spacing: 0.02em;
-        }
-        #diff-guide article {
-            font-size: 0.88rem;
-            margin-top: 0.5rem;
-        }
-        #diff-guide article hr { margin: 0.8rem 0; }
-        #diff-guide pre {
-            font-size: 0.78rem;
-            border-left: 3px solid var(--pico-primary);
-        }
-        #diff-guide .behind-curtain {
-            border-left: 3px solid var(--pico-form-element-border-color);
-            border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
-            padding: 0.6rem 1rem;
-            background: var(--pico-form-element-background-color);
-        }
     </style>
 </head>
 
@@ -232,7 +181,7 @@
                         <input id="diffextra" type="checkbox" role="switch" checked>
                         <i>with</i> <code>extra-packages</code>
                     </label>
-                    <label style="margin-left:1rem">
+                    <label class="ml-1">
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
@@ -267,17 +216,17 @@
             <div id="diff-options" hidden>
                 <small>
                     Show
-                    <select id="diffFormat" style="display:inline-block; width:auto; padding:0.15em 0.4em; font-size:0.85em; margin:0 0.2rem; vertical-align:baseline">
+                    <select id="diffFormat" class="inline-select">
                         <option value="side-by-side">side-by-side</option>
                         <option value="line-by-line">line-by-line</option>
                     </select>
                     with
-                    <select id="diffContext" style="display:inline-block; width:auto; padding:0.15em 0.4em; font-size:0.85em; margin:0 0.2rem; vertical-align:baseline">
+                    <select id="diffContext" class="inline-select">
                         <option value="0" selected>no</option>
                         <option value="3">+/- 3 lines</option>
                     </select>
                     context
-                    <select id="diffHunks" style="display:inline-block; width:auto; padding:0.15em 0.4em; font-size:0.85em; margin:0 0.2rem; vertical-align:baseline">
+                    <select id="diffHunks" class="inline-select">
                         <option value="showing" selected>showing</option>
                         <option value="hiding">hiding</option>
                     </select>
@@ -291,13 +240,13 @@
 
             <div id="diffcodedetails" hidden>
                 <div id="diffoutput"></div>
-                <div id="share-section" style="margin-top:1.5rem; text-align:right">
-                    <a href="#" id="share-link" style="font-size:0.9em">🔗 Share this diff</a>
+                <div id="share-section" class="mt-1-5 text-right">
+                    <a href="#" id="share-link" class="share-link">🔗 Share this diff</a>
                 </div>
             </div>
         </section>
 
-        <details id="diff-guide">
+        <details id="diff-guide" class="page-guide">
             <summary><b>How to read this?</b> &hellip;</summary>
             <article>
                 <header>
@@ -376,15 +325,15 @@
     </footer>
 
     <!-- Share modal -->
-    <dialog id="share-modal" style="max-width:36rem; width:90%; border-radius:0.5rem; padding:1.5rem">
-        <article style="margin:0">
-            <header style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.75rem">
+    <dialog id="share-modal" class="share-modal">
+        <article>
+            <header>
                 <strong>Share this diff</strong>
                 <a href="#" id="share-modal-close" aria-label="Close">✕</a>
             </header>
-            <input id="share-url" type="text" readonly style="font-size:0.8em; font-family:var(--pico-font-family-monospace)" aria-label="Shareable URL">
-            <footer style="display:flex; justify-content:flex-end; gap:0.5rem; padding-top:0.75rem">
-                <button id="share-copy" class="secondary" style="width:auto">Copy to clipboard</button>
+            <input id="share-url" class="share-url-input" type="text" readonly aria-label="Shareable URL">
+            <footer>
+                <button id="share-copy" class="secondary share-copy-btn">Copy to clipboard</button>
             </footer>
         </article>
     </dialog>

@@ -47,42 +47,10 @@
         integrity="sha512-fdudyA6TY0Kv3vTiHyZj6wkhDbmZFCflZmxtiC/lR5xRNQJaF7ODChpx0ajIIeFBBtaucDolRB1qG0r/U7eYSg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-    <!-- Font overrides for Pico CSS -->
+    <!-- Shared styles (fonts, logo, theme switcher, utilities) -->
+    <link rel="stylesheet" href="restraml-shared.css">
+
     <style>
-        :root {
-            --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
-            --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
-            --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
-        }
-
-        /* Tools dropdown: force LTR on items so leading slash in "/app Editor"
-           doesn't migrate to end in the RTL-aligned container */
-        details.dropdown ul li { direction: ltr; }
-
-        /* Dark mode theme switcher icon sizing */
-        header nav li a svg {
-            width: var(--font-size);
-            height: var(--font-size);
-            color: var(--contrast);
-        }
-
-        /* MikroTik logo: always left-aligned; default shows light logo only.
-           Dark logo appears only in explicit dark or OS-dark auto mode. */
-        img[data-theme=dark] { display: none; }
-        [data-theme=dark] img[data-theme=dark] { display: inline; }
-        [data-theme=dark] img[data-theme=light] { display: none; }
-        [data-theme=light] img[data-theme=dark] { display: none; }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
-            :root:not([data-theme=light]) img[data-theme=light] { display: none; }
-        }
-
-        /* MikroTik logo sizing */
-        header nav img[data-theme] {
-            height: 2rem;
-            width: auto;
-        }
-
         /* Version table link styles */
         .cell-vername a:link,
         .cell-vername a:visited {
@@ -159,7 +127,7 @@
                         <input id="diffextra" type="checkbox" role="switch" checked>
                         <i>with</i> <code>extra-packages</code>
                     </label>
-                    <label style="margin-left:1rem">
+                    <label class="ml-1">
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>

@@ -91,6 +91,9 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **Client-side SPA** — no backend, no server-side code. GitHub Pages is static hosting only.
 - **GitHub API/GraphQL** — use for dynamic data (version lists, schema contents, inspect JSON).
 - **Single `.html` file** — keep JS inline unless there is a very strong reason for separation.
+- **`restraml-shared.css`** — all pages load shared CSS (fonts, logo swap, theme icon, page-guide,
+  share-modal, utility classes) via `<link rel="stylesheet" href="restraml-shared.css">` after
+  Pico CSS and before page `<style>`. Shared visual patterns go here, not inline.
 - **`restraml-shared.js`** — all pages load shared utilities (version parsing, theme switcher,
   share modal, GitHub API fetch) via `<script src="restraml-shared.js"></script>`. Modify shared
   behavior in this file, not inline. New pages must include this script.
@@ -116,7 +119,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 ### Create a custom docs page (from a GitHub Issue)
 1. Read the issue for the desired feature/view.
 2. Create `docs/{custom-name}.html` following the web page conventions above.
-3. Include `<script src="restraml-shared.js"></script>` and call `initThemeSwitcher()`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns.
+3. Include `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`) and `<script src="restraml-shared.js"></script>`. Call `initThemeSwitcher()` and optionally `initShareModal({...})`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns.
 4. Add the shared **Tools nav dropdown** to the new page (see `CLAUDE.md` → "Tools Nav Dropdown").
 5. Also add the new page to the dropdown list in `index.html`, `lookup.html`, and `diff.html`.
 6. Keep all JS in the single HTML file.
@@ -169,5 +172,6 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `.github/workflows/appyamlschemas.yaml` | Build: validate and publish /app YAML schemas per-version |
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `docs/restraml-shared.js` | Shared JS utilities for all tool pages (version parsing, theme, share modal) |
+| `docs/restraml-shared.css` | Shared CSS for all tool pages (fonts, logo, theme, guide, modal, utilities) |
 | `CLAUDE.md` | Full architecture guide for AI agents |
 | `AGENTS.md` | This file — Copilot agent-specific instructions |

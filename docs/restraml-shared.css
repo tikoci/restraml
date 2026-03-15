@@ -1,0 +1,205 @@
+/* =====================================================================
+ * restraml-shared.css — Shared styles for all docs/*.html tool pages
+ *
+ * AGENTS: This file contains CSS shared across ALL tool pages.
+ * Page-specific styles (diff2html overrides, Monaco editor layout,
+ * tikapp toolbar, etc.) stay inline in each HTML file.
+ *
+ * When adding a new docs/*.html page, include this stylesheet via:
+ *   <link rel="stylesheet" href="restraml-shared.css">
+ * Load it AFTER Pico CSS and Google Fonts, BEFORE page-specific <style>.
+ *
+ * This file is organized into these sections:
+ *   1. Font overrides (JetBrains Mono + Manrope over Pico defaults)
+ *   2. Inline code/kbd tightening (fix line-height bloat in paragraphs)
+ *   3. MikroTik logo dark/light swap
+ *   4. Theme switcher icon sizing
+ *   5. Tools nav dropdown LTR fix
+ *   6. Page guide pattern (collapsible help sections)
+ *   7. Share modal styling
+ *   8. Utility classes (inline style="" replacements)
+ *   9. Site footer
+ * ===================================================================== */
+
+
+/* -----------------------------------------------------------------
+ * 1. Font overrides
+ *    JetBrains Mono as the primary body font; Manrope as sans-serif
+ *    fallback. These override Pico's default system font stacks.
+ * ----------------------------------------------------------------- */
+:root {
+    --pico-font-family-sans-serif: Manrope, system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--pico-font-family-emoji);
+    --pico-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--pico-font-family-emoji);
+    --pico-font-family: "JetBrains Mono", var(--pico-font-family-sans-serif);
+}
+
+
+/* -----------------------------------------------------------------
+ * 2. Inline code/kbd tightening
+ *    Pico adds vertical padding to inline <code> and <kbd> which
+ *    inflates line-height in running text. These rules reduce the
+ *    padding so code spans sit flush within paragraph lines.
+ *    Block-level <pre><code> is not affected (no extra padding there).
+ * ----------------------------------------------------------------- */
+:not(pre) > code,
+:not(pre) > kbd {
+    padding: 0.05em 0.3em;
+    vertical-align: baseline;
+}
+
+
+/* -----------------------------------------------------------------
+ * 3. MikroTik logo dark/light swap
+ *    Two <img data-theme="dark|light"> sit in the nav. CSS controls
+ *    which one is visible based on the current theme state.
+ *    Default (no data-theme on <html>): show light logo only.
+ *    Dark logo appears in explicit dark or OS-dark auto mode.
+ * ----------------------------------------------------------------- */
+img[data-theme=dark] { display: none; }
+[data-theme=dark] img[data-theme=dark] { display: inline; }
+[data-theme=dark] img[data-theme=light] { display: none; }
+[data-theme=light] img[data-theme=dark] { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) img[data-theme=dark] { display: inline; }
+    :root:not([data-theme=light]) img[data-theme=light] { display: none; }
+}
+
+header nav img[data-theme] {
+    height: 2rem;
+    width: auto;
+}
+
+
+/* -----------------------------------------------------------------
+ * 4. Theme switcher icon sizing
+ *    The sun/moon/half-circle SVG in the nav header.
+ * ----------------------------------------------------------------- */
+header nav li a svg {
+    width: var(--font-size);
+    height: var(--font-size);
+    color: var(--contrast);
+}
+
+
+/* -----------------------------------------------------------------
+ * 5. Tools nav dropdown LTR fix
+ *    The dropdown uses dir="rtl" on <ul> for right-alignment, but
+ *    items like "/app Editor" need LTR so the leading slash doesn't
+ *    migrate to the end of the text.
+ * ----------------------------------------------------------------- */
+details.dropdown ul li { direction: ltr; }
+
+
+/* -----------------------------------------------------------------
+ * 6. Page guide pattern (collapsible help sections)
+ *    Used by lookup.html (#lookup-guide) and diff.html (#diff-guide).
+ *    Scope via .page-guide class instead of page-specific IDs so
+ *    any page can reuse the pattern.
+ * ----------------------------------------------------------------- */
+.page-guide summary {
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+}
+.page-guide article {
+    font-size: 0.88rem;
+    margin-top: 0.5rem;
+}
+.page-guide article hr { margin: 0.8rem 0; }
+.page-guide pre {
+    font-size: 0.78rem;
+    border-left: 3px solid var(--pico-primary);
+}
+.page-guide .behind-curtain {
+    border-left: 3px solid var(--pico-form-element-border-color);
+    border-radius: 0 var(--pico-border-radius) var(--pico-border-radius) 0;
+    padding: 0.6rem 1rem;
+    background: var(--pico-form-element-background-color);
+}
+
+
+/* -----------------------------------------------------------------
+ * 7. Share modal styling
+ *    Replaces inline style="" attributes on <dialog> and its children.
+ *    Used by lookup.html and diff.html.
+ * ----------------------------------------------------------------- */
+dialog.share-modal {
+    max-width: 36rem;
+    width: 90%;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+dialog.share-modal > article {
+    margin: 0;
+}
+dialog.share-modal > article > header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.75rem;
+}
+dialog.share-modal > article > footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+}
+dialog.share-modal .share-url-input {
+    font-size: 0.8em;
+    font-family: var(--pico-font-family-monospace);
+}
+dialog.share-modal .share-copy-btn {
+    width: auto;
+}
+
+
+/* -----------------------------------------------------------------
+ * 8. Utility classes
+ *    Replace common inline style="" patterns with reusable classes.
+ * ----------------------------------------------------------------- */
+
+/* margin-left spacer for adjacent switch labels */
+.ml-1 { margin-left: 1rem; }
+
+/* Right-aligned share/action link below results */
+.text-right { text-align: right; }
+.mt-1 { margin-top: 1rem; }
+.mt-1-5 { margin-top: 1.5rem; }
+
+/* Share link styling */
+.share-link { font-size: 0.9em; }
+
+/* Inline compact select (used in diff options row) */
+.inline-select {
+    display: inline-block;
+    width: auto;
+    padding: 0.15em 0.4em;
+    font-size: 0.85em;
+    margin: 0 0.2rem;
+    vertical-align: baseline;
+}
+
+/* Compact, consistent switch labels in control navs */
+.switch-controls label {
+    font-size: 0.78rem;
+    font-style: italic;
+    white-space: nowrap;
+}
+.switch-controls label code {
+    font-style: normal;
+    font-size: inherit;
+}
+.switch-controls ul:last-child li + li { margin-left: 0.5rem; }
+
+/* 2fr/1fr grid layout (e.g. lookup path+attr inputs) */
+.grid-2fr-1fr {
+    grid-template-columns: 2fr 1fr;
+}
+
+
+/* -----------------------------------------------------------------
+ * 9. Site footer
+ *    Consistent disclaimer across all pages.
+ * ----------------------------------------------------------------- */
+body > footer small {
+    font-style: italic;
+}
