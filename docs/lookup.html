@@ -100,7 +100,7 @@
         <section>
             <h3>Lookup RouterOS Command</h3>
 
-            <div class="grid grid-2fr-1fr">
+            <div class="grid" style="grid-template-columns: 55% 27% 17%; gap: 0.5rem;">
                 <label>
                     CLI Path <small>(with <em>optional</em> command)</small>
                     <input type="text" id="input-cmdpath" placeholder="/ip/address/set" value="/ip/address/set"
@@ -111,16 +111,16 @@
                     <input type="text" id="input-attr"
                         aria-label="RouterOS attribute name (optional)">
                 </label>
+                <label>
+                    Version
+                    <select id="version-select" aria-label="RouterOS version to check">
+                        <option value="" disabled selected>Loading&hellip;</option>
+                    </select>
+                </label>
             </div>
 
             <nav id="lookup-controls" class="switch-controls">
-                <ul>
-                    <li>
-                        <select id="version-select" aria-label="RouterOS version to check">
-                            <option value="" disabled selected>Loading versions&hellip;</option>
-                        </select>
-                    </li>
-                </ul>
+                <ul></ul>
                 <ul>
                     <li>
                         <label>
@@ -146,7 +146,12 @@
 
         <!-- Results -->
         <section id="results-section" hidden>
-            <h3>Results</h3>
+            <nav style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+                <h3 style="margin:0">Results</h3>
+                <button id="share-btn" type="button" class="outline secondary"
+                    title="Copy shareable URL to clipboard"
+                    style="width:auto;margin:0;padding:0.3rem 0.7rem;font-size:0.82rem;">Share</button>
+            </nav>
             <div id="results-summary" aria-live="polite"></div>
             <div class="overflow-auto">
                 <table id="results-table">
@@ -154,52 +159,56 @@
                         <tr>
                             <th scope="col">Version</th>
                             <th scope="col">Status</th>
-                            <th scope="col">Details</th>
+                            <th scope="col" id="details-col-header">Details</th>
                         </tr>
                     </thead>
                     <tbody id="results-body"></tbody>
                 </table>
             </div>
-            <div class="mt-1 text-right">
-                <a href="#" id="share-link" class="share-link">🔗 Share this lookup</a>
-            </div>
         </section>
 
         <details id="lookup-guide" class="page-guide">
-            <summary><b>How does this work?</b> &hellip;</summary>
+            <summary><b>Usage</b> &hellip;</summary>
             <article>
+                <header><strong>Controls</strong></header>
                 <p>
-                    Type a CLI path &mdash; results update as you type.
-                    The last segment determines what you get back:
+                    Enter a CLI path in <b>CLI Path</b> &mdash; results update automatically
+                    as you type (about 400&nbsp;ms after you stop typing). Press <kbd>Enter</kbd>
+                    to search immediately. The last segment of the path determines what comes back:
                 </p>
                 <figure>
-                    <pre><code>/ip/address              &larr; path: lists commands
-/ip/address/set          &larr; command: lists attributes
-/ip/address/set + address  &larr; attribute: shows type hint</code></pre>
+                    <pre><code>/ip/address              &larr; path: lists available commands
+/ip/address/set          &larr; command: lists its attributes
+/ip/address/set + address  &larr; attribute: shows the type hint</code></pre>
                     <figcaption>
-                        <small>Path goes in the first field, attribute (if any) in the second.</small>
+                        <small>Path goes in <b>CLI Path</b>, attribute (if any) in <b>Attribute</b>.</small>
                     </figcaption>
                 </figure>
                 <p>
-                    <mark>extra-packages</mark> includes <kbd>container</kbd>,
-                    <kbd>iot</kbd>, etc.
-                    <mark>check all versions</mark> scans every release.
-                    <mark>testing</mark> adds beta/RC builds.
+                    <b>Version</b> picks which RouterOS release to search. Toggle
+                    <mark>check all versions</mark> to scan every published release at once.
+                    <mark>include testing</mark> adds beta and RC builds to the version list.
                 </p>
-                <hr>
-                <div class="behind-curtain">
-                    <small>
-                        <b>Behind the curtain</b> &mdash;
-                        same <code>/console/inspect</code> data as
-                        <a href="diff.html">Schema&nbsp;Diff</a>.
-                        A real RouterOS CHR boots in CI, the command tree is walked
-                        via REST, and published as <code>inspect.json</code> per version.
-                    </small>
-                </div>
+                <p>
+                    <mark>extra-packages</mark> searches schemas built with the full
+                    <kbd>all_packages</kbd> bundle, which adds:
+                    <kbd>container</kbd>, <kbd>dude</kbd>, <kbd>iot</kbd>, <kbd>lora</kbd>,
+                    <kbd>openflow</kbd>, <kbd>tr069-client</kbd>, <kbd>user-manager</kbd>,
+                    <kbd>rose-storage</kbd>, <kbd>ups</kbd>, <kbd>wifi-qcom</kbd>,
+                    <kbd>wifi-qcom-ac</kbd>, <kbd>zerotier</kbd>, <kbd>calea</kbd>,
+                    and <kbd>gps</kbd> (package list as of 7.22).
+                    Without this toggle, results reflect the base CHR image only.
+                </p>
+                <p>
+                    The <b>Share</b> button copies a direct link to your current search
+                    &mdash; version, path, attribute, and all toggle states are captured in the URL.
+                </p>
                 <footer>
                     <small>
-                        💬 <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a>
-                        &mdash; bugs and ideas welcome.
+                        Data comes from <code>/console/inspect</code> &mdash; the same
+                        introspection endpoint behind WinBox&rsquo;s sidebar tree. A real
+                        RouterOS CHR boots in CI for each release, every API branch is walked
+                        via REST, and the result is published as <code>inspect.json</code>.
                         &nbsp;&middot;&nbsp;
                         <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                         for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>
@@ -208,25 +217,18 @@
             </article>
         </details>
 
+        <section>
+            <article>
+                <small>💬 <strong>Found a bug? Want a feature? Need a specific version built?</strong>
+                Everything is tracked on GitHub —
+                <a href="https://github.com/tikoci/restraml/issues/new/choose">open an issue</a>.</small>
+            </article>
+        </section>
     </main>
 
     <footer class="container">
         <small><em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small>
     </footer>
-
-    <!-- Share modal -->
-    <dialog id="share-modal" class="share-modal">
-        <article>
-            <header>
-                <strong>Share this lookup</strong>
-                <a href="#" id="share-modal-close" aria-label="Close">✕</a>
-            </header>
-            <input id="share-url" class="share-url-input" type="text" readonly aria-label="Shareable URL">
-            <footer>
-                <button id="share-copy" class="secondary share-copy-btn">Copy to clipboard</button>
-            </footer>
-        </article>
-    </dialog>
 
     <!--
         ========================================================================
@@ -331,9 +333,9 @@
                     const desc = (argNode && typeof argNode === 'object' && argNode.desc)
                         ? String(argNode.desc)
                         : ''
-                    return { found: true, detail: desc }
+                    return { found: true, detail: desc, nodeType }
                 }
-                return { found: true, detail: args.join(', ') }
+                return { found: true, detail: args.join(', '), nodeType }
             }
 
             if (nodeType === 'dir' || nodeType === 'path') {
@@ -343,14 +345,14 @@
                 const detail = cmds.length > 0
                     ? cmds.join(', ')
                     : Object.keys(node).filter(k => !k.startsWith('_')).join(', ')
-                return { found: true, detail }
+                return { found: true, detail, nodeType }
             }
 
             // Unknown node type — treat as not found to avoid false positives
             if (!nodeType) {
                 return { found: false, detail: 'path does not point to a valid RouterOS node' }
             }
-            return { found: true, detail: nodeType }
+            return { found: true, detail: nodeType, nodeType }
         }
 
         // -----------------------------------------------------------------
@@ -447,6 +449,15 @@
 
             if (versionsToCheck.length === 0) return
 
+            // Update the Details column header based on search type
+            const detailsHeader = document.getElementById('details-col-header')
+            if (attrStr) {
+                detailsHeader.textContent = 'Attribute'
+            } else {
+                // Will be refined after first result; default label
+                detailsHeader.textContent = 'Details'
+            }
+
             // Clear previous results and show section
             resultsBody.innerHTML = ''
             resultsSummary.innerHTML = ''
@@ -461,6 +472,7 @@
 
             let foundCount = 0
             let checkedCount = 0
+            let lastNodeType = null
 
             for (const ver of versionsToCheck) {
                 if (thisId !== runLookupId) return // cancelled by a newer run
@@ -473,16 +485,43 @@
                 } catch (err) {
                     result = { found: false, error: String(err), detail: '' }
                 }
-                if (result.found) foundCount++
+                if (result.found) {
+                    foundCount++
+                    if (result.nodeType) lastNodeType = result.nodeType
+                }
                 checkedCount++
                 appendResultRow(ver, result)
             }
 
             if (thisId !== runLookupId) return // cancelled during last iteration
 
-            resultsSummary.innerHTML =
-                `<p>Found in <strong>${foundCount}</strong> of <strong>${checkedCount}</strong> version(s) checked &mdash; ` +
-                `<code>${normalizedPath}</code>${attrPart}</p>`
+            // Update column header based on what the search actually returned
+            if (!attrStr && lastNodeType === 'cmd') {
+                detailsHeader.textContent = 'Attributes'
+            } else if (!attrStr && (lastNodeType === 'dir' || lastNodeType === 'path')) {
+                detailsHeader.textContent = 'Commands'
+            }
+
+            // Build a smart summary sentence
+            const schemaLabel = useExtra ? 'extra-packages' : 'base'
+            const testingNote = showTesting ? ' (including testing)' : ''
+            let summary
+            if (!lookAll) {
+                // Single version
+                const ver = versionsToCheck[0]
+                const verb = foundCount > 0 ? 'Found' : 'Not found'
+                summary = `<p>${verb} in <strong>${ver}</strong> (${schemaLabel} schema) &mdash; ` +
+                    `<code>${normalizedPath}</code>${attrPart}</p>`
+            } else {
+                // All versions
+                const allCount = allVersions.filter(v => showTesting || !isPreRelease(v)).length
+                const scopeLabel = checkedCount === allCount
+                    ? `all ${checkedCount} ${showTesting ? 'stable and testing' : 'stable'} versions`
+                    : `${checkedCount} version${checkedCount !== 1 ? 's' : ''}`
+                summary = `<p>Found in <strong>${foundCount}</strong> of ${scopeLabel}${testingNote} ` +
+                    `(${schemaLabel} schema) &mdash; <code>${normalizedPath}</code>${attrPart}</p>`
+            }
+            resultsSummary.innerHTML = summary
 
             versionSelect.disabled = checkAllVersions.checked
 
@@ -626,10 +665,18 @@
             return (version && !checkAllVersions.checked) ? version : null
         }
 
-        // Share modal (wired up via restraml-shared.js)
-        initShareModal({
-            linkId: 'share-link', modalId: 'share-modal',
-            closeId: 'share-modal-close', copyId: 'share-copy', urlId: 'share-url'
+        // Share button: copy URL to clipboard with "Copied!" feedback
+        const shareBtn = document.getElementById('share-btn')
+        shareBtn.addEventListener('click', () => {
+            writeQueryParams()
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                const orig = shareBtn.textContent
+                shareBtn.textContent = '✓ Copied!'
+                setTimeout(() => { shareBtn.textContent = orig }, 1800)
+                plausible('Lookup Share', {})
+            }).catch(() => {
+                shareBtn.title = 'Could not copy — copy the URL from the address bar.'
+            })
         })
     </script>
 

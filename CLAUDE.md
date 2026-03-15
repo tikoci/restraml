@@ -268,13 +268,15 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
     `context` (0|3), `hunks` (showing|hiding)
   - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
     `testing` (true), `extra` (true)
-- **Share modal — `<dialog>` pattern**: `diff.html` and `lookup.html` include a "Share" link
-  below results that opens a `<dialog class="share-modal">` modal showing the current URL with a
-  "Copy to clipboard" button. All modal styling lives in `restraml-shared.css` — use the
-  `.share-modal`, `.share-url-input`, and `.share-copy-btn` classes instead of inline styles.
-  Use `dialog.showModal()` / `dialog.close()`. Clicking the backdrop (`e.target === dialog`)
-  also closes it. Use `navigator.clipboard.writeText()` for copying (works on HTTPS).
-  Call `writeQueryParams()` before showing the modal in `diff.html` to ensure the URL is current.
+- **Share button — two patterns exist**:
+  - **Preferred: inline "Copied!" button** (`lookup.html`, `tikapp.html`): A `<button>` that
+    calls `writeQueryParams()`, copies the URL via `navigator.clipboard.writeText()`, and swaps
+    its text to "✓ Copied!" for 1.8 seconds. No modal, no dialog. Place it right-aligned on the
+    same line as the Results heading. New pages should use this pattern.
+  - **Legacy: `<dialog>` modal** (`diff.html`): A "Share" link opens a `<dialog class="share-modal">`
+    with URL input and "Copy to clipboard" button, wired via `initShareModal()` from
+    `restraml-shared.js`. Styling in `restraml-shared.css`. This pattern still works but new
+    pages should prefer the inline button.
 
 ### docs/index.html — Architecture Reference
 
@@ -293,10 +295,17 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 
 `docs/lookup.html` is a fully event-driven command search tool. Key patterns:
 
+- **Inline controls layout**: CLI Path (~55%), Attribute (~27%), and Version (~17%) are on a
+  single row. Switches (extra-packages, check all versions, include testing) sit below.
 - **Combined path+cmd input**: a single text field accepts the full path including the command
   as the last segment (e.g. `/ip/address/set`). No separate path and command inputs.
 - **Dynamic, no submit button**: results update as the user types (400 ms debounce on text,
   immediate on `change` for checkboxes/selects).
+- **Smart results summary**: single-version searches name the version; multi-version searches
+  describe the scope ("all 25 stable versions"). Schema type (base/extra-packages) is stated.
+- **Dynamic column header**: the "Details" column header changes to "Attributes" (when the
+  terminal node is a command) or "Commands" (when a directory/path) based on the search result.
+- **Inline share button**: "Share" button copies the URL with "✓ Copied!" feedback (no modal).
 - **inspect.json cache**: fetched data cached per version+subdir in `inspectCache`.
 - **Cancellation tokens**: `runLookupId` counter prevents stale async results from updating DOM.
 
@@ -317,8 +326,9 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
   before any page-specific `<style>` block. This provides fonts, logo swap, theme switcher,
   page-guide, share-modal, and utility classes — no need to duplicate these in page styles.
 - Include `<script src="restraml-shared.js"></script>` before page-specific scripts. Call
-  `initThemeSwitcher()` and optionally `initShareModal({...})`. Use `fetchVersionList()` and
-  `RESTRAML.pagesUrl` from the shared utilities.
+  `initThemeSwitcher()`. For sharing, prefer the inline "Copied!" button pattern (see Share
+  button section above); `initShareModal({...})` is still available as a legacy option. Use
+  `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities.
 - Keep JavaScript in the single `.html` file (no separate `.js` files unless there is a very
   strong reason for separation).
 - Issues requesting custom views will typically describe a desired user-facing feature (e.g.,
