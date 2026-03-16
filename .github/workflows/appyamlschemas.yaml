@@ -1,4 +1,4 @@
-name: appyamlschemas — Validate and Publish /app YAML Schemas
+name: "Build: /app YAML Schemas"
 
 # Validates RouterOS /app YAML schemas and all built-in /app entries against them.
 # Generates per-version schema files under docs/<version>/ and commits to main.
@@ -222,13 +222,11 @@ jobs:
           })
           console.log('Created GitHub issue for validation failures')
 
-    - name: Fail build if /app YAML validation failed
-      if: steps.validate.outcome == 'failure'
-      run: |
-        echo "::error::/app YAML schema validation failed — see GitHub issue created above for details"
-        exit 1
-
     - name: Publish per-version /app YAML schemas to /docs
+      # Publish schemas even when /app YAML validation failed — the schemas themselves
+      # are valid JSON Schema (meta-validated in Part 1). Only some MikroTik built-in
+      # apps may not conform yet, which is tracked via the GitHub issue above.
+      if: always() && steps.connection-check.outcome == 'success'
       run: |
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
         echo "Per-version schemas written to docs/${ROSVER}/ by appyamlvalidate.js"
@@ -240,6 +238,7 @@ jobs:
         fi
 
     - name: Commit and push per-version /app YAML schemas to repository
+      if: always() && steps.connection-check.outcome == 'success'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -254,6 +253,10 @@ jobs:
           echo "No schema changes to commit — already up to date"
         else
           git commit -m "Publish ${ROSVER} /app YAML schemas [${{ github.workflow }}]"
+          # Clean up unstaged changes left by bun install so that
+          # git pull --rebase can proceed if the push is rejected.
+          git checkout -- .
+          git clean -fd
           # Retry push with pull --rebase to handle concurrent build conflicts.
           for attempt in {1..5}; do
             if git push origin main; then
@@ -277,6 +280,16 @@ jobs:
           docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-schema.json
           docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-store-schema.json
           docs/${{ steps.connection-check.outputs.rosver }}/app.json
+
+    - name: Fail build if /app YAML validation failed
+      # This step runs AFTER schemas are committed, so per-version schemas are always
+      # published. The failure is still reported so the workflow shows as failed and
+      # the GitHub issue (created above) prompts schema updates.
+      if: steps.validate.outcome == 'failure'
+      run: |
+        echo "::error::/app YAML schema validation failed — per-version schemas were still committed."
+        echo "::error::See the GitHub issue created above for details on which /app entries failed."
+        exit 1
 
     - name: Cleanup QEMU
       if: always()

@@ -1,8 +1,13 @@
-name: Auto-Build New RouterOS Versions
+name: "Auto-Build New RouterOS Versions"
 
 # Runs daily to check for new RouterOS versions and trigger schema builds automatically.
-# Eliminates the need to manually dispatch a workflow for every new RouterOS release.
-# Follows the same pattern as tikoci/mikropkl's auto.yaml workflow.
+# This is the "one stop shop" — it checks ALL build artifacts for every current release
+# channel version and dispatches builds for any that are missing:
+#   - Base schema: docs/{version}/schema.raml
+#   - Extra-packages schema: docs/{version}/extra/schema.raml
+#   - /app YAML schemas: docs/{version}/routeros-app-yaml-schema.json
+#
+# Can also be triggered manually to retry/fix any missing builds.
 #
 # MikroTik publishes the latest version for each channel at:
 #   https://upgrade.mikrotik.com/routeros/NEWESTa7.<channel>
@@ -10,7 +15,6 @@ name: Auto-Build New RouterOS Versions
 #
 # Stable releases (e.g. "7.22") are hosted on download.mikrotik.com.
 # Beta/rc/testing releases (e.g. "7.22rc2", "7.22beta4") are on cdn.mikrotik.com.
-# The Dockerfile handles both via a primary+fallback wget pattern.
 
 on:
   workflow_dispatch:
@@ -24,7 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Check for New RouterOS Versions
     outputs:
-      versions: ${{ steps.needs-builds.outputs.versions }}
+      base_versions: ${{ steps.needs-builds.outputs.base_versions }}
+      extra_versions: ${{ steps.needs-builds.outputs.extra_versions }}
       app_schema_versions: ${{ steps.needs-builds.outputs.app_schema_versions }}
     steps:
       - name: Checkout repository
@@ -73,12 +78,14 @@ jobs:
           echo "version=$ROSVER" >> $GITHUB_OUTPUT
           echo "Long-term: $ROSVER"
 
-      - name: Determine which versions are missing from /docs
-        # Checks if docs/{version}/schema.raml exists for each channel version.
-        # If the schema file is missing, that version needs to be built.
-        # Deduplication is applied so the same version reported by multiple channels
-        # (e.g. stable == testing) only triggers one build.
-        # Also checks for docs/{version}/routeros-app-yaml-schema.json for app YAML schema builds.
+      - name: Determine which builds are needed
+        # Checks all three build artifacts for each channel version:
+        #   1. docs/{version}/schema.raml — base schema (triggers base build)
+        #   2. docs/{version}/extra/schema.raml — extra-packages schema (triggers extra build)
+        #   3. docs/{version}/routeros-app-yaml-schema.json — /app YAML schemas (triggers app schema build)
+        # Each is tracked independently so a failed extra build can be retried without
+        # re-running the base build. Deduplication is applied so the same version reported
+        # by multiple channels only triggers one build per artifact type.
         id: needs-builds
         env:
           STABLE: ${{ steps.get-stable.outputs.version }}
@@ -86,67 +93,102 @@ jobs:
           DEVELOPMENT: ${{ steps.get-development.outputs.version }}
           LONGTERM: ${{ steps.get-longterm.outputs.version }}
         run: |
-          VERSIONS=()
+          BASE_VERSIONS=()
+          EXTRA_VERSIONS=()
           APP_SCHEMA_VERSIONS=()
+
+          # Collect unique versions across all channels
+          UNIQUE_VERSIONS=()
           for VER in "$STABLE" "$TESTING" "$DEVELOPMENT" "$LONGTERM"; do
             [ -z "$VER" ] && continue
-            # Skip duplicates — multiple channels may report the same version
             ALREADY=false
-            for V in "${VERSIONS[@]}"; do [ "$V" = "$VER" ] && ALREADY=true && break; done
+            for V in "${UNIQUE_VERSIONS[@]}"; do [ "$V" = "$VER" ] && ALREADY=true && break; done
             $ALREADY && continue
+            UNIQUE_VERSIONS+=("$VER")
+          done
+
+          for VER in "${UNIQUE_VERSIONS[@]}"; do
+            # Check base schema
             if [ ! -f "docs/${VER}/schema.raml" ]; then
-              echo "docs/${VER}/schema.raml not found — adding $VER to build list"
-              VERSIONS+=("$VER")
+              echo "docs/${VER}/schema.raml not found — $VER needs base build"
+              BASE_VERSIONS+=("$VER")
             else
-              echo "docs/${VER}/schema.raml exists — skipping $VER"
+              echo "docs/${VER}/schema.raml exists — base OK"
             fi
+
+            # Check extra-packages schema
+            if [ ! -f "docs/${VER}/extra/schema.raml" ]; then
+              echo "docs/${VER}/extra/schema.raml not found — $VER needs extra-packages build"
+              EXTRA_VERSIONS+=("$VER")
+            else
+              echo "docs/${VER}/extra/schema.raml exists — extra OK"
+            fi
+
+            # Check /app YAML schema
             if [ ! -f "docs/${VER}/routeros-app-yaml-schema.json" ]; then
-              echo "docs/${VER}/routeros-app-yaml-schema.json not found — adding $VER to app-schema build list"
+              echo "docs/${VER}/routeros-app-yaml-schema.json not found — $VER needs app-schema build"
               APP_SCHEMA_VERSIONS+=("$VER")
             else
-              echo "docs/${VER}/routeros-app-yaml-schema.json exists — skipping $VER for app schema"
+              echo "docs/${VER}/routeros-app-yaml-schema.json exists — app-schema OK"
             fi
           done
+
           # Use jq to produce properly-formatted JSON arrays
-          if [ ${#VERSIONS[@]} -eq 0 ]; then
-            JSON_ARRAY="[]"
-          else
-            JSON_ARRAY=$(printf '%s\n' "${VERSIONS[@]}" | jq -R . | jq -sc .)
-          fi
-          echo "versions=${JSON_ARRAY}" >> $GITHUB_OUTPUT
-          echo "Versions needing build: ${JSON_ARRAY}"
-          if [ ${#APP_SCHEMA_VERSIONS[@]} -eq 0 ]; then
-            APP_JSON_ARRAY="[]"
-          else
-            APP_JSON_ARRAY=$(printf '%s\n' "${APP_SCHEMA_VERSIONS[@]}" | jq -R . | jq -sc .)
-          fi
-          echo "app_schema_versions=${APP_JSON_ARRAY}" >> $GITHUB_OUTPUT
-          echo "Versions needing /app YAML schema build: ${APP_JSON_ARRAY}"
+          to_json() {
+            local -n arr=$1
+            if [ ${#arr[@]} -eq 0 ]; then echo "[]"
+            else printf '%s\n' "${arr[@]}" | jq -R . | jq -sc .
+            fi
+          }
+
+          BASE_JSON=$(to_json BASE_VERSIONS)
+          EXTRA_JSON=$(to_json EXTRA_VERSIONS)
+          APP_JSON=$(to_json APP_SCHEMA_VERSIONS)
+
+          echo "base_versions=${BASE_JSON}" >> $GITHUB_OUTPUT
+          echo "extra_versions=${EXTRA_JSON}" >> $GITHUB_OUTPUT
+          echo "app_schema_versions=${APP_JSON}" >> $GITHUB_OUTPUT
+
+          echo "Base builds needed: ${BASE_JSON}"
+          echo "Extra-packages builds needed: ${EXTRA_JSON}"
+          echo "/app YAML schema builds needed: ${APP_JSON}"
 
       - name: Summary
+        env:
+          STABLE: ${{ steps.get-stable.outputs.version }}
+          TESTING: ${{ steps.get-testing.outputs.version }}
+          DEVELOPMENT: ${{ steps.get-development.outputs.version }}
+          LONGTERM: ${{ steps.get-longterm.outputs.version }}
         run: |
-          echo "Stable channel:      ${{ steps.get-stable.outputs.version }}"
-          echo "Testing channel:     ${{ steps.get-testing.outputs.version }}"
-          echo "Development channel: ${{ steps.get-development.outputs.version }}"
-          echo "Long-term channel:   ${{ steps.get-longterm.outputs.version }}"
-          echo "To build: ${{ steps.needs-builds.outputs.versions }}"
+          echo "### Channel Versions" >> $GITHUB_STEP_SUMMARY
+          echo "| Channel | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Stable | $STABLE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Testing | $TESTING |" >> $GITHUB_STEP_SUMMARY
+          echo "| Development | $DEVELOPMENT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Long-term | $LONGTERM |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Builds Needed" >> $GITHUB_STEP_SUMMARY
+          echo "- Base: ${{ steps.needs-builds.outputs.base_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Extra-packages: ${{ steps.needs-builds.outputs.extra_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "- /app YAML schemas: ${{ steps.needs-builds.outputs.app_schema_versions }}" >> $GITHUB_STEP_SUMMARY
 
-  build-docker:
+  build-base:
     needs: check
     runs-on: ubuntu-latest
-    if: ${{ fromJSON(needs.check.outputs.versions)[0] != null }}
+    if: ${{ fromJSON(needs.check.outputs.base_versions)[0] != null }}
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.check.outputs.versions) }}
+        version: ${{ fromJSON(needs.check.outputs.base_versions) }}
       max-parallel: 1
-    name: Trigger schema build (base) for ${{ matrix.version }}
+    name: "Trigger base build: ${{ matrix.version }}"
     steps:
-      - name: Dispatch manual-using-docker-in-docker for ${{ matrix.version }}
+      - name: Dispatch base schema build for ${{ matrix.version }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            console.log(`Triggering build for RouterOS ${{ matrix.version }}`)
+            console.log(`Triggering base schema build for RouterOS ${{ matrix.version }}`)
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -158,26 +200,25 @@ jobs:
             })
             console.log('Dispatched successfully')
 
-  build-extra-docker:
-    needs: [check, build-docker]
+  build-extra:
+    needs: check
     runs-on: ubuntu-latest
-    # Run even if build-docker is skipped, but only if check succeeded and there are versions
-    if: |
-      always() &&
-      needs.check.result == 'success' &&
-      fromJSON(needs.check.outputs.versions)[0] != null
+    # Runs independently of build-base — checks its own list of versions missing
+    # docs/{version}/extra/schema.raml. This means a failed extra build can be
+    # retried by re-running auto.yaml without re-running the base build.
+    if: ${{ fromJSON(needs.check.outputs.extra_versions)[0] != null }}
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.check.outputs.versions) }}
+        version: ${{ fromJSON(needs.check.outputs.extra_versions) }}
       max-parallel: 1
-    name: Trigger schema build (extra packages) for ${{ matrix.version }}
+    name: "Trigger extra-packages build: ${{ matrix.version }}"
     steps:
-      - name: Dispatch manual-using-extra-docker-in-docker for ${{ matrix.version }}
+      - name: Dispatch extra-packages schema build for ${{ matrix.version }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            console.log(`Triggering extra-packages build for RouterOS ${{ matrix.version }}`)
+            console.log(`Triggering extra-packages schema build for RouterOS ${{ matrix.version }}`)
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -190,20 +231,18 @@ jobs:
             console.log('Dispatched successfully')
 
   build-app-yaml-schemas:
-    needs: [check]
+    needs: check
     runs-on: ubuntu-latest
-    # Runs for all versions missing docs/{version}/routeros-app-yaml-schema.json.
-    # Runs independently of build-extra-docker — the appyamlschemas workflow boots its own CHR.
-    if: |
-      needs.check.result == 'success' &&
-      fromJSON(needs.check.outputs.app_schema_versions)[0] != null
+    # Runs independently — checks its own list of versions missing
+    # docs/{version}/routeros-app-yaml-schema.json.
+    if: ${{ fromJSON(needs.check.outputs.app_schema_versions)[0] != null }}
     strategy:
       matrix:
         version: ${{ fromJSON(needs.check.outputs.app_schema_versions) }}
       max-parallel: 1
-    name: Trigger /app YAML schema build for ${{ matrix.version }}
+    name: "Trigger /app YAML schema build: ${{ matrix.version }}"
     steps:
-      - name: Dispatch appyamlschemas for ${{ matrix.version }}
+      - name: Dispatch /app YAML schema build for ${{ matrix.version }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -219,4 +258,3 @@ jobs:
               }
             })
             console.log('Dispatched successfully')
-
