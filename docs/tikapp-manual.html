@@ -46,14 +46,6 @@
         }
         .tip-box p { margin: 0; font-size: 0.9rem; }
 
-        .kbd {
-            display: inline-block; padding: 0.1em 0.4em;
-            font-family: var(--pico-font-family-monospace); font-size: 0.85em;
-            background: var(--pico-form-element-background-color);
-            border: 1px solid var(--pico-form-element-border-color);
-            border-radius: 3px;
-        }
-
         .section-anchor { color: inherit; text-decoration: none; }
         .section-anchor:hover { text-decoration: underline; }
 
@@ -66,6 +58,10 @@
             border-radius: var(--pico-border-radius);
             padding: 1.2rem; overflow-x: auto; white-space: pre;
             line-height: 1.6; color: var(--pico-color);
+        }
+
+        .manual-footer {
+            color: var(--pico-muted-color); font-size: 0.85rem; text-align: center;
         }
     </style>
 </head>
@@ -227,31 +223,31 @@
                 <thead><tr><th>Action</th><th>Windows / Linux</th><th>macOS</th></tr></thead>
                 <tbody>
                     <tr><td>Save to file</td><td colspan="2"><em>Use the Download button instead (browser security)</em></td></tr>
-                    <tr><td>Undo</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Z</span></td><td><span class="kbd">⌘</span>+<span class="kbd">Z</span></td></tr>
-                    <tr><td>Redo</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">Z</span></td><td><span class="kbd">⌘</span>+<span class="kbd">Shift</span>+<span class="kbd">Z</span></td></tr>
-                    <tr><td>Paste from clipboard</td><td><span class="kbd">Ctrl</span>+<span class="kbd">V</span></td><td><span class="kbd">⌘</span>+<span class="kbd">V</span></td></tr>
-                    <tr><td>Select all</td><td><span class="kbd">Ctrl</span>+<span class="kbd">A</span></td><td><span class="kbd">⌘</span>+<span class="kbd">A</span></td></tr>
-                    <tr><td>Find / Replace</td><td><span class="kbd">Ctrl</span>+<span class="kbd">H</span></td><td><span class="kbd">⌘</span>+<span class="kbd">H</span></td></tr>
-                    <tr><td>Format document</td><td><span class="kbd">Shift</span>+<span class="kbd">Alt</span>+<span class="kbd">F</span></td><td><span class="kbd">⇧</span>+<span class="kbd">⌥</span>+<span class="kbd">F</span></td></tr>
-                    <tr><td>Trigger suggestions</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Space</span></td><td><span class="kbd">⌃</span>+<span class="kbd">Space</span></td></tr>
-                    <tr><td>Go to line</td><td><span class="kbd">Ctrl</span>+<span class="kbd">G</span></td><td><span class="kbd">⌃</span>+<span class="kbd">G</span></td></tr>
-                    <tr><td>Toggle comment</td><td><span class="kbd">Ctrl</span>+<span class="kbd">/</span></td><td><span class="kbd">⌘</span>+<span class="kbd">/</span></td></tr>
-                    <tr><td>Indent selection</td><td><span class="kbd">Tab</span></td><td><span class="kbd">Tab</span></td></tr>
-                    <tr><td>Fold region</td><td><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">[</span></td><td><span class="kbd">⌘</span>+<span class="kbd">⌥</span>+<span class="kbd">[</span></td></tr>
+                    <tr><td>Undo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td><kbd>⌘</kbd>+<kbd>Z</kbd></td></tr>
+                    <tr><td>Redo</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td><kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td></tr>
+                    <tr><td>Paste from clipboard</td><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td><kbd>⌘</kbd>+<kbd>V</kbd></td></tr>
+                    <tr><td>Select all</td><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td><kbd>⌘</kbd>+<kbd>A</kbd></td></tr>
+                    <tr><td>Find / Replace</td><td><kbd>Ctrl</kbd>+<kbd>H</kbd></td><td><kbd>⌘</kbd>+<kbd>H</kbd></td></tr>
+                    <tr><td>Format document</td><td><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></td><td><kbd>⇧</kbd>+<kbd>⌥</kbd>+<kbd>F</kbd></td></tr>
+                    <tr><td>Trigger suggestions</td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td><kbd>⌃</kbd>+<kbd>Space</kbd></td></tr>
+                    <tr><td>Go to line</td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td><kbd>⌃</kbd>+<kbd>G</kbd></td></tr>
+                    <tr><td>Toggle comment</td><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td><kbd>⌘</kbd>+<kbd>/</kbd></td></tr>
+                    <tr><td>Indent selection</td><td><kbd>Tab</kbd></td><td><kbd>Tab</kbd></td></tr>
+                    <tr><td>Fold region</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd></td><td><kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>[</kbd></td></tr>
                 </tbody>
             </table>
             <div class="tip-box">
                 <p>
                     🖱 <strong>YAML autocompletion</strong> is powered by the loaded JSON schema.
-                    Press <span class="kbd">Ctrl/⌘</span>+<span class="kbd">Space</span> anywhere
+                    Press <kbd>Ctrl/⌘</kbd>+<kbd>Space</kbd> anywhere
                     to see available keys. Required fields sort to the top.
                 </p>
             </div>
             <p>
                 <strong>Browser differences:</strong> On some browsers (especially Firefox),
-                <span class="kbd">Ctrl</span>+<span class="kbd">W</span> closes the tab instead of
-                triggering an editor action — be careful. On macOS, <span class="kbd">⌘</span>
-                shortcuts are used instead of <span class="kbd">Ctrl</span>.
+                <kbd>Ctrl</kbd>+<kbd>W</kbd> closes the tab instead of
+                triggering an editor action — be careful. On macOS, <kbd>⌘</kbd>
+                shortcuts are used instead of <kbd>Ctrl</kbd>.
             </p>
 
             <h3 id="validation">Live Validation</h3>
@@ -515,7 +511,7 @@ tikapp.html loads schema + app.json from GitHub Pages
         </section>
 
         <hr>
-        <p style="color:var(--pico-muted-color);font-size:0.85rem;text-align:center">
+        <p class="manual-footer">
             From <a href="https://github.com/tikoci/restraml">TIKOCI</a>. Not affiliated with
             <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1a</kbd>
         </p>
