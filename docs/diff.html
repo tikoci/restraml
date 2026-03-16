@@ -539,9 +539,16 @@
             return document.getElementById('diffFormat').value
         }
 
+        // Max patch lines fed to diff2html. Beyond this the DOM becomes too large to render
+        // usefully. The full patch is kept in _lastPatch; only the render is truncated.
+        const RENDER_LINE_LIMIT = 6000
+
         function renderDiff(patch) {
             _lastPatch = patch
-            diffoutput.innerHTML = Diff2Html.html(patch, {
+            const patchLines = patch.split('\n')
+            const truncated = patchLines.length > RENDER_LINE_LIMIT
+            const renderInput = truncated ? patchLines.slice(0, RENDER_LINE_LIMIT).join('\n') : patch
+            diffoutput.innerHTML = Diff2Html.html(renderInput, {
                 drawFileList: false,
                 matching: 'lines',
                 outputFormat: getDiffFormat(),
@@ -551,6 +558,11 @@
             diffoutput.querySelectorAll('.d2h-tag').forEach(el => el.remove())
             const hideMarkers = document.getElementById('diffHunks').value === 'hiding'
             diffoutput.classList.toggle('hide-markers', hideMarkers)
+            if (truncated) {
+                const warn = document.createElement('p')
+                warn.innerHTML = `<mark>&#9888; Output truncated &mdash; showing ${RENDER_LINE_LIMIT.toLocaleString()} of ${patchLines.length.toLocaleString()} diff lines. Use &#8595;&nbsp;Download to compare the full text locally.</mark>`
+                diffoutput.appendChild(warn)
+            }
         }
 
         function rerenderFromCache() {
@@ -573,6 +585,7 @@
                 compare2.disabled = true
                 diffextra.disabled = true
                 diffcodedetails.hidden = true
+                document.getElementById('diff-options').hidden = true
                 diffstatus.hidden = false
                 document.querySelectorAll('[name=inspectstats]').forEach(e => e.hidden = true)
 
@@ -585,6 +598,23 @@
 
                     const text1 = inspectToRosLines(json1).join('\n') + '\n'
                     const text2 = inspectToRosLines(json2).join('\n') + '\n'
+
+                    // Fast O(N) estimate of diff complexity via symmetric line-set difference.
+                    // Done BEFORE Diff.createPatch() so we can warn the user immediately —
+                    // createPatch() itself blocks the UI thread for large diffs and the old
+                    // post-computation confirm was appearing after a ~1-minute freeze.
+                    const _set1 = new Set(text1.trimEnd().split('\n'))
+                    const _set2 = new Set(text2.trimEnd().split('\n'))
+                    let _common = 0
+                    for (const _l of _set1) { if (_set2.has(_l)) _common++ }
+                    const estimatedChanges = (_set1.size - _common) + (_set2.size - _common)
+
+                    if (estimatedChanges > 1500) {
+                        // Update the spinner message and yield to browser so it paints
+                        // before the blocking computation starts.
+                        diffstatus.innerHTML = `<p aria-busy="true">Computing large diff (~${estimatedChanges.toLocaleString()} estimated changes) &mdash; this may take a moment&hellip;</p>`
+                        await new Promise(r => setTimeout(r, 50))
+                    }
 
                     // Generate unified diff patch via jsdiff
                     _lastText1 = text1
@@ -599,15 +629,6 @@
                         compare2.value,
                         { context: getDiffContext() }
                     )
-
-                    // Alert if diff is very large
-                    const lineCount = patch.split('\n').length
-                    if (lineCount > 10000) {
-                        if (!confirm(`The diff has ${lineCount.toLocaleString()} lines and may be slow to render. Continue?`)) {
-                            diffstatus.hidden = true
-                            return
-                        }
-                    }
 
                     renderDiff(patch)
 

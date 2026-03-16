@@ -266,6 +266,34 @@
         ========================================================================
     -->
 
+    <!-- Changelog / Release Notes modal (shared with index.html) -->
+    <dialog id="changelog-modal">
+        <article>
+            <header>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:0.75rem">
+                    <div>
+                        <strong id="changelog-title" style="font-size:1.05rem">RouterOS — Release Notes</strong><br>
+                        <small id="changelog-subtitle" style="font-family:var(--pico-font-family-monospace); opacity:0.75"></small>
+                    </div>
+                    <button type="button" id="changelog-close" aria-label="Close" style="background:none; border:none; cursor:pointer; font-size:1.3rem; line-height:1; padding:0; flex-shrink:0; color:inherit">✕</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+                    <div style="display:flex; gap:0.25rem; flex-shrink:0">
+                        <button id="changelog-font-dec" type="button" class="outline secondary" style="width:auto; padding:0.3rem 0.6rem; margin:0" aria-label="Decrease font size" title="Decrease font size">A−</button>
+                        <button id="changelog-font-inc" type="button" class="outline secondary" style="width:auto; padding:0.3rem 0.6rem; margin:0" aria-label="Increase font size" title="Increase font size">A+</button>
+                    </div>
+                    <input id="changelog-search" type="search" placeholder="Filter entries…" style="flex:1; min-width:8rem; margin:0" aria-label="Filter changelog entries">
+                    <a id="changelog-mikrotik-link" href="#" target="_blank" rel="noopener" class="outline secondary" role="button" style="width:auto; white-space:nowrap; padding:0.3rem 0.75rem; margin:0; font-size:0.85em"><img class="cl-mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik"> CHANGELOG ↗</a>
+                </div>
+            </header>
+            <div id="changelog-content" role="region" aria-live="polite" aria-label="Release notes content"></div>
+            <footer>
+                <small id="changelog-item-count" style="opacity:0.65"></small>
+                <a id="changelog-diff-link" href="diff.html" class="secondary" style="font-size:0.85em; white-space:nowrap" hidden>View Diff →</a>
+            </footer>
+        </article>
+    </dialog>
+
     <script src="restraml-shared.js"></script>
 
     <script>
@@ -296,6 +324,24 @@
         const resultsSection = document.getElementById('results-section')
         const resultsSummary = document.getElementById('results-summary')
         const resultsBody = document.getElementById('results-body')
+
+        // -----------------------------------------------------------------
+        // Changelog modal — wired via shared initChangelogModal().
+        // getVersions() returns allVersions; includePre() reflects the
+        // "include testing" toggle for correct prev-version diff link.
+        // -----------------------------------------------------------------
+        const { showChangelog } = initChangelogModal({
+            getVersions: () => allVersions,
+            includePre: () => includeTesting.checked,
+        })
+
+        // Event delegation: left-click on version link opens the changelog modal
+        resultsBody.addEventListener('click', e => {
+            const link = e.target.closest('a[data-changelog-version]')
+            if (!link) return
+            e.preventDefault()
+            showChangelog(link.dataset.changelogVersion)
+        })
 
         // -----------------------------------------------------------------
         // Rebuild version <select> based on current filter state
@@ -410,13 +456,13 @@
         function appendResultRow(ver, result) {
             const tr = document.createElement('tr')
 
-            // Version cell
+            // Version cell — left-click opens the inline changelog modal;
+            // right-click / middle-click falls back to the CHANGELOG URL.
             const tdVer = document.createElement('td')
             const link = document.createElement('a')
             link.href = `https://download.mikrotik.com/routeros/${ver}/CHANGELOG`
             link.textContent = ver
-            link.target = '_blank'
-            link.rel = 'noopener noreferrer'
+            link.dataset.changelogVersion = ver
             tdVer.appendChild(link)
             tr.appendChild(tdVer)
 

@@ -153,6 +153,231 @@ function initThemeSwitcher(id) {
     })
 }
 
+// --- Changelog / Release Notes modal ---------------------------------
+
+/**
+ * HTML-escape a string for safe insertion into innerHTML.
+ */
+function _clEscapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Escape a string for use as a regex literal.
+ */
+function _clEscapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * HTML-escape `str` then wrap all occurrences of `query` in a highlight <mark>.
+ */
+function _clHighlight(str, query) {
+    if (!query) return _clEscapeHtml(str)
+    const safe = _clEscapeHtml(str)
+    return safe.replace(new RegExp(`(${_clEscapeRegex(query)})`, 'gi'), '<mark class="cl-highlight">$1</mark>')
+}
+
+/**
+ * Render MikroTik CHANGELOG text into `contentEl`.
+ * Items starting with "!)" are highlighted in red (important/breaking).
+ *
+ * @param {string} rawText       - Raw CHANGELOG text
+ * @param {string} targetVersion - Version whose section should be scrolled into view
+ * @param {string} query         - Filter string (empty = show all)
+ * @param {HTMLElement} contentEl   - The element to render into
+ * @param {HTMLElement} itemCountEl - The element to show item count in
+ */
+function renderChangelogContent(rawText, targetVersion, query, contentEl, itemCountEl) {
+    const lines = rawText.split('\n')
+    const q = query ? query.toLowerCase() : ''
+
+    let html = ''
+    let totalItems = 0
+    let visibleItems = 0
+    let prevBlank = false
+
+    for (const line of lines) {
+        const trimmed = line.trim()
+
+        // Section header: "What's new in X.X (date):"
+        if (/^What's new in /i.test(trimmed)) {
+            const vPart = trimmed.replace(/^What's new in /i, '').split(' ')[0]
+            const isTarget = vPart === targetVersion
+            const id = isTarget ? 'cl-current-section' : ''
+            const cls = isTarget ? 'cl-section-header cl-section-current' : 'cl-section-header'
+            if (!q || trimmed.toLowerCase().includes(q)) {
+                html += `<span${id ? ` id="${id}"` : ''} class="${cls}">${_clEscapeHtml(trimmed)}</span>`
+            }
+            prevBlank = false
+            continue
+        }
+
+        // Changelog item: "*)" regular item, "!)" important/breaking item (red)
+        if (/^[*!]\)/.test(trimmed)) {
+            const isImportant = trimmed.startsWith('!)')
+            totalItems++
+            const isMatch = !q || trimmed.toLowerCase().includes(q)
+            if (isMatch) {
+                visibleItems++
+                const body = trimmed.replace(/^[*!]\)\s*/, '')
+                const dashIdx = body.indexOf(' - ')
+                let subsystemHtml = ''
+                let bodyHtml = ''
+                if (dashIdx > 0 && dashIdx < 30) {
+                    const sub = body.substring(0, dashIdx).trim()
+                    const rest = body.substring(dashIdx + 3)
+                    subsystemHtml = `<span class="cl-subsystem">${_clEscapeHtml(sub)}</span>`
+                    bodyHtml = _clHighlight(rest, query)
+                } else {
+                    bodyHtml = _clHighlight(body, query)
+                }
+                const isSecure = /security|vulnerabilit|CVE-/i.test(trimmed)
+                const cls = `cl-item${(isSecure || isImportant) ? ' cl-item-important' : ''}`
+                html += `<span class="${cls}">${subsystemHtml}${bodyHtml}</span>`
+            }
+            prevBlank = false
+            continue
+        }
+
+        // Blank lines: insert a spacer (but collapse multiples)
+        if (!trimmed) {
+            if (!prevBlank && !q) html += '<br>'
+            prevBlank = true
+            continue
+        }
+        prevBlank = false
+    }
+
+    if (!html.trim()) {
+        contentEl.innerHTML = '<p style="opacity:0.6; padding:2rem; text-align:center"><em>No matching entries found.</em></p>'
+    } else {
+        contentEl.innerHTML = html
+    }
+
+    if (q) {
+        itemCountEl.textContent = `${visibleItems} of ${totalItems} entries match "${query}"`
+    } else {
+        itemCountEl.textContent = `${totalItems} total entries`
+    }
+
+    // Scroll the target version's section into view
+    if (!q) {
+        const targetEl = contentEl.querySelector('#cl-current-section')
+        if (targetEl) {
+            setTimeout(() => targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+        }
+    }
+}
+
+/**
+ * Initialize the Changelog / Release Notes modal on a page.
+ * Expects <dialog id="changelog-modal"> with the standard inner structure.
+ *
+ * @param {Object}            opts
+ * @param {function(): string[]}  opts.getVersions  - Returns all known version names, newest-first
+ * @param {function(): boolean}   opts.includePre   - Returns true when pre-releases should be
+ *                                                    included in the diff-link "previous version" search
+ * @param {string}               [opts.diffPage]    - Relative URL of the diff page (default: 'diff.html')
+ * @returns {{ showChangelog: function(version: string): void }}
+ */
+function initChangelogModal(opts) {
+    const modal = document.getElementById('changelog-modal')
+    if (!modal) return { showChangelog: () => {} }
+
+    const diffPage = opts.diffPage || 'diff.html'
+    const contentEl    = document.getElementById('changelog-content')
+    const titleEl      = document.getElementById('changelog-title')
+    const subtitleEl   = document.getElementById('changelog-subtitle')
+    const mikrotikLink = document.getElementById('changelog-mikrotik-link')
+    const searchEl     = document.getElementById('changelog-search')
+    const itemCountEl  = document.getElementById('changelog-item-count')
+    const diffLinkEl   = document.getElementById('changelog-diff-link')
+
+    let _fontSizeRem = 0.82  // rem, matches CSS default
+    let _rawText = ''
+    let _version = ''
+
+    document.getElementById('changelog-close').addEventListener('click', () => modal.close())
+    modal.addEventListener('click', e => { if (e.target === modal) modal.close() })
+
+    document.getElementById('changelog-font-dec').addEventListener('click', () => {
+        _fontSizeRem = Math.max(0.6, _fontSizeRem - 0.08)
+        contentEl.style.fontSize = `${_fontSizeRem.toFixed(2)}rem`
+    })
+    document.getElementById('changelog-font-inc').addEventListener('click', () => {
+        _fontSizeRem = Math.min(1.5, _fontSizeRem + 0.08)
+        contentEl.style.fontSize = `${_fontSizeRem.toFixed(2)}rem`
+    })
+
+    searchEl.addEventListener('input', () => {
+        if (_rawText) renderChangelogContent(_rawText, _version, searchEl.value.trim(), contentEl, itemCountEl)
+    })
+
+    async function showChangelog(version) {
+        const url = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
+        _version = version
+        _rawText = ''
+        searchEl.value = ''
+        titleEl.textContent = `RouterOS ${version} — Release Notes`
+        subtitleEl.textContent = ''
+        mikrotikLink.href = url
+        contentEl.innerHTML = '<p aria-busy="true" style="text-align:center; padding:2rem">Loading changelog…</p>'
+        itemCountEl.textContent = ''
+
+        // Find the previous version for the diff link.
+        // Respects opts.includePre(): if false, skip pre-release versions so
+        // e.g. "7.21.3 → 7.22" is used instead of "7.22rc4 → 7.22".
+        const allVers = opts.getVersions()
+        const incPre = opts.includePre()
+        const idx = allVers.indexOf(version)
+        let prevVer = null
+        for (let i = idx + 1; i < allVers.length; i++) {
+            if (incPre || !isPreRelease(allVers[i])) {
+                prevVer = allVers[i]
+                break
+            }
+        }
+        if (diffLinkEl) {
+            if (prevVer) {
+                diffLinkEl.href = `${diffPage}?compare1=${encodeURIComponent(prevVer)}&compare2=${encodeURIComponent(version)}`
+                diffLinkEl.textContent = `View Diff: ${prevVer} → ${version} ↗`
+                diffLinkEl.hidden = false
+            } else {
+                diffLinkEl.hidden = true
+            }
+        }
+
+        modal.showModal()
+
+        try {
+            const response = await fetch(url)
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            const text = await response.text()
+            _rawText = text
+
+            // Extract release date for the subtitle
+            const headerMatch = text.match(new RegExp(`What's new in ${_clEscapeRegex(version)} \\(([^)]+)\\)`, 'i'))
+            if (headerMatch) subtitleEl.textContent = headerMatch[1]
+
+            renderChangelogContent(text, version, '', contentEl, itemCountEl)
+            if (typeof plausible !== 'undefined') plausible('Changelog View', { props: { version } })
+        } catch (err) {
+            console.warn('Changelog fetch failed for', version, err)
+            const escaped = _clEscapeHtml(url)
+            contentEl.innerHTML = `
+                <p style="text-align:center; padding:2rem 1rem">
+                    <span style="font-size:2rem">📋</span><br><br>
+                    The changelog cannot be loaded inline (browser security restriction).<br><br>
+                    <a href="${escaped}" target="_blank" rel="noopener" role="button">Open CHANGELOG on MikroTik ↗</a>
+                </p>`
+            itemCountEl.textContent = ''
+        }
+    }
+
+    return { showChangelog }
+}
+
 // --- Share modal (<dialog>) ------------------------------------------
 
 /**

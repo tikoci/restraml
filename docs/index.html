@@ -63,94 +63,6 @@
         .cell-vername {
             vertical-align: middle;
         }
-
-        /* === Changelog / Release Notes modal === */
-        #changelog-modal {
-            max-width: 62rem;
-            width: 95vw;
-            max-height: 92vh;
-            padding: 0;
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-        #changelog-modal > article {
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            max-height: 90vh;
-        }
-        #changelog-modal > article > header {
-            flex-shrink: 0;
-            padding: 1.25rem 1.5rem 0.75rem;
-        }
-        #changelog-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0.5rem 1.5rem 0.75rem;
-            font-family: var(--pico-font-family-monospace);
-            font-size: 0.82rem;
-            line-height: 1.6;
-            min-height: 10rem;
-        }
-        .cl-section-header {
-            display: block;
-            font-weight: 700;
-            color: var(--pico-primary);
-            margin-top: 1.4em;
-            margin-bottom: 0.25em;
-            padding-bottom: 0.2em;
-            border-bottom: 1px solid var(--pico-muted-border-color);
-            scroll-margin-top: 0.5rem;
-        }
-        .cl-section-header:first-child { margin-top: 0; }
-        .cl-section-current { font-size: 1.05em; }
-        .cl-item {
-            display: block;
-            padding-left: 1.5em;
-            text-indent: -1.5em;
-            margin-bottom: 0.1em;
-        }
-        .cl-item-security { color: var(--pico-del-color, #c0392b); font-weight: 600; }
-        .cl-subsystem {
-            display: inline-block;
-            font-size: 0.72em;
-            padding: 0.05em 0.38em;
-            border-radius: 3px;
-            background: var(--pico-code-background-color, #e8e8e8);
-            color: var(--pico-code-color, #333);
-            margin-right: 0.35em;
-            vertical-align: baseline;
-            font-weight: 700;
-            white-space: nowrap;
-            letter-spacing: 0.01em;
-        }
-        mark.cl-highlight {
-            background: var(--pico-mark-background-color, #fff3cd);
-            color: inherit;
-            border-radius: 2px;
-            padding: 0 1px;
-        }
-        #changelog-modal > article > footer {
-            flex-shrink: 0;
-            padding: 0.6rem 1.5rem;
-            border-top: 1px solid var(--pico-muted-border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        /* Dark mode subsystem tag */
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme=light]) .cl-subsystem {
-                background: var(--pico-code-background-color, #2a2a2a);
-                color: var(--pico-code-color, #ccc);
-            }
-        }
-        [data-theme=dark] .cl-subsystem {
-            background: var(--pico-code-background-color, #2a2a2a);
-            color: var(--pico-code-color, #ccc);
-        }
     </style>
 </head>
 
@@ -365,7 +277,7 @@
                         <button id="changelog-font-inc" type="button" class="outline secondary" style="width:auto; padding:0.3rem 0.6rem; margin:0" aria-label="Increase font size" title="Increase font size">A+</button>
                     </div>
                     <input id="changelog-search" type="search" placeholder="Filter entries…" style="flex:1; min-width:8rem; margin:0" aria-label="Filter changelog entries">
-                    <a id="changelog-mikrotik-link" href="#" target="_blank" rel="noopener" class="outline secondary" role="button" style="width:auto; white-space:nowrap; padding:0.3rem 0.75rem; margin:0; font-size:0.85em">Open on MikroTik ↗</a>
+                    <a id="changelog-mikrotik-link" href="#" target="_blank" rel="noopener" class="outline secondary" role="button" style="width:auto; white-space:nowrap; padding:0.3rem 0.75rem; margin:0; font-size:0.85em"><img class="cl-mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik"> CHANGELOG ↗</a>
                 </div>
             </header>
             <div id="changelog-content" role="region" aria-live="polite" aria-label="Release notes content"></div>
@@ -390,185 +302,18 @@
         function _earlyBuilddirListener(e) { _pendingBuildDirs.push(e.detail) }
         document.addEventListener('builddir', _earlyBuilddirListener)
 
-        const filerows = document.getElementById('filerows')
-
         // -----------------------------------------------------------------
         // Changelog / Release Notes modal
         // -----------------------------------------------------------------
-        const changelogModal = document.getElementById('changelog-modal')
-        const changelogContent = document.getElementById('changelog-content')
-        const changelogTitle = document.getElementById('changelog-title')
-        const changelogSubtitle = document.getElementById('changelog-subtitle')
-        const changelogMikrotikLink = document.getElementById('changelog-mikrotik-link')
-        const changelogSearch = document.getElementById('changelog-search')
-        const changelogItemCount = document.getElementById('changelog-item-count')
+        const filerows = document.getElementById('filerows')
 
-        let _changelogFontSize = 0.82  // rem, matches CSS default
-        let _changelogText = ''
-        let _changelogVersion = ''
-
-        function _clEscapeHtml(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        }
-
-        function _clEscapeRegex(str) {
-            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        }
-
-        function _clHighlight(str, query) {
-            if (!query) return _clEscapeHtml(str)
-            // HTML-escape first so the regex can only match plain text, never inject tags
-            const safe = _clEscapeHtml(str)
-            return safe.replace(new RegExp(`(${_clEscapeRegex(query)})`, 'gi'), '<mark class="cl-highlight">$1</mark>')
-        }
-
-        function renderChangelogContent(rawText, targetVersion, query) {
-            const lines = rawText.split('\n')
-            const q = query ? query.toLowerCase() : ''
-
-            let html = ''
-            let totalItems = 0
-            let visibleItems = 0
-            let prevBlank = false
-
-            for (const line of lines) {
-                const trimmed = line.trim()
-
-                // Section header: "What's new in X.X (date):"
-                if (/^What's new in /i.test(trimmed)) {
-                    const vPart = trimmed.replace(/^What's new in /i, '').split(' ')[0]
-                    const isTarget = vPart === targetVersion
-                    const id = isTarget ? 'cl-current-section' : ''
-                    const cls = isTarget ? 'cl-section-header cl-section-current' : 'cl-section-header'
-                    if (!q || trimmed.toLowerCase().includes(q)) {
-                        html += `<span${id ? ` id="${id}"` : ''} class="${cls}">${_clEscapeHtml(trimmed)}</span>`
-                    }
-                    prevBlank = false
-                    continue
-                }
-
-                // Changelog item: starts with "*)"
-                if (/^\*\)/.test(trimmed)) {
-                    totalItems++
-                    const isMatch = !q || trimmed.toLowerCase().includes(q)
-                    if (isMatch) {
-                        visibleItems++
-                        const body = trimmed.replace(/^\*\)\s*/, '')
-                        const dashIdx = body.indexOf(' - ')
-                        let subsystemHtml = ''
-                        let bodyHtml = ''
-                        if (dashIdx > 0 && dashIdx < 30) {
-                            const sub = body.substring(0, dashIdx).trim()
-                            const rest = body.substring(dashIdx + 3)
-                            subsystemHtml = `<span class="cl-subsystem">${_clEscapeHtml(sub)}</span>`
-                            bodyHtml = _clHighlight(rest, query)
-                        } else {
-                            bodyHtml = _clHighlight(body, query)
-                        }
-                        const isSecure = /security|vulnerabilit|CVE-/i.test(trimmed)
-                        const cls = `cl-item${isSecure ? ' cl-item-security' : ''}`
-                        html += `<span class="${cls}">${subsystemHtml}${bodyHtml}</span>`
-                    }
-                    prevBlank = false
-                    continue
-                }
-
-                // Blank lines: insert a spacer (but collapse multiples)
-                if (!trimmed) {
-                    if (!prevBlank && !q) html += '<br>'
-                    prevBlank = true
-                    continue
-                }
-                prevBlank = false
-            }
-
-            if (!html.trim()) {
-                changelogContent.innerHTML = '<p style="opacity:0.6; padding:2rem; text-align:center"><em>No matching entries found.</em></p>'
-            } else {
-                changelogContent.innerHTML = html
-            }
-
-            if (q) {
-                changelogItemCount.textContent = `${visibleItems} of ${totalItems} entries match "${query}"`
-            } else {
-                changelogItemCount.textContent = `${totalItems} total entries`
-            }
-
-            // Scroll the target version's section into view
-            if (!q) {
-                const targetEl = changelogContent.querySelector('#cl-current-section')
-                if (targetEl) {
-                    setTimeout(() => targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-                }
-            }
-        }
-
-        async function showChangelog(version) {
-            const url = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
-            _changelogVersion = version
-            _changelogText = ''
-            changelogSearch.value = ''
-            changelogTitle.textContent = `RouterOS ${version} — Release Notes`
-            changelogSubtitle.textContent = ''
-            changelogMikrotikLink.href = url
-            changelogContent.innerHTML = '<p aria-busy="true" style="text-align:center; padding:2rem">Loading changelog…</p>'
-            changelogItemCount.textContent = ''
-
-            // Wire up "View API changes" link to previous version if available
-            const diffLink = document.getElementById('changelog-diff-link')
-            const idx = _diffVersions.indexOf(version)
-            const prevVer = (idx >= 0 && idx < _diffVersions.length - 1) ? _diffVersions[idx + 1] : null
-            if (prevVer) {
-                diffLink.href = `diff.html?compare1=${prevVer}&compare2=${version}`
-                diffLink.textContent = `API changes: ${prevVer} → ${version} ↗`
-                diffLink.hidden = false
-            } else {
-                diffLink.hidden = true
-            }
-
-            changelogModal.showModal()
-
-            try {
-                const response = await fetch(url)
-                if (!response.ok) throw new Error(`HTTP ${response.status}`)
-                const text = await response.text()
-                _changelogText = text
-
-                // Extract release date from the header for the selected version
-                const headerMatch = text.match(new RegExp(`What's new in ${_clEscapeRegex(version)} \\(([^)]+)\\)`, 'i'))
-                if (headerMatch) changelogSubtitle.textContent = headerMatch[1]
-
-                renderChangelogContent(text, version, '')
-                plausible('Changelog View', { props: { version } })
-            } catch (err) {
-                console.warn('Changelog fetch failed for', version, err)
-                const escaped = _clEscapeHtml(url)
-                changelogContent.innerHTML = `
-                    <p style="text-align:center; padding:2rem 1rem">
-                        <span style="font-size:2rem">📋</span><br><br>
-                        The changelog cannot be loaded inline (browser security restriction).<br><br>
-                        <a href="${escaped}" target="_blank" rel="noopener" role="button">Open CHANGELOG on MikroTik ↗</a>
-                    </p>`
-                changelogItemCount.textContent = ''
-            }
-        }
-
-        document.getElementById('changelog-close').addEventListener('click', () => {
-            changelogModal.close()
-        })
-        changelogModal.addEventListener('click', e => { if (e.target === changelogModal) changelogModal.close() })
-
-        document.getElementById('changelog-font-dec').addEventListener('click', () => {
-            _changelogFontSize = Math.max(0.6, _changelogFontSize - 0.08)
-            changelogContent.style.fontSize = `${_changelogFontSize.toFixed(2)}rem`
-        })
-        document.getElementById('changelog-font-inc').addEventListener('click', () => {
-            _changelogFontSize = Math.min(1.5, _changelogFontSize + 0.08)
-            changelogContent.style.fontSize = `${_changelogFontSize.toFixed(2)}rem`
-        })
-
-        changelogSearch.addEventListener('input', () => {
-            if (_changelogText) renderChangelogContent(_changelogText, _changelogVersion, changelogSearch.value.trim())
+        // initChangelogModal wires up all modal event handlers and returns showChangelog.
+        // getVersions() returns _diffVersions (which includes/excludes testing per _diffShowAll).
+        // includePre() reflects the "include testing" toggle so that the diff link uses
+        // the correct previous version (e.g. 7.21.3 → 7.22, not 7.22rc4 → 7.22).
+        const { showChangelog } = initChangelogModal({
+            getVersions: () => _diffVersions,
+            includePre: () => _diffShowAll,
         })
 
         // Event delegation: click on version name in table opens the changelog modal
