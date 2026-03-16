@@ -298,6 +298,8 @@
             </select>
             <button id="load-example-confirm-btn" type="button" class="outline toolbar-btn" disabled>Load</button>
             <button id="cancel-example-btn" type="button" class="outline secondary toolbar-btn">Cancel</button>
+            <span style="flex:1"></span>
+            <button id="view-appjson-btn" type="button" class="outline secondary toolbar-btn" title="View built-in /app collection (app.json) for this version">⧉ app.json</button>
         </div>
 
         <!-- Status line -->
@@ -405,6 +407,7 @@
         const appNameSelect        = document.getElementById('app-name-select')
         const loadExampleConfirmBtn = document.getElementById('load-example-confirm-btn')
         const cancelExampleBtn     = document.getElementById('cancel-example-btn')
+        const viewAppJsonBtn       = document.getElementById('view-appjson-btn')
         const statusLine           = document.getElementById('status-line')
         const errorBanner          = document.getElementById('error-banner')
         const editorContainer      = document.getElementById('editor-container')
@@ -710,6 +713,7 @@
             appNameSelect.disabled = disabled
             appCatSelect.disabled = disabled
             loadExampleConfirmBtn.disabled = disabled
+            viewAppJsonBtn.disabled = disabled
             stashBtn.disabled = disabled
             downloadBtn.disabled = disabled
             copyBtn.disabled = disabled
@@ -786,6 +790,17 @@
             else if (filteredApps.some(a => a.name === DEFAULT_APP)) appNameSelect.value = DEFAULT_APP
             else if (appNameSelect.options.length > 0) appNameSelect.value = appNameSelect.options[0].value
         }
+
+        // --- View app.json (open in new window) --------------------------
+        function viewAppJson() {
+            const version = verSelect.value
+            if (!version) return
+            const ver = (version === 'latest' || version === 'editor') ? latestStableVer : version
+            if (!ver) return
+            const url = `${RESTRAML.pagesUrl}/${ver}/app.json`
+            window.open(url, '_blank', 'noopener')
+        }
+        viewAppJsonBtn.addEventListener('click', () => viewAppJson())
 
         // --- Version changed ---------------------------------------------
         async function onVersionChanged() {

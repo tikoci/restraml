@@ -205,13 +205,21 @@
             <h3 id="example-picker">Example Picker (Line 2)</h3>
             <p>
                 When the <strong>Examples</strong> button is active, a second row appears with
-                a category dropdown and an app dropdown. Changing either when your current content
+                a category dropdown, an app dropdown, <strong>Load</strong> and <strong>Cancel</strong> buttons.
+                Changing either when your current content
                 is a <em>clean</em> (unmodified) example will immediately load the new example —
                 no extra click needed. If you have edited the current example, the editor asks
                 before replacing it. See <a href="#examples-dirty">§4</a> for full details.
             </p>
             <p>
                 Double-clicking an app name in the picker also loads it immediately.
+            </p>
+            <p>
+                On the right side of the example picker row is the <strong>⧉ app.json</strong> button,
+                which opens the full <code>app.json</code> collection (all built-in MikroTik /app definitions)
+                for the selected RouterOS version in a new browser tab or window.
+                This is useful for browsing and inspecting the complete set of built-in apps
+                without filtering through the category and name dropdowns.
             </p>
 
             <h3 id="monaco">Monaco Editor Controls</h3>
