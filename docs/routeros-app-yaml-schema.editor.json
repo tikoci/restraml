@@ -41,7 +41,8 @@
         "ai",
         "messaging",
         "radio",
-        "security"
+        "security",
+        "business"
       ],
       "description": "App store category. Validated against RouterOS-accepted values; build CI raises an issue when new categories appear."
     },
@@ -87,6 +88,14 @@
               "type": "string",
               "description": "Container hostname"
             },
+            "entrypoint": {
+              "oneOf": [
+                {"type": "string"},
+                {"type": "array", "items": {"type": "string"}}
+              ],
+              "description": "Override the default container entrypoint (string or list)",
+              "examples": ["/bin/bash", ["/bin/sh", "-c"]]
+            },
             "command": {
               "oneOf": [
                 {"type": "string"},
@@ -99,12 +108,13 @@
               "description": "Port mappings",
               "items": {
                 "type": "string",
-                "description": "Format: `[ip:]host-port:container-port[/proto][:label]`. RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — unlike OCI/Docker where port labels are comments, in RouterOS `web` marks this port for browser forwarding and includes it in the admin URL shown in Winbox/WebFig.",
-                "$comment": "Strict pattern (used in .latest.json): ^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$",
+                "description": "Two formats supported: (1) `[ip:]host:container[/tcp|/udp][:label]` (OCI-style, pre-7.23) or (2) `[ip:]host:container[:label][:tcp|:udp]` (RouterOS 7.23+, protocol after label). RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
+                "$comment": "Strict pattern (used in .latest.json): ^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?(:(tcp|udp))?$",
                 "examples": [
                   "80:80",
                   "80:80:web",
                   "8080:8080/tcp:rest api",
+                  "8080:8080:web:tcp",
                   "[accessIP]:[accessPort]:80:web",
                   "127.0.0.1:9000:9000"
                 ]
@@ -180,6 +190,14 @@
                 {"type": "object"}
               ],
               "description": "Start after these named services"
+            },
+            "devices": {
+              "type": "array",
+              "description": "Host device mappings passed into the container (e.g. for USB/serial hardware access)",
+              "items": {
+                "type": "string",
+                "description": "Format: `host-device[:container-device]` (e.g. `/dev/ttyACM0:/dev/ttyACM0`)"
+              }
             },
             "user": {
               "type": "string",
