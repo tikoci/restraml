@@ -123,6 +123,44 @@
         /* Hide @@ hunk marker rows when .hide-markers is active */
         #diffoutput.hide-markers tr:has(td.d2h-info) { display: none; }
 
+        /* Version grid: 3 columns for compare1 / swap / compare2 */
+        .version-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0 1rem;
+            align-items: start;
+            border: 0; padding: 0;
+            margin-bottom: var(--pico-spacing);
+        }
+        .swap-col {
+            display: flex;
+            align-items: center;
+            padding-top: 0.35rem;
+        }
+        #swap-btn {
+            padding: 0.35rem 0.6rem;
+            margin: 0;
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        /* Per-version stats row */
+        [name=inspectstats] { display: flex; gap: 0.75rem; align-items: baseline; }
+        [name=inspectstats][hidden] { display: none; }
+        [name=inspectstats] a { text-decoration: none; }
+
+        /* Diff options bar */
+        #diff-options { display: flex; justify-content: space-between; align-items: center; }
+        #diff-options[hidden] { display: none; }
+
+        /* Delta stats */
+        .diff-delta { font-size: 0.85rem; white-space: nowrap; }
+        .diff-delta kbd { font-size: 0.8em; }
+
+        /* Spacing tweaks */
+        #section-diff > nav { margin-bottom: 0.75rem; }
+
     </style>
 </head>
 
@@ -187,26 +225,31 @@
                 </ul>
             </nav>
 
-            <fieldset class="grid">
+            <fieldset class="version-grid">
                 <div id="inspect1">
                     <select id="compare1" required>
                         <option selected disabled value="">Version to compare...</option>
                     </select>
                     <small>
-                        <div name="inspectstats" hidden>
-                            <b><span name="cmd">0</span></b> commands,
-                            <b><span name="arg">0</span></b> attributes
+                        <div class="grid" name="inspectstats" hidden>
+                            <span><b><span name="cmd">0</span></b> commands</span>
+                            <span><b><span name="arg">0</span></b> attributes</span>
+                            <a name="dl-link" href="#" title="Download inspect.json" download>⬇ Download</a>
                         </div>
                     </small>
+                </div>
+                <div class="swap-col">
+                    <button id="swap-btn" type="button" class="outline secondary" title="Swap versions">⇄</button>
                 </div>
                 <div id="inspect2">
                     <select id="compare2" required>
                         <option selected disabled value="">...against this version</option>
                     </select>
                     <small>
-                        <div name="inspectstats" hidden>
-                            <b><span name="cmd">0</span></b> commands,
-                            <b><span name="arg">0</span></b> attributes
+                        <div class="grid" name="inspectstats" hidden>
+                            <div><span><b><span name="cmd">0</span></b> commands</span></div>
+                            <div><span><b><span name="arg">0</span></b> attributes</span></div>
+                            <div><a name="dl-link" href="#" title="Download inspect.json" download>⬇ Download</a></div>
                         </div>
                     </small>
                 </div>
@@ -231,6 +274,11 @@
                     </select>
                     hunks
                 </small>
+                <span id="diff-delta" class="diff-delta">
+                    <code>𝚫</code>
+                    <b><span id="delta-cmds"></span></b> cmds
+                    <b><span id="delta-attr"></span></b> attr
+                </span>
             </div>
 
             <div id="diffstatus" hidden>
@@ -240,13 +288,13 @@
             <div id="diffcodedetails" hidden>
                 <div id="diffoutput"></div>
                 <div id="share-section" class="mt-1-5 text-right">
-                    <a href="#" id="share-link" class="share-link">🔗 Share this diff</a>
+                    <button id="share-btn" type="button" class="outline secondary" title="Copy shareable URL to clipboard">🔗 Share</button>
                 </div>
             </div>
         </section>
 
         <details id="diff-guide" class="page-guide">
-            <summary><b>How to read this?</b> &hellip;</summary>
+            <summary><b>How to use RouterOS Schema Diff Tool</b> &hellip;</summary>
             <article>
                 <header>
                     <strong>Using the Diff</strong>
@@ -320,22 +368,11 @@
     </main>
 
     <footer class="container">
-        <small><em>This site is not affiliated with or endorsed by <a href="https://mikrotik.com">MikroTik</a>. All trademarks are property of their respective owners.</em></small>
+        <small>
+            From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1a</kbd>
+        </small>
     </footer>
 
-    <!-- Share modal -->
-    <dialog id="share-modal" class="share-modal">
-        <article>
-            <header>
-                <strong>Share this diff</strong>
-                <a href="#" id="share-modal-close" aria-label="Close">✕</a>
-            </header>
-            <input id="share-url" class="share-url-input" type="text" readonly aria-label="Shareable URL">
-            <footer>
-                <button id="share-copy" class="secondary share-copy-btn">Copy to clipboard</button>
-            </footer>
-        </article>
-    </dialog>
 
     <!--
         ========================================================================
@@ -372,6 +409,15 @@
         })
         diffextra.addEventListener('change', () => {
             if (compare1.value && compare2.value) document.dispatchEvent(new Event('vercompare'))
+        })
+
+        // Swap versions button
+        document.getElementById('swap-btn').addEventListener('click', () => {
+            const v1 = compare1.value
+            const v2 = compare2.value
+            compare1.value = v2
+            compare2.value = v1
+            if (v1 && v2) document.dispatchEvent(new Event('vercompare'))
         })
 
         document.getElementById('diffFormat').addEventListener('change', () => {
@@ -543,7 +589,30 @@
                         { context: getDiffContext() }
                     )
 
+                    // Alert if diff is very large
+                    const lineCount = patch.split('\n').length
+                    if (lineCount > 10000) {
+                        if (!confirm(`The diff has ${lineCount.toLocaleString()} lines and may be slow to render. Continue?`)) {
+                            diffstatus.hidden = true
+                            return
+                        }
+                    }
+
                     renderDiff(patch)
+
+                    // Compute and display delta stats
+                    const ncmd1 = parseInt(document.querySelector('#inspect1 [name=cmd]').textContent, 10)
+                    const narg1 = parseInt(document.querySelector('#inspect1 [name=arg]').textContent, 10)
+                    const ncmd2 = parseInt(document.querySelector('#inspect2 [name=cmd]').textContent, 10)
+                    const narg2 = parseInt(document.querySelector('#inspect2 [name=arg]').textContent, 10)
+                    const ncmddiff = ncmd2 - ncmd1
+                    const nargdiff = narg2 - narg1
+                    const deltaCmds = document.getElementById('delta-cmds')
+                    const deltaAttr = document.getElementById('delta-attr')
+                    deltaCmds.textContent = (ncmddiff > 0 ? '+' : '') + ncmddiff
+                    deltaAttr.textContent = (nargdiff > 0 ? '+' : '') + nargdiff
+                    deltaCmds.style.color = ncmddiff > 0 ? 'green' : ncmddiff < 0 ? 'red' : 'goldenrod'
+                    deltaAttr.style.color = nargdiff > 0 ? 'green' : nargdiff < 0 ? 'red' : 'goldenrod'
 
                     diffstatus.hidden = true
                     diffcodedetails.hidden = false
@@ -567,8 +636,6 @@
         // Update per-version stats when inspect.json is downloaded
         document.addEventListener('inspectdownload', e => {
             const { ver, json, extra } = e.detail
-            // Only update these stats for the base (non-extra) schema
-            if (extra) return
             let cmdCount = 0, argCount = 0
             function countTypes(obj) {
                 for (const k of Object.keys(obj)) {
@@ -581,14 +648,18 @@
                 }
             }
             countTypes(json)
+            const subdir = extra ? '/extra' : ''
+            const dlUrl = pagesUrl + '/' + ver + subdir + '/inspect.json'
             if (compare1.value === ver) {
                 document.querySelector('#inspect1 [name=cmd]').textContent = cmdCount
                 document.querySelector('#inspect1 [name=arg]').textContent = argCount
+                document.querySelector('#inspect1 [name=dl-link]').href = dlUrl
                 document.querySelector('#inspect1 [name=inspectstats]').hidden = false
             }
             if (compare2.value === ver) {
                 document.querySelector('#inspect2 [name=cmd]').textContent = cmdCount
                 document.querySelector('#inspect2 [name=arg]').textContent = argCount
+                document.querySelector('#inspect2 [name=dl-link]').href = dlUrl
                 document.querySelector('#inspect2 [name=inspectstats]').hidden = false
             }
         })
@@ -703,11 +774,15 @@
             }
         }
 
-        // Share modal (wired up via restraml-shared.js)
-        initShareModal({
-            linkId: 'share-link', modalId: 'share-modal',
-            closeId: 'share-modal-close', copyId: 'share-copy', urlId: 'share-url',
-            beforeShow: writeQueryParams
+        // Inline share button (no modal)
+        document.getElementById('share-btn').addEventListener('click', () => {
+            writeQueryParams()
+            const btn = document.getElementById('share-btn')
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                btn.textContent = '✓ Copied!'
+                setTimeout(() => { btn.textContent = '🔗 Share' }, 1800)
+            })
+            plausible('SideBySideDiff Share', {})
         })
     </script>
 
