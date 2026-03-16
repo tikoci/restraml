@@ -234,7 +234,7 @@
                         <div class="grid" name="inspectstats" hidden>
                             <span><b><span name="cmd">0</span></b> commands</span>
                             <span><b><span name="arg">0</span></b> attributes</span>
-                            <a name="dl-link" href="#" title="Download inspect.json" download>⬇ Download</a>
+                            <a name="dl-link" href="#" title="Download pseudo-CLI text" download>⬇ Download</a>
                         </div>
                     </small>
                 </div>
@@ -249,7 +249,7 @@
                         <div class="grid" name="inspectstats" hidden>
                             <div><span><b><span name="cmd">0</span></b> commands</span></div>
                             <div><span><b><span name="arg">0</span></b> attributes</span></div>
-                            <div><a name="dl-link" href="#" title="Download inspect.json" download>⬇ Download</a></div>
+                            <div><a name="dl-link" href="#" title="Download pseudo-CLI text" download>⬇ Download</a></div>
                         </div>
                     </small>
                 </div>
@@ -648,18 +648,25 @@
                 }
             }
             countTypes(json)
-            const subdir = extra ? '/extra' : ''
-            const dlUrl = pagesUrl + '/' + ver + subdir + '/inspect.json'
+            // Generate pseudo-CLI text blob for download
+            const cliText = inspectToRosLines(json).join('\n') + '\n'
+            const blob = new Blob([cliText], { type: 'text/plain' })
+            const dlUrl = URL.createObjectURL(blob)
+            const dlName = 'routeros-' + ver + (extra ? '-extra' : '') + '.txt'
             if (compare1.value === ver) {
                 document.querySelector('#inspect1 [name=cmd]').textContent = cmdCount
                 document.querySelector('#inspect1 [name=arg]').textContent = argCount
-                document.querySelector('#inspect1 [name=dl-link]').href = dlUrl
+                const dl1 = document.querySelector('#inspect1 [name=dl-link]')
+                dl1.href = dlUrl
+                dl1.download = dlName
                 document.querySelector('#inspect1 [name=inspectstats]').hidden = false
             }
             if (compare2.value === ver) {
                 document.querySelector('#inspect2 [name=cmd]').textContent = cmdCount
                 document.querySelector('#inspect2 [name=arg]').textContent = argCount
-                document.querySelector('#inspect2 [name=dl-link]').href = dlUrl
+                const dl2 = document.querySelector('#inspect2 [name=dl-link]')
+                dl2.href = dlUrl
+                dl2.download = dlName
                 document.querySelector('#inspect2 [name=inspectstats]').hidden = false
             }
         })
