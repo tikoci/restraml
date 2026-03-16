@@ -104,8 +104,12 @@ in the filename since the parent directory already implies the version.
 **`appyamlschemas.yaml` workflow:**
 - Takes `rosver` input; boots CHR with extra packages (container/app feature requires them)
 - Runs `appyamlvalidate.js` against the live CHR
-- Creates a GitHub Issue listing any failing built-in /app app names if validation fails
-- Commits per-version schemas to `docs/{version}/`
+- Handles three distinct exit codes from `appyamlvalidate.js`:
+  - **Exit 0** (all passed) → commits `app.json` + per-version schemas to `docs/{version}/`
+  - **Exit 1** (meta-validation failed — schemas are invalid JSON Schema) → fails immediately, commits nothing
+  - **Exit 2** (live validation failed — schemas valid but some MikroTik apps don't conform) → commits `app.json` only (for debugging); schemas are NOT committed so `auto.yaml` will detect them as missing and retry the build
+- Creates a GitHub Issue listing each failing built-in /app app name when exit code is 2
+- Uses two separate commit steps: one for `app.json` (always if fetched), one for schemas (only on exit 0)
 - Dispatched by `auto.yaml` when `docs/{version}/routeros-app-yaml-schema.json` is missing
 
 **RouterOS /app YAML format notes:**
@@ -236,8 +240,17 @@ git add docs/${ROSVER}/
 git commit -m "Publish ${ROSVER} ..."
 # Retry up to 5 times with rebase on push rejection
 for attempt in {1..5}; do
-  if git push origin main; then break; fi
-  echo "::warning::Push attempt $attempt/5 failed, rebasing and retrying..."
+  if git push origin main; then
+    break
+  elif [ $attempt -eq 5 ]; then
+    echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
+    exit 1
+  fi
+  echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
+  # Clean up unstaged changes left by bun install / npm install BEFORE rebase.
+  # Do NOT run this before artifact upload — run it only when a push fails.
+  git checkout -- .
+  git clean -fd
   git pull --rebase
   sleep $((RANDOM % 10 + 5))
 done
@@ -245,7 +258,8 @@ done
 
 This is safe because each build writes to its own `docs/{version}/` directory — there are no
 real file conflicts between concurrent jobs. **Do not revert to a simple `git pull` + `git push`
-pattern.**
+pattern.** The `git checkout -- .` / `git clean -fd` are required because `bun install` /
+`npm install` modify tracked files (`package.json`, `bun.lock`) which would block `git pull --rebase`.
 
 ---
 
@@ -631,10 +645,10 @@ node validraml.cjs ros-rest-all.raml
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels, dispatches builds for new versions |
+| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks 3 artifacts (`schema.raml`, `extra/schema.raml`, `routeros-app-yaml-schema.json`) and dispatches only the builds that are missing; outputs a step summary table |
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
-| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas, commits per-version schemas |
+| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.

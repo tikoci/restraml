@@ -336,9 +336,3 @@ jobs:
           kill "$(cat /tmp/qemu.pid)" || true
           echo "QEMU process terminated."
         fi
-
-      run: |
-        if [ -f /tmp/qemu.pid ]; then
-          kill "$(cat /tmp/qemu.pid)" || true
-          echo "QEMU process terminated."
-        fi
