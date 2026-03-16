@@ -123,8 +123,17 @@
               "description": "Port mappings",
               "items": {
                 "type": "string",
-                "$comment": "Two port formats supported: (1) old OCI-style: [ip:]host:container[/tcp|/udp][:label] and (2) new RouterOS 7.23+ style: [ip:]host:container[:label][:tcp|:udp]. The protocol segment (tcp/udp) comes before the label in format 1, and after the label in format 2.",
-                "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?(:(tcp|udp))?$"
+                "$comment": "Two port formats supported, exactly one protocol style per entry: (1) old OCI-style [ip:]host:container[/tcp|/udp][:label] and (2) new RouterOS 7.23+ style [ip:]host:container[:label][:tcp|:udp]. Mixing styles (e.g. host:container/tcp:label:tcp) is rejected.",
+                "anyOf": [
+                  {
+                    "$comment": "Old OCI-style: [ip:]host:container[/tcp|/udp][:label]",
+                    "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+                  },
+                  {
+                    "$comment": "New RouterOS 7.23+ style: [ip:]host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
+                    "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
+                  }
+                ]
               }
             },
             "environment": {
