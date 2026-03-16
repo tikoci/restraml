@@ -204,10 +204,6 @@ jobs:
       run: |
         git add docs/${{ steps.connection-check.outputs.rosver }}/
         git commit -m "Publish ${{ steps.connection-check.outputs.rosver }} extra/${{ steps.publish-to-docs.outputs.subpath }} [${{ github.workflow }}]"
-        # Clean up unstaged changes left by bun install / npm install so that
-        # git pull --rebase can proceed if the push is rejected.
-        git checkout -- .
-        git clean -fd
         # Retry push with pull --rebase to handle concurrent build conflicts.
         # Multiple builds (base + extra, multiple versions) can run simultaneously and all
         # push to main. If another job commits first the push is rejected; rebasing our commit
@@ -221,6 +217,11 @@ jobs:
             exit 1
           fi
           echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
+          # Clean up unstaged changes left by bun install / npm install so that
+          # git pull --rebase can proceed. Do this right before rebase, not before
+          # artifact upload (which happens after push succeeds or fails).
+          git checkout -- .
+          git clean -fd
           git pull --rebase
           sleep $((RANDOM % 10 + 5))
         done
