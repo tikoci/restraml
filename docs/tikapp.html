@@ -142,6 +142,36 @@
         }
         .action-row button { margin: 0; padding: 0.25rem 0.7rem; font-size: 0.78rem; }
 
+        /* Undo Pico CSS's global button/role-button styles inside Monaco editor.
+           Selector specificity must sit BETWEEN two competing cascades:
+             Low:  Pico globals — [role="button"] (0,1,0) / button (0,0,1)
+             High: Monaco widget rules — .zone-widget button, etc. (0,2,1+)
+           .monaco-editor :is(button, a[role="button"]) resolves to (0,2,1):
+           beats Pico's globals; Monaco's own multi-class widget rules still win.
+           NOTE: do NOT add appearance, font, or color to the :is() rule —
+           Monaco controls those for codicon icon glyphs on <button> elements. */
+        .monaco-editor :is(button, a[role="button"]) {
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            width: auto;
+            inline-size: auto;
+            min-height: 0;
+            margin: 0;
+            border-radius: 0;
+        }
+        /* Pico also inflates font-size, font-weight, and line-height on
+           [role="button"] links (e.g. "View Problem (F8)" in the hover widget).
+           Reset those here, scoped to <a> ONLY — not <button> — so we don't
+           touch the codicon icon font-size that Monaco sets explicitly on
+           <button class="codicon …"> elements in zone/navigate widgets. */
+        .monaco-editor a[role="button"] {
+            font-size: inherit;
+            line-height: inherit;
+            font-weight: inherit;
+        }
+
         /* MikroTik symbol SVG: invert to white in dark mode */
         .mt-symbol { height: 0.9em; width: auto; vertical-align: middle; margin: 0 2px; }
         @media (prefers-color-scheme: dark) { :root:not([data-theme=light]) .mt-symbol { filter: invert(1); } }
@@ -201,7 +231,6 @@
                             <li><a href="lookup.html">Command Lookup</a></li>
                             <li><a href="diff.html">Schema Diff</a></li>
                             <li><a href="tikapp.html" aria-current="page">/app Editor</a></li>
-                            <li><a href="tikapp-manual.html">/app Editor Manual</a></li>
                         </ul>
                     </details>
                 </li>
@@ -304,12 +333,12 @@
                 <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
                 Copy /app/add
             </button>
+            <button id="share-btn" type="button" class="outline secondary" title="Copy shareable URL to clipboard" disabled>🔗 Share</button>
             <span style="flex:1"></span>
             <small style="color:var(--pico-muted-color);font-size:0.72rem;align-self:center">
-                From <a href="https://github.com/tikoci/restraml">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>.
+            <small> 
+                From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1a</kbd></small>
             </small>
-            <button id="share-btn" type="button" class="outline secondary" title="Copy shareable URL to clipboard" disabled>🔗 Share</button>
-            <button id="clear-btn" type="button" class="outline secondary" title="Clear the editor" disabled>✕ Clear</button>
         </div>
 
     </main>
@@ -327,7 +356,7 @@
         //   Stash (STASH_KEY): explicit "💾 Stash" button; "Recall Stash" restores it
         //   Dirty tracking: if content differs from loaded example → show stash/OK options
         //   Import: file picker → load YAML into editor
-        //   New/Clear: clear editor
+        //   New: clear editor
         // =================================================================
 
         // --- State -------------------------------------------------------
@@ -389,7 +418,6 @@
         const copyBtn              = document.getElementById('copy-btn')
         const copyCmdBtn           = document.getElementById('copy-cmd-btn')
         const shareBtn             = document.getElementById('share-btn')
-        const clearBtn             = document.getElementById('clear-btn')
 
         // --- Dirty state helpers -----------------------------------------
         function isDirty() {
@@ -687,7 +715,6 @@
             copyBtn.disabled = disabled
             copyCmdBtn.disabled = disabled
             shareBtn.disabled = disabled
-            clearBtn.disabled = disabled
         }
 
         // --- Update copy-cmd-btn based on store mode ---------------------
@@ -1143,7 +1170,6 @@
                 downloadBtn.disabled = false
                 copyBtn.disabled = false
                 shareBtn.disabled = false
-                clearBtn.disabled = false
 
                 runValidation()
                 initPage()
@@ -1435,29 +1461,6 @@
             }).catch(() => {
                 setStatus('Could not copy URL — copy it from the address bar.')
             })
-        })
-
-        // Clear button
-        clearBtn.addEventListener('click', () => {
-            if (!editor) return
-            const content = editor.getValue().trim()
-            if (!content) return
-            setStatus('Clear editor? All current content will be lost.', false, [
-                {
-                    label: 'Clear', fn: () => {
-                        suppressChangeEvent = true
-                        editor.setValue('')
-                        suppressChangeEvent = false
-                        clearCurrentExample()
-                        localStorage.removeItem(AUTOSAVE_KEY)
-                        runValidation()
-                        setStatus('Editor cleared.', true)
-                        editor.focus()
-                        plausible?.('App YAML Clear', {})
-                    }
-                },
-                { label: 'Cancel', fn: () => clearStatus() }
-            ])
         })
 
         // --- Shareable URL query params ----------------------------------

@@ -384,6 +384,69 @@ forces light mode. The shared code handles this correctly by removing the attrib
 [data-theme=dark] #mycomponent { /* dark styles */ }
 ```
 
+### Monaco Editor Integration — Pico CSS Conflict
+
+`docs/tikapp.html` embeds Monaco Editor. Pico CSS's global `button` and `[role="button"]` rules
+leak into Monaco's internal widget DOM and style Monaco's hover tooltips, zone widgets (problem
+panels), and action links as large styled buttons. The fix is a targeted CSS reset, but the
+*selector specificity* is critical — get it wrong and you either don't fix Pico's overrides or
+you break Monaco's own internal styling.
+
+**The specificity sandwich:**
+
+| Rule | Specificity | Must… |
+|---|---|---|
+| Pico global `button { }` | `(0,0,1)` | be beaten by our reset |
+| Pico global `[role="button"] { }` | `(0,1,0)` | be beaten by our reset |
+| **Our reset** | **`(0,2,1)`** | **sits between the two** |
+| Monaco widget `.zone-widget button` etc. | `(0,2,1)+` | beat our reset so Monaco's own styles win |
+
+Note: `.monaco-editor :is(button, a[role="button"])` resolves to `(0,2,1)` because `.monaco-editor`
+contributes `(0,1,0)` and `:is(button, a[role="button"])` contributes `(0,1,1)` (the max specificity
+of its forgiving list).
+
+**The correct two-rule pattern:**
+```css
+/* Box model reset for both <button> and <a role="button"> */
+.monaco-editor :is(button, a[role="button"]) {
+    padding: 0; border: 0; background: transparent;
+    box-shadow: none; width: auto; inline-size: auto;
+    min-height: 0; margin: 0; border-radius: 0;
+}
+/* Font reset for <a role="button"> ONLY ("View Problem (F8)" etc.)
+   Scoped to <a> not <button> — Monaco controls icon font-size on <button>.codicon */
+.monaco-editor a[role="button"] {
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+}
+```
+
+**Anti-patterns that cause bugs:**
+
+- **`#editor-container :is(...)`** — ID gives specificity `(1,0,1)/(1,1,1)`, which is HIGHER than
+  Monaco's own `.zone-widget button` rules `(0,2,1)`. This overrides Monaco's internal widget
+  styles and causes close/navigate icon buttons to render as "bars" (bare codicon characters with
+  all Monaco chrome removed).
+- **`appearance: auto`** — tells the browser to render OS-native button chrome. On macOS dark mode
+  with `background: transparent`, this produces visible striped bars on previously styled buttons.
+- **`font: inherit`** — codicon icon glyphs in `.monaco-editor ::before` pseudo-elements rely on
+  `font-family: codicon` being set by Monaco's own rules on the pseudo-element; adding `font: inherit`
+  on the parent element can interfere with glyph rendering depending on where Monaco puts the icon
+  character (text content vs `::before`). Omit it.
+- **`color: inherit`** — may affect icon color in dark vs light modes. Let Monaco control it.
+- **Adding `font-size/weight/line-height` to the `:is(button, a[role="button"])` rule** — Pico
+  inflates font on `[role="button"]` anchors ("View Problem" link becomes oversized), but resetting
+  font-size on `<button>` too can interfere with Monaco's codicon icon sizing. Split it: reset font
+  properties on a **separate `a[role="button"]`-only rule** (see pattern above).
+
+**Monaco widget types and which elements they use:**
+
+- **Hover widget** ("View Problem (F8)" etc.): uses `<a role="button">` — must be in the selector.
+- **Zone widget** (problem navigation panel): uses `<button>` and `<a role="button">` for close/navigate.
+- **Overflow widgets** (hover tooltip): only appear outside `.monaco-editor` if `fixedOverflowWidgets: true`
+  (default is `false`, so they stay inside `.monaco-editor` and ARE covered by the selector).
+
 ### diff2html Integration — Gotchas
 
 `docs/diff.html` uses [diff2html](https://diff2html.xyz/) with [jsdiff](https://github.com/kpdecker/jsdiff).

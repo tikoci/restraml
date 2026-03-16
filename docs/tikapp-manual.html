@@ -271,7 +271,6 @@
                     <tr><td><strong>📋 Copy</strong></td><td>Copy the raw YAML to your clipboard.</td></tr>
                     <tr><td><strong>Copy /app/add</strong></td><td>Copy a ready-to-paste RouterOS CLI command: <code>/app add yaml="…"</code>. Disabled in app-store-urls= mode (array format is not supported by <code>/app add</code>).</td></tr>
                     <tr><td><strong>🔗 Share</strong></td><td>Copy a shareable URL that encodes the current version, mode, and YAML content to your clipboard. Share the link — anyone who opens it gets the same editor state.</td></tr>
-                    <tr><td><strong>✕ Clear</strong></td><td>Clear the editor (prompts for confirmation).</td></tr>
                 </tbody>
             </table>
         </section>
@@ -454,7 +453,7 @@ services:
         <section id="architecture">
             <h2><a class="section-anchor" href="#architecture">7. Behind the Scenes — How the Schema Gets Here</a></h2>
             <p>
-                The editor's live validation is powered by a JSON Schema that is generated
+                The editor's live validation is powered by a JSON Schema that is validated
                 automatically from a real RouterOS router. Here is how the pipeline works —
                 a quick look behind the curtain.
             </p>
@@ -477,7 +476,7 @@ QEMU boots the CHR on a GitHub Actions runner (with KVM acceleration)
          │
          ▼
 appyamlvalidate.js (Bun)
-  Generates per-version JSON Schema from routeros-app-yaml-schema.latest.json
+  Copies per-version JSON Schema from routeros-app-yaml-schema.latest.json
   Validates every built-in /app YAML against the schema
   Writes docs/{version}/routeros-app-yaml-schema.json
   Writes docs/{version}/app.json  (built-in app YAMLs)
@@ -517,7 +516,7 @@ tikapp.html loads schema + app.json from GitHub Pages
         <hr>
         <p style="color:var(--pico-muted-color);font-size:0.85rem;text-align:center">
             From <a href="https://github.com/tikoci/restraml">TIKOCI</a>. Not affiliated with
-            <a href="https://mikrotik.com">MikroTik</a>.
+            <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1a</kbd>
         </p>
 
     </main>

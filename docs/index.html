@@ -178,7 +178,6 @@
                             <li><a href="lookup.html">Command Lookup</a></li>
                             <li><a href="diff.html">Schema Diff</a></li>
                             <li><a href="tikapp.html">/app Editor</a></li>
-                            <li><a href="tikapp-manual.html">/app Editor Manual</a></li>
                         </ul>
                     </details>
                 </li>
@@ -245,8 +244,9 @@
             <details id="diffcodedetails" hidden>
                 <summary>
                     <div class="grid">
-                        <div>
+                        <div class="grid">
                             <span id="diff-toggle-label">Show JSON Diff</span>
+                            <span id="diff-tool-link-p"><a id="diff-tool-link" href="diff.html"><mark>Try New Diff</mark></a></span>
                         </div>
                         <div class="grid">
                             <div><b><span class="cmddiff"></span></b> commands</div>
@@ -256,11 +256,11 @@
                 </summary>
                 <pre><code id="diffcode" class="language-diff"></code></pre>
             </details>
-            <p id="diff-tool-link-p" hidden><small><a id="diff-tool-link" href="diff.html">View in new RouterOS <code>diff</code> — <em>with new style diffs and better views</em></a></small></p>
+            <!--<p id="diff-tool-link-p" hidden><small><a id="diff-tool-link" href="diff.html">View in new RouterOS <code>diff</code> — <em>with new style diffs and better views</em></a></small></p>-->        
         </section>
 
         <!-- /app YAML Schema callout -->
-        <article id="section-app-yaml">
+        <article id="section-app-yaml" hidden="true">
             <small>📦 <strong>Schema for <code>/app</code> YAML</strong> (RouterOS 7.22+) —
                 Validate RouterOS <code>/app</code> container YAML in editors like VSCode using
                 <a href="https://tikoci.github.io/restraml/routeros-app-yaml-schema.latest.json">routeros-app-yaml-schema.latest.json</a>
