@@ -206,6 +206,94 @@ body > footer small {
 
 
 /* -----------------------------------------------------------------
+ * 11. Reversed/inverted brand text (TIKOCI)
+ *     Gradient pill used in nav brand link and hero headings.
+ *     Synced with tikoci.github.io shared.css.
+ * ----------------------------------------------------------------- */
+.brand-reverse {
+    display: inline-block;
+    background: var(--brand-gradient, linear-gradient(135deg, #3660B9, #5F2965));
+    color: #fff;
+    padding: 0.05em 0.4em;
+    border-radius: var(--pico-border-radius);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    text-decoration: none;
+}
+.brand-reverse:hover,
+.brand-reverse:visited {
+    color: #fff;
+    text-decoration: none;
+}
+a.brand-reverse:hover { opacity: 0.85; }
+
+
+/* -----------------------------------------------------------------
+ * 11b. Nav brand link — MikroTik logo + "by TIKOCI" header
+ *      Synced with tikoci.github.io shared.css.
+ * ----------------------------------------------------------------- */
+.nav-brand-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.nav-brand-link:hover { text-decoration: none; }
+.nav-brand-link .brand-reverse {
+    font-size: 0.9rem;
+    padding: 0.05em 0.35em;
+}
+/* Full MikroTik logo (symbol + brand name) — desktop only */
+.nav-mt-full {
+    height: 1.4rem;
+    width: auto;
+    flex-shrink: 0;
+    color: var(--pico-color);
+}
+/* MikroTik symbol only — mobile only */
+.nav-mt-symbol {
+    height: 1.4rem;
+    width: auto;
+    flex-shrink: 0;
+    display: none;
+    color: var(--pico-color);
+}
+.nav-by {
+    font-size: 0.78rem;
+    color: var(--pico-muted-color);
+    font-style: italic;
+}
+@media (max-width: 576px) {
+    .nav-mt-full { display: none; }
+    .nav-mt-symbol { display: inline; }
+}
+
+
+/* -----------------------------------------------------------------
+ * 12. Nav dropdown buttons with icon (Tools, GitHub)
+ *     Synced with tikoci.github.io shared.css.
+ * ----------------------------------------------------------------- */
+nav details.dropdown {
+    width: fit-content;
+}
+nav details.dropdown > summary[role="button"].nav-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+nav details.dropdown > summary.nav-btn-icon svg.nav-icon {
+    width: 1.4rem;
+    height: 1.4rem;
+    flex-shrink: 0;
+}
+
+
+/* -----------------------------------------------------------------
  * 10. Changelog / Release Notes modal
  *     Shared by index.html and lookup.html (and any future page).
  *     Trigger via initChangelogModal() from restraml-shared.js.

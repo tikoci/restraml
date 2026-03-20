@@ -19,6 +19,27 @@ const RESTRAML = Object.freeze({
     apiContentsUrl: 'https://api.github.com/repos/tikoci/restraml/contents/docs',
 })
 
+// --- Brand gradient (random MikroTik-inspired gradient per page load) -
+// Synced with tikoci.github.io shared.js. Runs immediately — no DOM needed.
+const _BRAND_GRADIENTS = [
+    ['#C33366', '#692878'],
+    ['#EE9B01', '#EE4F01'],
+    ['#3660B9', '#5F2965'],
+    ['#3BB5B6', '#44DE95'],
+    ['#582D7C', '#1FC8DB'],
+    ['#CF0F14', '#EE4F01'],
+    ['#1F417A', '#87D3DB'],
+    ['#015EA4', '#3BB5B6'],
+    ['#017C65', '#A3D16E'],
+    ['#692878', '#1FC8DB'],
+];
+(() => {
+    const p = _BRAND_GRADIENTS[Math.floor(Math.random() * _BRAND_GRADIENTS.length)];
+    document.documentElement.style.setProperty(
+        '--brand-gradient', `linear-gradient(135deg, ${p[0]}, ${p[1]})`
+    );
+})();
+
 // --- RouterOS version parsing and sorting ----------------------------
 
 /**
@@ -418,4 +439,48 @@ function initShareModal(opts) {
             document.getElementById(opts.urlId).select()
         })
     })
+}
+
+
+// --- HTML escaping ---------------------------------------------------
+
+/**
+ * Escape HTML special characters for safe innerHTML insertion.
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+
+// --- GitHub repos dropdown -------------------------------------------
+// Lazily populates a <ul> with the most recently active tikoci repos.
+// Synced with tikoci.github.io shared.js.
+
+/**
+ * Fetch repos with 3+ stars and populate a dropdown list, sorted by stars.
+ * Falls back gracefully to the static link if the API is unavailable.
+ *
+ * @param {string} listId - ID of the <ul> element to populate
+ */
+function initGitHubDropdown(listId) {
+    const el = document.getElementById(listId)
+    if (!el || el.dataset.loaded) return
+    el.dataset.loaded = '1'
+    const allUrl = `https://github.com/orgs/${RESTRAML.owner}/repositories`
+    fetch(`https://api.github.com/search/repositories?q=org:${RESTRAML.owner}+stars:>=3&sort=stars&order=desc&per_page=30`)
+        .then(r => {
+            if (!r.ok) throw new Error(r.status)
+            return r.json()
+        })
+        .then(data => {
+            const repos = data.items
+            if (!Array.isArray(repos)) return
+            el.innerHTML = repos.map(r =>
+                `<li><a href="${escapeHtml(r.html_url)}" target="_blank" rel="noopener">${escapeHtml(r.name)}</a></li>`
+            ).join('') +
+            `<li><a href="${allUrl}" target="_blank" rel="noopener"><strong>All repositories &rarr;</strong></a></li>`
+        })
+        .catch(() => { /* keep static fallback */ })
 }
