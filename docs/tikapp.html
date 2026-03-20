@@ -44,6 +44,8 @@
         header.container { flex-shrink: 0; padding-top: 0.6rem; padding-bottom: 0.2rem; }
 
         header h1 { margin-bottom: 0.2rem; font-size: 1.4rem; }
+        header h1 small { font-size: 0.52em; font-weight: 400; opacity: 0.6; margin-left: 0.6rem; }
+        header h1 small a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
         main.container {
             flex: 1; min-height: 0; display: flex; flex-direction: column;
@@ -236,7 +238,6 @@
                         <ul dir="rtl">
                             <li><a href="https://tikoci.github.io/chr-images.html">CHR Images</a></li>
                             <li><a href="tikapp.html" aria-current="page">/app Editor</a></li>
-                            <li><a href="tikapp-manual.html">/app Manual</a></li>
                             <li><a href="diff.html">Schema Diff</a></li>
                             <li><a href="lookup.html">Command Lookup</a></li>
                             <li><a href="index.html">Schema Downloads</a></li>
@@ -251,15 +252,8 @@
                 <li><a href="#" id="theme_switcher" aria-label="Toggle dark mode"></a></li>
             </ul>
         </nav>
-        <h1 style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.2rem">
-            <span><code>/app</code> <mark>YAML Editor</mark></span>
-            <span style="margin-left:auto;font-size:0.72rem;font-weight:400;white-space:nowrap;opacity:0.65">
-                <a href="https://github.com/tikoci/restraml/blob/main/README.md#app-yaml-editor" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[about]</a>
-                ·
-                <a href="https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[/app docs]</a>
-                ·
-                <a href="tikapp-manual.html" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">[manual]</a>
-            </span>
+        <h1><code>/app</code> <mark>YAML Editor</mark>
+            <small><a href="tikapp-manual.html"><code>[manual]</code></a> <a href="https://forum.mikrotik.com/t/amm0s-manual-for-custom-app-containers-7-22beta/268036" target="_blank" rel="noopener"><code>[/app docs]</code></a> <a href="https://github.com/tikoci/restraml/blob/main/README.md#app-yaml-editor" target="_blank" rel="noopener"><code>[about]</code></a></small>
         </h1>
     </header>
 
