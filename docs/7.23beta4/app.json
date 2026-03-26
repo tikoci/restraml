@@ -3225,7 +3225,7 @@
     "required-hw-devices": "",
     "required-mounts": "postgresql-14,rabbitmq,redis,zulip",
     "running": "false",
-    "secrets": "zulip__postgres_password:oHKAywAJeXUWraWJPtOQinehPcFZsSVr,zulip__memcached_password:gJJhfCPwTfNzXCAuYiEmzvYAYVZZWFuH,zulip__rabbitmq_password:PsEumffvJFCVpltNdtbSddPTXwRdREMz,zulip__redis_password:TxqabEOrGiBlvjFYVUGkNVayilWafKuA,zulip__secret_key:avyWAYszHHNlDdppZGkAIJvsKuuESbAT,zulip__email_password:knYliieJNfuNRuCuafvavMNftRmDfqMw",
+    "secrets": "zulip__postgres_password:HrRifGGVWtGVJjUchgZGAbRlBDNLfZUn,zulip__memcached_password:xqHcStExIQwGtqjOxYunOspFOkxZNQWQ,zulip__rabbitmq_password:mMNcStMvVsrmSUHiOZYejuSoYYglwPLV,zulip__redis_password:FhTYIXQSEFGadnqXzzcVcKyZjWNgHelt,zulip__secret_key:epfcroVRhDXSUmoaBEjSoXwDMhKCqXef,zulip__email_password:dMnfzGZZIipGnHfcTYmJRbqctXepTFYg",
     "status": "",
     "ui-url": "",
     "use-https": "true",
