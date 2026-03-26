@@ -178,7 +178,8 @@
                         "type": "string",
                         "description": "Application protocol hint"
                       }
-                    }
+                    },
+                    "additionalProperties": false
                   }
                 ]
               }
@@ -313,6 +314,8 @@
                   "oneOf": [
                     {
                       "type": "object",
+                      "required": ["soft", "hard"],
+                      "additionalProperties": false,
                       "properties": {
                         "soft": {
                           "type": "integer"
@@ -333,6 +336,7 @@
               "oneOf": [
                 {
                   "type": "object",
+                  "additionalProperties": false,
                   "properties": {
                     "context": {
                       "type": "string"
@@ -354,6 +358,7 @@
             "healthcheck": {
               "type": "object",
               "description": "Container health check configuration",
+              "additionalProperties": false,
               "properties": {
                 "test": {
                   "oneOf": [
