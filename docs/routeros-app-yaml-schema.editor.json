@@ -61,6 +61,14 @@
       "description": "URL path suffix appended to the access URL for browser access",
       "examples": ["/", "/ui", "/admin"]
     },
+    "credentials": {
+      "type": "string",
+      "description": "Credential hint displayed in the app UI (alternative to default-credentials)"
+    },
+    "option": {
+      "type": "boolean",
+      "description": "Whether this /app is optional"
+    },
     "auto-update": {
       "type": "boolean",
       "description": "Pull and restart all service containers on every router boot"
@@ -107,16 +115,49 @@
               "type": "array",
               "description": "Port mappings",
               "items": {
-                "type": "string",
-                "description": "Two formats supported: (1) `[ip:]host:container[/tcp|/udp][:label]` (OCI-style, pre-7.23) or (2) `[ip:]host:container[:label][:tcp|:udp]` (RouterOS 7.23+, protocol after label). RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
-                "$comment": "Two strict patterns used in .latest.json (anyOf): (1) old OCI-style: ^(ip:)?host:container(/tcp|/udp)?(:label)?$ and (2) new RouterOS 7.23+ style: ^(ip:)?host:container(:label)?(:tcp|:udp)?$ where label may not contain / or :. Mixing both protocol styles in one entry is rejected.",
-                "examples": [
-                  "80:80",
-                  "80:80:web",
-                  "8080:8080/tcp:rest api",
-                  "8080:8080:web:tcp",
-                  "[accessIP]:[accessPort]:80:web",
-                  "127.0.0.1:9000:9000"
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Two formats supported: (1) `[ip:]host:container[/tcp|/udp][:label]` (OCI-style, pre-7.23) or (2) `[ip:]host:container[:label][:tcp|:udp]` (RouterOS 7.23+, protocol after label). RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
+                    "$comment": "Two strict patterns used in .latest.json (anyOf): (1) old OCI-style: ^(ip:)?host:container(/tcp|/udp)?(:label)?$ and (2) new RouterOS 7.23+ style: ^(ip:)?host:container(:label)?(:tcp|:udp)?$ where label may not contain / or :. Mixing both protocol styles in one entry is rejected.",
+                    "examples": [
+                      "80:80",
+                      "80:80:web",
+                      "8080:8080/tcp:rest api",
+                      "8080:8080:web:tcp",
+                      "[accessIP]:[accessPort]:80:web",
+                      "127.0.0.1:9000:9000"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "$comment": "Long syntax port mapping with named fields",
+                    "required": ["target", "published"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Port mapping label"
+                      },
+                      "target": {
+                        "type": "integer",
+                        "description": "Container port"
+                      },
+                      "published": {
+                        "type": "integer",
+                        "description": "Host port"
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "enum": ["tcp", "udp"],
+                        "description": "Protocol (tcp or udp)"
+                      },
+                      "app_protocol": {
+                        "type": "string",
+                        "description": "Application protocol hint"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
                 ]
               }
             },
@@ -213,8 +254,78 @@
               "description": "Shared memory size (e.g. `128m`, `1g`)"
             },
             "stop_grace_period": {
-              "type": "string",
+              "type": ["string", "integer"],
               "description": "Wait this long before sending SIGKILL (e.g. `10s`, `1m30s`)"
+            },
+            "ulimits": {
+              "type": "object",
+              "description": "Resource limits (e.g. nofile soft/hard)",
+              "patternProperties": {
+                "^[a-zA-Z0-9_-]+$": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": ["soft", "hard"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "soft": {"type": "integer"},
+                        "hard": {"type": "integer"}
+                      }
+                    },
+                    {"type": "integer"}
+                  ]
+                }
+              }
+            },
+            "build": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "context": {"type": "string"},
+                    "dockerfile": {"type": "string"},
+                    "args": {"type": "object"}
+                  }
+                },
+                {"type": "string"}
+              ],
+              "description": "Build configuration for the container image"
+            },
+            "healthcheck": {
+              "type": "object",
+              "description": "Container health check configuration",
+              "additionalProperties": false,
+              "properties": {
+                "test": {
+                  "oneOf": [
+                    {"type": "array", "items": {"type": "string"}},
+                    {"type": "string"}
+                  ]
+                },
+                "interval": {"type": "string"},
+                "timeout": {"type": "string"},
+                "retries": {"type": "integer"},
+                "start_period": {"type": "string"}
+              }
+            },
+            "stdin_open": {
+              "type": "boolean",
+              "description": "Keep stdin open even if not attached"
+            },
+            "expose": {
+              "type": "array",
+              "description": "Expose ports without publishing them to the host",
+              "items": {"type": ["string", "integer"]}
+            },
+            "secrets": {
+              "type": "array",
+              "description": "Secrets to expose to the service",
+              "items": {"type": "string"}
+            },
+            "attach": {
+              "type": "boolean",
+              "description": "Whether to attach to the container's stdio"
             }
           }
         }
