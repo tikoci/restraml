@@ -704,8 +704,15 @@
             verSelect.appendChild(new Option('editor (loose)', 'editor'))
             for (const v of schemaVersions) verSelect.appendChild(new Option(v.name, v.name))
 
-            const hasDefault = [...verSelect.options].some(o => o.value === DEFAULT_VERSION)
-            verSelect.value = hasDefault ? DEFAULT_VERSION : schemaVersions[0].name
+            // Prefer the version from the URL query params (shared / bookmarked URL),
+            // then DEFAULT_VERSION when available, otherwise fall back to the newest.
+            const urlVersion = new URLSearchParams(window.location.search).get('version')
+            const allValues = [...verSelect.options].map(o => o.value)
+            if (urlVersion && allValues.includes(urlVersion)) {
+                verSelect.value = urlVersion
+            } else {
+                verSelect.value = allValues.includes(DEFAULT_VERSION) ? DEFAULT_VERSION : schemaVersions[0].name
+            }
             verSelect.disabled = false
 
             await onVersionChanged()
