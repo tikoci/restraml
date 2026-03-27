@@ -1,0 +1,242 @@
+{
+  "convert": {
+    "_type": "cmd",
+    "from": {
+      "_type": "arg",
+      "desc": "value to convert from"
+    },
+    "to": {
+      "_type": "arg",
+      "desc": "value to convert to"
+    },
+    "transform": {
+      "_type": "arg",
+      "desc": "transformation type"
+    }
+  },
+  "certificate": {
+    "_type": "dir",
+    "add": {
+      "_type": "cmd",
+      "common-name": {
+        "_type": "arg",
+        "desc": "string value"
+      },
+      "country": {
+        "_type": "arg",
+        "desc": "string value"
+      },
+      "days-valid": {
+        "_type": "arg",
+        "desc": ""
+      },
+      "key-size": {
+        "_type": "arg",
+        "desc": "integer"
+      }
+    },
+    "get": {
+      "_type": "cmd",
+      "common-name": {
+        "_type": "arg",
+        "desc": "Read-only (string)"
+      },
+      "fingerprint": {
+        "_type": "arg",
+        "desc": "Read-only (string)"
+      }
+    },
+    "set": {
+      "_type": "cmd",
+      "trusted": {
+        "_type": "arg",
+        "desc": "yes | no"
+      }
+    },
+    "remove": {
+      "_type": "cmd"
+    },
+    "print": {
+      "_type": "cmd"
+    },
+    "crl": {
+      "_type": "dir",
+      "get": {
+        "_type": "cmd",
+        "name": {
+          "_type": "arg",
+          "desc": "string value"
+        }
+      },
+      "print": {
+        "_type": "cmd"
+      }
+    }
+  },
+  "ip": {
+    "_type": "path",
+    "address": {
+      "_type": "dir",
+      "add": {
+        "_type": "cmd",
+        "address": {
+          "_type": "arg",
+          "desc": "IP address/netmask"
+        },
+        "interface": {
+          "_type": "arg",
+          "desc": "interface name"
+        },
+        "comment": {
+          "_type": "arg",
+          "desc": "string value"
+        }
+      },
+      "get": {
+        "_type": "cmd",
+        "address": {
+          "_type": "arg",
+          "desc": "Read-only (IP/mask)"
+        },
+        "interface": {
+          "_type": "arg",
+          "desc": "Read-only (string)"
+        },
+        "disabled": {
+          "_type": "arg",
+          "desc": "Read-only (boolean)"
+        }
+      },
+      "set": {
+        "_type": "cmd",
+        "address": {
+          "_type": "arg",
+          "desc": "IP address/netmask"
+        },
+        "interface": {
+          "_type": "arg",
+          "desc": "interface name"
+        },
+        "comment": {
+          "_type": "arg",
+          "desc": "string value"
+        }
+      },
+      "remove": {
+        "_type": "cmd"
+      },
+      "print": {
+        "_type": "cmd"
+      }
+    },
+    "firewall": {
+      "_type": "dir",
+      "filter": {
+        "_type": "dir",
+        "add": {
+          "_type": "cmd",
+          "chain": {
+            "_type": "arg",
+            "desc": "string value"
+          },
+          "action": {
+            "_type": "arg",
+            "desc": "action to take"
+          },
+          "protocol": {
+            "_type": "arg",
+            "desc": "protocol name"
+          },
+          "where": {
+            "_type": "arg"
+          },
+          "do": {
+            "_type": "arg"
+          }
+        },
+        "get": {
+          "_type": "cmd",
+          "chain": {
+            "_type": "arg",
+            "desc": "Read-only (string)"
+          },
+          "action": {
+            "_type": "arg",
+            "desc": "Read-only (string)"
+          }
+        },
+        "set": {
+          "_type": "cmd",
+          "chain": {
+            "_type": "arg",
+            "desc": "string value"
+          },
+          "action": {
+            "_type": "arg",
+            "desc": "action to take"
+          }
+        },
+        "remove": {
+          "_type": "cmd"
+        },
+        "print": {
+          "_type": "cmd"
+        }
+      }
+    }
+  },
+  "interface": {
+    "_type": "dir",
+    "ethernet": {
+      "_type": "dir",
+      "get": {
+        "_type": "cmd",
+        "name": {
+          "_type": "arg",
+          "desc": "Read-only (string)"
+        },
+        "speed": {
+          "_type": "arg",
+          "desc": "Read-only (string)"
+        }
+      },
+      "set": {
+        "_type": "cmd",
+        "speed": {
+          "_type": "arg",
+          "desc": "interface speed"
+        },
+        "mtu": {
+          "_type": "arg",
+          "desc": "integer"
+        }
+      },
+      "print": {
+        "_type": "cmd"
+      }
+    }
+  },
+  "system": {
+    "_type": "dir",
+    "identity": {
+      "_type": "dir",
+      "get": {
+        "_type": "cmd",
+        "name": {
+          "_type": "arg",
+          "desc": "Read-only (string)"
+        }
+      },
+      "set": {
+        "_type": "cmd",
+        "name": {
+          "_type": "arg",
+          "desc": "string value"
+        }
+      },
+      "print": {
+        "_type": "cmd"
+      }
+    }
+  }
+}

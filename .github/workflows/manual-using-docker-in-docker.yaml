@@ -143,6 +143,16 @@ jobs:
         npm install webapi-parser
         node validraml.cjs ros-rest*.raml
 
+    - name: Generate deep-inspect.json and openapi.json
+      run: |
+        bun deep-inspect.ts \
+          --inspect-file ros-inspect-all.json \
+          --output-dir . \
+          --test-crash-paths
+
+    - name: Run deep-inspect integration tests
+      run: bun test deep-inspect.integration.test.ts
+
     - name: Publish schema files to /docs
       id: publish-to-docs
       run: |
@@ -154,6 +164,8 @@ jobs:
         cp index.html "$DOCS_PATH/docs/"
         cp ros-rest*.raml "$DOCS_PATH/schema.raml"
         cp ros-inspect*.json "$DOCS_PATH/inspect.json"
+        if [ -f deep-inspect.json ]; then cp deep-inspect.json "$DOCS_PATH/"; fi
+        if [ -f openapi.json ]; then cp openapi.json "$DOCS_PATH/"; fi
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
 
     - name: Commit and push schema to repository
@@ -191,6 +203,8 @@ jobs:
         path: |
           ros-rest*.raml
           ros-inspect*.json
+          deep-inspect.json
+          openapi.json
           index.html
 
     - name: Cleanup QEMU

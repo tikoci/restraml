@@ -1,0 +1,711 @@
+/**
+ * deep-inspect.ts — Enhanced RouterOS schema generation
+ *
+ * Takes an existing inspect.json (from rest2raml.js) and enriches it with
+ * completion data from the RouterOS REST API. Outputs deep-inspect.json
+ * (superset of inspect.json) and openapi.json (OpenAPI 3.0).
+ *
+ * Usage:
+ *   bun deep-inspect.ts --inspect-file docs/7.22/inspect.json
+ *   URLBASE=http://localhost:9180/rest BASICAUTH=admin: bun deep-inspect.ts --inspect-file docs/7.22/inspect.json
+ *   URLBASE=http://localhost:9180/rest BASICAUTH=admin: bun deep-inspect.ts --live
+ */
+
+import { parseArgs } from "util";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+/** A node in the inspect tree (as produced by rest2raml.js / /console/inspect) */
+export interface InspectNode {
+  _type?: "cmd" | "arg" | "dir" | "path";
+  desc?: string;
+  _completion?: Record<string, CompletionEntry>;
+  [key: string]: InspectNode | string | undefined | Record<string, CompletionEntry>;
+}
+
+export interface CompletionEntry {
+  style: string;
+  preference?: number;
+  desc?: string;
+}
+
+export interface DeepInspectMeta {
+  version: string;
+  generatedAt: string;
+  crashPathsTested: string[];
+  crashPathsSafe: string[];
+  crashPathsCrashed: string[];
+  completionStats: {
+    argsTotal: number;
+    argsWithCompletion: number;
+    argsFailed: number;
+  };
+}
+
+export interface DeepInspectOutput {
+  _meta: DeepInspectMeta;
+  [key: string]: InspectNode | DeepInspectMeta;
+}
+
+/** Raw response item from /console/inspect with request=child */
+interface InspectChildResponse {
+  type: string;
+  name: string;
+  "node-type": string;
+}
+
+/** Raw response item from /console/inspect with request=syntax */
+interface InspectSyntaxResponse {
+  text: string;
+}
+
+/** Raw response item from /console/inspect with request=completion */
+interface InspectCompletionResponse {
+  completion: string;
+  show: boolean | string;
+  style?: string;
+  preference?: number;
+  desc?: string;
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+/** Paths known to crash the RouterOS REST server in older versions.
+ *  deep-inspect.ts tests these with a timeout to discover which are safe. */
+export const CRASH_PATHS = [
+  "where",
+  "do",
+  "else",
+  "rule",
+  "command",
+  "on-error",
+] as const;
+
+const CRASH_PATH_TIMEOUT_MS = 5_000;
+const COMPLETION_TIMEOUT_MS = 5_000;
+
+// ── RouterOS API Client ────────────────────────────────────────────────────
+
+export class RouterOSClient {
+  private baseUrl: string;
+  private authHeader: string;
+
+  constructor(baseUrl: string, basicAuth: string) {
+    this.baseUrl = baseUrl;
+    this.authHeader = `Basic ${btoa(basicAuth)}`;
+  }
+
+  private async fetchPost<T>(url: string, body: Record<string, string>, signal?: AbortSignal): Promise<T> {
+    const response = await fetch(url, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+      },
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText} for ${url}`);
+    }
+    return response.json() as Promise<T>;
+  }
+
+  async fetchVersion(): Promise<string> {
+    const resp = await this.fetchPost<{ ret: string }>(
+      `${this.baseUrl}/system/resource/get`,
+      { "value-name": "version" },
+    );
+    return resp.ret.split(" ")[0];
+  }
+
+  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+    return this.fetchPost<InspectChildResponse[]>(
+      `${this.baseUrl}/console/inspect`,
+      { request: "child", path: path.toString() },
+    );
+  }
+
+  async fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
+    return this.fetchPost<InspectSyntaxResponse[]>(
+      `${this.baseUrl}/console/inspect`,
+      { request: "syntax", path: path.toString() },
+      signal,
+    );
+  }
+
+  async fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
+    return this.fetchPost<InspectCompletionResponse[]>(
+      `${this.baseUrl}/console/inspect`,
+      { request: "completion", path: path.toString() },
+      signal,
+    );
+  }
+}
+
+// ── Completion Enrichment ──────────────────────────────────────────────────
+
+/** Filter completion responses to only those that should be shown */
+export function filterCompletions(completions: InspectCompletionResponse[]): InspectCompletionResponse[] {
+  return completions.filter(
+    (c) => c.show === true || c.show === "yes",
+  );
+}
+
+/** Convert filtered completion responses to the _completion object format */
+export function completionsToObject(completions: InspectCompletionResponse[]): Record<string, CompletionEntry> {
+  const result: Record<string, CompletionEntry> = {};
+  for (const c of completions) {
+    const entry: CompletionEntry = { style: c.style || "none" };
+    if (c.preference !== undefined) entry.preference = c.preference;
+    if (c.desc) entry.desc = c.desc;
+    result[c.completion] = entry;
+  }
+  return result;
+}
+
+/** Walk the inspect tree and fetch completions for all arg nodes */
+export async function enrichWithCompletions(
+  tree: InspectNode,
+  client: RouterOSClient,
+  path: string[] = [],
+  stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
+): Promise<typeof stats> {
+  for (const [key, value] of Object.entries(tree)) {
+    if (key.startsWith("_") || typeof value !== "object" || value === null) continue;
+    const node = value as InspectNode;
+    const currentPath = [...path, key];
+
+    if (node._type === "arg") {
+      stats.argsTotal++;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), COMPLETION_TIMEOUT_MS);
+        const completions = await client.fetchCompletion(currentPath, controller.signal);
+        clearTimeout(timeout);
+
+        const shown = filterCompletions(completions);
+        if (shown.length > 0) {
+          node._completion = completionsToObject(shown);
+          stats.argsWithCompletion++;
+        }
+      } catch {
+        stats.argsFailed++;
+      }
+    }
+
+    // Recurse into child nodes
+    await enrichWithCompletions(node, client, currentPath, stats);
+  }
+  return stats;
+}
+
+// ── CRASH_PATHS Testing ────────────────────────────────────────────────────
+
+export interface CrashPathResult {
+  path: string;
+  safe: boolean;
+  error?: string;
+}
+
+/** Test each CRASH_PATH to see if it still crashes the router */
+export async function testCrashPaths(client: RouterOSClient): Promise<CrashPathResult[]> {
+  const results: CrashPathResult[] = [];
+
+  for (const crashPath of CRASH_PATHS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CRASH_PATH_TIMEOUT_MS);
+
+    try {
+      await client.fetchSyntax([crashPath], controller.signal);
+      results.push({ path: crashPath, safe: true });
+      console.log(`  ✓ "${crashPath}" is safe`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      results.push({ path: crashPath, safe: false, error: message });
+      console.log(`  ✗ "${crashPath}" still crashes/times out: ${message}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return results;
+}
+
+// ── Full Crawl (--live mode) ───────────────────────────────────────────────
+
+/** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren) */
+export async function crawlInspectTree(
+  client: RouterOSClient,
+  rpath: string[] = [],
+  skipPaths: Set<string> = new Set(),
+): Promise<InspectNode> {
+  const memo: InspectNode = {};
+  const children = await client.fetchChild(rpath);
+
+  for (const child of children) {
+    if (child.type !== "child") continue;
+    const newpath = [...rpath, child.name];
+    const node: InspectNode = { _type: child["node-type"] as InspectNode["_type"] };
+    memo[child.name] = node;
+
+    if (child["node-type"] === "arg") {
+      // Check if any segment of the path is in the skip set
+      const shouldSkip = newpath.some((segment) => skipPaths.has(segment));
+      if (!shouldSkip) {
+        try {
+          const syntax = await client.fetchSyntax(newpath);
+          if (syntax.length === 1 && syntax[0].text.length > 0) {
+            node.desc = syntax[0].text;
+          }
+        } catch {
+          // Syntax fetch failed — skip desc
+        }
+      }
+    }
+
+    const childTree = await crawlInspectTree(client, newpath, skipPaths);
+    Object.assign(node, childTree);
+  }
+
+  return memo;
+}
+
+// ── OpenAPI 3.0 Generation ─────────────────────────────────────────────────
+
+interface OpenAPISchema {
+  openapi: string;
+  info: { title: string; version: string; description: string };
+  servers: Array<{ url: string; description: string; variables?: Record<string, { default: string; description: string }> }>;
+  paths: Record<string, OpenAPIPathItem>;
+  components: { securitySchemes: Record<string, unknown> };
+  security: Array<Record<string, string[]>>;
+}
+
+interface OpenAPIPathItem {
+  get?: OpenAPIOperation;
+  post?: OpenAPIOperation;
+  put?: OpenAPIOperation;
+  patch?: OpenAPIOperation;
+  delete?: OpenAPIOperation;
+}
+
+interface OpenAPIOperation {
+  summary?: string;
+  description?: string;
+  parameters?: OpenAPIParameter[];
+  requestBody?: {
+    content: { "application/json": { schema: OpenAPISchemaObject } };
+  };
+  responses: Record<string, { description: string; content?: Record<string, { schema: OpenAPISchemaObject }> }>;
+}
+
+interface OpenAPIParameter {
+  name: string;
+  in: string;
+  required: boolean;
+  description?: string;
+  schema: OpenAPISchemaObject;
+}
+
+interface OpenAPISchemaObject {
+  type: string;
+  properties?: Record<string, OpenAPISchemaObject>;
+  items?: OpenAPISchemaObject;
+  enum?: string[];
+  description?: string;
+}
+
+/** Generate OpenAPI 3.0 schema from the enriched inspect tree */
+export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISchema {
+  const paths: Record<string, OpenAPIPathItem> = {};
+
+  function walkTree(node: InspectNode, restPath: string) {
+    // Collect args and cmds at this level
+    const args: Array<[string, InspectNode]> = [];
+    const cmds: Array<[string, InspectNode]> = [];
+    const childDirs: Array<[string, InspectNode]> = [];
+
+    for (const [key, value] of Object.entries(node)) {
+      if (key.startsWith("_") || typeof value !== "object" || value === null) continue;
+      const child = value as InspectNode;
+      if (child._type === "arg") args.push([key, child]);
+      else if (child._type === "cmd") cmds.push([key, child]);
+      else if (child._type === "dir" || child._type === "path") childDirs.push([key, child]);
+    }
+
+    // Process cmd nodes → REST endpoints
+    for (const [cmdName, cmdNode] of cmds) {
+      const cmdArgs = collectArgs(cmdNode);
+
+      if (cmdName === "get") {
+        // GET /path → list, GET /path/{id} → single item
+        ensurePath(paths, restPath);
+        paths[restPath].get = makeGetOperation(cmdArgs);
+        const idPath = `${restPath}/{id}`;
+        ensurePath(paths, idPath);
+        paths[idPath].get = {
+          summary: `Get single item`,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: standardResponses(),
+        };
+      } else if (cmdName === "set") {
+        const idPath = `${restPath}/{id}`;
+        ensurePath(paths, idPath);
+        paths[idPath].patch = makeBodyOperation("Update item", cmdArgs);
+        if (!paths[idPath].get) {
+          // Ensure id parameter exists
+          paths[idPath].get = undefined;
+        }
+      } else if (cmdName === "add") {
+        ensurePath(paths, restPath);
+        paths[restPath].put = makeBodyOperation("Create item", cmdArgs);
+      } else if (cmdName === "remove") {
+        const idPath = `${restPath}/{id}`;
+        ensurePath(paths, idPath);
+        paths[idPath].delete = makeBodyOperation("Remove item", cmdArgs);
+      } else {
+        // Other commands (print, export, etc.) → POST /path/{cmdName}
+        const cmdPath = `${restPath}/${cmdName}`;
+        ensurePath(paths, cmdPath);
+        paths[cmdPath].post = makeBodyOperation(cmdNode.desc || cmdName, cmdArgs);
+      }
+    }
+
+    // Recurse into child dirs/paths
+    for (const [dirName, dirNode] of childDirs) {
+      walkTree(dirNode, `${restPath}/${dirName}`);
+    }
+  }
+
+  walkTree(tree, "");
+
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: `RouterOS REST API v${version}`,
+      version,
+      description:
+        "Auto-generated OpenAPI schema from RouterOS /console/inspect. " +
+        "See https://tikoci.github.io/restraml for details.",
+    },
+    servers: [
+      {
+        url: "https://{host}:{port}/rest",
+        description: "RouterOS device",
+        variables: {
+          host: { default: "192.168.88.1", description: "RouterOS IP or hostname" },
+          port: { default: "443", description: "HTTPS port" },
+        },
+      },
+    ],
+    paths,
+    components: {
+      securitySchemes: {
+        basicAuth: { type: "http", scheme: "basic" },
+      },
+    },
+    security: [{ basicAuth: [] }],
+  };
+}
+
+function ensurePath(paths: Record<string, OpenAPIPathItem>, path: string) {
+  if (!paths[path]) paths[path] = {};
+}
+
+function collectArgs(node: InspectNode): Array<[string, InspectNode]> {
+  return Object.entries(node).filter(
+    ([k, v]) => !k.startsWith("_") && typeof v === "object" && v !== null && (v as InspectNode)._type === "arg",
+  ) as Array<[string, InspectNode]>;
+}
+
+function argToSchema(arg: InspectNode): OpenAPISchemaObject {
+  const schema: OpenAPISchemaObject = { type: "string" };
+  if (arg.desc) schema.description = arg.desc as string;
+  if (arg._completion && Object.keys(arg._completion).length > 0) {
+    schema.enum = Object.keys(arg._completion);
+  }
+  return schema;
+}
+
+function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation {
+  return {
+    summary: "List items",
+    parameters: args.map(([name, arg]) => ({
+      name,
+      in: "query",
+      required: false,
+      description: (arg.desc as string) || undefined,
+      schema: argToSchema(arg),
+    })),
+    responses: {
+      "200": {
+        description: "Success",
+        content: { "application/json": { schema: { type: "array", items: { type: "object" } } } },
+      },
+      ...errorResponses(),
+    },
+  };
+}
+
+function makeBodyOperation(summary: string, args: Array<[string, InspectNode]>): OpenAPIOperation {
+  const properties: Record<string, OpenAPISchemaObject> = {};
+  for (const [name, arg] of args) {
+    properties[name] = argToSchema(arg);
+  }
+
+  const op: OpenAPIOperation = {
+    summary,
+    responses: standardResponses(),
+  };
+
+  if (Object.keys(properties).length > 0) {
+    op.requestBody = {
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties,
+          },
+        },
+      },
+    };
+  }
+
+  // Add .proplist and .query for POST operations
+  properties[".proplist"] = { type: "string", description: "Property list filter" };
+  properties[".query"] = { type: "array", items: { type: "string" }, description: "Query filter" };
+
+  return op;
+}
+
+function standardResponses() {
+  return {
+    "200": {
+      description: "Success",
+      content: { "application/json": { schema: { type: "object" } } },
+    },
+    ...errorResponses(),
+  };
+}
+
+function errorResponses() {
+  return {
+    "400": { description: "Bad command or error" },
+    "401": { description: "Unauthorized" },
+  };
+}
+
+// ── CLI Entry Point ────────────────────────────────────────────────────────
+
+interface CliOptions {
+  inspectFile?: string;
+  live: boolean;
+  outputDir: string;
+  skipOpenapi: boolean;
+  skipCompletion: boolean;
+  testCrashPaths: boolean;
+  version: boolean;
+  help: boolean;
+}
+
+function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
+  const { values, positionals } = parseArgs({
+    args: Bun.argv,
+    options: {
+      "inspect-file": { type: "string" },
+      live: { type: "boolean", default: false },
+      "output-dir": { type: "string", default: "." },
+      "skip-openapi": { type: "boolean", default: false },
+      "skip-completion": { type: "boolean", default: false },
+      "test-crash-paths": { type: "boolean", default: false },
+      version: { type: "boolean", default: false },
+      help: { type: "boolean", default: false },
+    },
+    strict: true,
+    allowPositionals: true,
+  });
+
+  const [, , ...pathArgs] = positionals;
+
+  return {
+    opts: {
+      inspectFile: values["inspect-file"],
+      live: values.live ?? false,
+      outputDir: values["output-dir"] ?? ".",
+      skipOpenapi: values["skip-openapi"] ?? false,
+      skipCompletion: values["skip-completion"] ?? false,
+      testCrashPaths: values["test-crash-paths"] ?? false,
+      version: values.version ?? false,
+      help: values.help ?? false,
+    },
+    pathArgs,
+  };
+}
+
+function printUsage() {
+  console.log(`
+deep-inspect.ts — Enhanced RouterOS schema generation
+
+Usage:
+  bun deep-inspect.ts [options] [path...]
+
+Options:
+  --inspect-file <path>   Input inspect.json file (offline enrichment)
+  --live                  Query live router (URLBASE/BASICAUTH env vars)
+  --output-dir <dir>      Output directory (default: .)
+  --skip-openapi          Skip OpenAPI 3.0 generation
+  --skip-completion       Skip completion data fetching
+  --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
+  --version               Print RouterOS version and exit
+  --help                  Show this help
+
+Environment:
+  URLBASE     RouterOS REST base URL (e.g. http://localhost:9180/rest)
+  BASICAUTH   Credentials as user:pass (e.g. admin:)
+
+Examples:
+  # Offline enrichment (no completion data, just structure + OpenAPI)
+  bun deep-inspect.ts --inspect-file docs/7.22/inspect.json --output-dir /tmp
+
+  # Live enrichment with completions
+  URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
+    bun deep-inspect.ts --inspect-file docs/7.22/inspect.json
+
+  # Full live crawl
+  URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
+    bun deep-inspect.ts --live --output-dir docs/7.22
+`.trim());
+}
+
+async function main() {
+  const { opts, pathArgs } = parseCliArgs();
+
+  if (opts.help) {
+    printUsage();
+    return;
+  }
+
+  // Build client if we have connection info
+  const urlBase = process.env.URLBASE;
+  const basicAuth = process.env.BASICAUTH;
+  let client: RouterOSClient | null = null;
+
+  if (urlBase && basicAuth) {
+    client = new RouterOSClient(urlBase, basicAuth);
+  }
+
+  // --version: print version and exit
+  if (opts.version) {
+    if (!client) {
+      console.error("Error: --version requires URLBASE and BASICAUTH env vars");
+      process.exit(1);
+    }
+    const ver = await client.fetchVersion();
+    console.log(ver);
+    return;
+  }
+
+  // Load or crawl the inspect tree
+  let inspectTree: InspectNode;
+  let version = "unknown";
+
+  if (opts.live) {
+    if (!client) {
+      console.error("Error: --live requires URLBASE and BASICAUTH env vars");
+      process.exit(1);
+    }
+    version = await client.fetchVersion();
+    console.log(`Crawling live router v${version}...`);
+
+    // Determine which CRASH_PATHS to skip in the crawl
+    const skipPaths = new Set<string>(CRASH_PATHS as unknown as string[]);
+
+    if (opts.testCrashPaths) {
+      console.log("Testing CRASH_PATHS...");
+      const crashResults = await testCrashPaths(client);
+      // Remove safe paths from the skip set
+      for (const r of crashResults) {
+        if (r.safe) skipPaths.delete(r.path);
+      }
+    }
+
+    inspectTree = await crawlInspectTree(client, pathArgs, skipPaths);
+  } else if (opts.inspectFile) {
+    const file = Bun.file(opts.inspectFile);
+    if (!(await file.exists())) {
+      console.error(`Error: inspect file not found: ${opts.inspectFile}`);
+      process.exit(1);
+    }
+    inspectTree = await file.json();
+    console.log(`Loaded inspect tree from ${opts.inspectFile}`);
+
+    // Try to determine version from path (e.g. docs/7.22/inspect.json)
+    const versionMatch = opts.inspectFile.match(/(\d+\.\d+(?:\.\d+)?(?:(?:beta|rc)\d+)?)\//);
+    if (versionMatch) {
+      version = versionMatch[1];
+    }
+  } else {
+    console.error("Error: specify --inspect-file <path> or --live");
+    printUsage();
+    process.exit(1);
+  }
+
+  console.log(`Version: ${version}`);
+
+  // Test CRASH_PATHS (if requested and not already done in --live mode)
+  let crashPathResults: CrashPathResult[] = [];
+  if (opts.testCrashPaths && !opts.live) {
+    if (!client) {
+      console.error("Warning: --test-crash-paths requires a live router (URLBASE/BASICAUTH)");
+    } else {
+      console.log("Testing CRASH_PATHS...");
+      crashPathResults = await testCrashPaths(client);
+    }
+  }
+
+  // Enrich with completion data
+  let completionStats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 };
+  if (!opts.skipCompletion && client) {
+    console.log("Enriching with completion data...");
+    completionStats = await enrichWithCompletions(inspectTree, client);
+    console.log(
+      `Completions: ${completionStats.argsWithCompletion}/${completionStats.argsTotal} args enriched` +
+      (completionStats.argsFailed > 0 ? `, ${completionStats.argsFailed} failed` : ""),
+    );
+  } else if (!opts.skipCompletion && !client) {
+    console.log("Skipping completions (no live router connection)");
+  }
+
+  // Build _meta
+  const meta: DeepInspectMeta = {
+    version,
+    generatedAt: new Date().toISOString(),
+    crashPathsTested: crashPathResults.map((r) => r.path),
+    crashPathsSafe: crashPathResults.filter((r) => r.safe).map((r) => r.path),
+    crashPathsCrashed: crashPathResults.filter((r) => !r.safe).map((r) => r.path),
+    completionStats,
+  };
+
+  // Write deep-inspect.json
+  const deepInspect: DeepInspectOutput = { _meta: meta, ...inspectTree };
+  const deepInspectPath = `${opts.outputDir}/deep-inspect.json`;
+  await Bun.write(deepInspectPath, JSON.stringify(deepInspect));
+  console.log(`Written: ${deepInspectPath}`);
+
+  // Write openapi.json
+  if (!opts.skipOpenapi) {
+    const openapi = generateOpenAPI(inspectTree, version);
+    const openapiPath = `${opts.outputDir}/openapi.json`;
+    await Bun.write(openapiPath, JSON.stringify(openapi, null, 2));
+    console.log(`Written: ${openapiPath}`);
+  }
+
+  console.log("Done.");
+}
+
+// Only run main when executed directly (not imported in tests)
+const isMainModule = import.meta.path === Bun.main;
+if (isMainModule) {
+  await main();
+}
