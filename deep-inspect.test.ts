@@ -273,15 +273,75 @@ describe("generateOpenAPI", () => {
   test("components/responses has error responses", () => {
     expect(openapi.components.responses?.BadRequest).toBeDefined();
     expect(openapi.components.responses?.Unauthorized).toBeDefined();
+    expect(openapi.components.responses?.NotFound).toBeDefined();
+    expect(openapi.components.responses?.NotAcceptable).toBeDefined();
   });
 
   test("components/schemas has shared schemas", () => {
     expect(openapi.components.schemas?.RouterOSItem).toBeDefined();
     expect(openapi.components.schemas?.RouterOSItemList).toBeDefined();
     expect(openapi.components.schemas?.QueryOptions).toBeDefined();
+    expect(openapi.components.schemas?.ProplistParam).toBeDefined();
     const qo = openapi.components.schemas?.QueryOptions;
     expect(qo?.properties?.[".proplist"]).toBeDefined();
     expect(qo?.properties?.[".query"]).toBeDefined();
+  });
+
+  test("ProplistParam uses oneOf for string and array", () => {
+    const pl = openapi.components.schemas?.ProplistParam;
+    expect(pl?.oneOf).toHaveLength(2);
+    expect(pl?.oneOf?.[0]).toEqual({ type: "string" });
+    expect(pl?.oneOf?.[1]).toEqual({ type: "array", items: { type: "string" } });
+  });
+
+  test("GET operations include .proplist query parameter", () => {
+    const getOp = openapi.paths["/ip/address"]?.get;
+    const proplistParam = getOp?.parameters?.find((p) => "name" in p && p.name === ".proplist");
+    expect(proplistParam).toBeDefined();
+    expect(proplistParam && "in" in proplistParam && proplistParam.in).toBe("query");
+  });
+
+  test("GET response includes .id and arg properties", () => {
+    const getOp = openapi.paths["/ip/address"]?.get;
+    const responseSchema = getOp?.responses["200"];
+    expect(responseSchema && "content" in responseSchema).toBe(true);
+    const schema = responseSchema && "content" in responseSchema
+      ? responseSchema.content?.["application/json"]?.schema : undefined;
+    // List response is array of objects with properties
+    expect(schema && "items" in schema && schema.items).toBeDefined();
+    const itemSchema = schema && "items" in schema ? schema.items : undefined;
+    expect(itemSchema && "properties" in itemSchema && itemSchema.properties?.[".id"]).toBeDefined();
+    expect(itemSchema && "properties" in itemSchema && itemSchema.properties?.address).toBeDefined();
+  });
+
+  test("single-item GET at {id} has .proplist param and rich response", () => {
+    const getOp = openapi.paths["/ip/address/{id}"]?.get;
+    expect(getOp).toBeDefined();
+    // Has both itemId ref and .proplist query param
+    expect(getOp?.parameters).toHaveLength(2);
+    const proplistParam = getOp?.parameters?.find((p) => "name" in p && p.name === ".proplist");
+    expect(proplistParam).toBeDefined();
+    // Response has object with properties
+    const resp200 = getOp?.responses["200"];
+    expect(resp200 && "content" in resp200).toBe(true);
+    const schema = resp200 && "content" in resp200 ? resp200.content?.["application/json"]?.schema : undefined;
+    expect(schema && "properties" in schema && schema.properties?.[".id"]).toBeDefined();
+  });
+
+  test("{id} operations include 404 response", () => {
+    const patchOp = openapi.paths["/ip/address/{id}"]?.patch;
+    expect(patchOp?.responses["404"]).toBeDefined();
+    const deleteOp = openapi.paths["/ip/address/{id}"]?.delete;
+    expect(deleteOp?.responses["404"]).toBeDefined();
+    const getIdOp = openapi.paths["/ip/address/{id}"]?.get;
+    expect(getIdOp?.responses["404"]).toBeDefined();
+  });
+
+  test("all operations include 406 response", () => {
+    const getOp = openapi.paths["/ip/address"]?.get;
+    expect(getOp?.responses["406"]).toBeDefined();
+    const putOp = openapi.paths["/ip/address"]?.put;
+    expect(putOp?.responses["406"]).toBeDefined();
   });
 
   test("integer range desc produces type integer with min/max", () => {

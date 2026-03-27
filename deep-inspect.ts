@@ -328,6 +328,7 @@ interface OpenAPISchemaObject {
   properties?: Record<string, OpenAPISchemaObject | OpenAPIRef>;
   items?: OpenAPISchemaObject | OpenAPIRef;
   allOf?: Array<OpenAPISchemaObject | OpenAPIRef>;
+  oneOf?: Array<OpenAPISchemaObject | OpenAPIRef>;
   enum?: string[];
   description?: string;
   pattern?: string;
@@ -363,6 +364,15 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
       const tag = restPath.split("/").filter(Boolean)[0] || "root";
 
       if (cmdName === "get") {
+        // Build response properties from get args
+        const responseProperties: Record<string, OpenAPISchemaObject> = {
+          ".id": { type: "string", description: "Item identifier", pattern: "^\\*[0-9A-Fa-f]+$" },
+        };
+        for (const [name, arg] of cmdArgs) {
+          responseProperties[name] = argToSchema(arg);
+        }
+        const itemSchema: OpenAPISchemaObject = { type: "object", properties: responseProperties };
+
         // GET /path → list, GET /path/{id} → single item
         ensurePath(paths, restPath);
         paths[restPath].get = {
@@ -376,8 +386,18 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
           summary: "Get single item",
           operationId: makeOperationId("get", idPath),
           tags: [tag],
-          parameters: [{ $ref: "#/components/parameters/itemId" }],
-          responses: standardResponses(),
+          parameters: [
+            { $ref: "#/components/parameters/itemId" },
+            { name: ".proplist", in: "query", required: false, description: "Comma-separated list of properties to return", schema: { type: "string" } },
+          ],
+          responses: {
+            "200": {
+              description: "Success",
+              content: { "application/json": { schema: itemSchema } },
+            },
+            ...errorResponses(),
+            ...notFoundResponse(),
+          },
         };
       } else if (cmdName === "set") {
         const idPath = `${restPath}/{id}`;
@@ -462,14 +482,23 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
       responses: {
         BadRequest: { description: "Bad command or error" },
         Unauthorized: { description: "Unauthorized" },
+        NotFound: { description: "Item not found" },
+        NotAcceptable: { description: "Not Acceptable — no such command or directory" },
       },
       schemas: {
         RouterOSItem: { type: "object" },
         RouterOSItemList: { type: "array", items: { $ref: "#/components/schemas/RouterOSItem" } },
+        ProplistParam: {
+          description: "Comma-separated property names, or an array of strings in POST bodies",
+          oneOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         QueryOptions: {
           type: "object",
           properties: {
-            ".proplist": { type: "string", description: "Property list filter" },
+            ".proplist": { $ref: "#/components/schemas/ProplistParam" },
             ".query": { type: "array", items: { type: "string" }, description: "Query filter" },
           },
         },
@@ -569,19 +598,44 @@ function argToSchema(arg: InspectNode): OpenAPISchemaObject {
 }
 
 function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation {
+  // Build response schema with actual properties from get cmd args
+  const responseProperties: Record<string, OpenAPISchemaObject> = {
+    ".id": { type: "string", description: "Item identifier", pattern: "^\\*[0-9A-Fa-f]+$" },
+  };
+  for (const [name, arg] of args) {
+    responseProperties[name] = argToSchema(arg);
+  }
+
+  const params: Array<OpenAPIParameter> = args.map(([name, arg]) => ({
+    name,
+    in: "query",
+    required: false,
+    description: (arg.desc as string) || undefined,
+    schema: argToSchema(arg),
+  }));
+  // .proplist filtering on GET via query string: GET /path?.proplist=address,disabled
+  params.push({
+    name: ".proplist",
+    in: "query",
+    required: false,
+    description: "Comma-separated list of properties to return",
+    schema: { type: "string" },
+  });
+
   return {
     summary: "List items",
-    parameters: args.map(([name, arg]) => ({
-      name,
-      in: "query",
-      required: false,
-      description: (arg.desc as string) || undefined,
-      schema: argToSchema(arg),
-    })),
+    parameters: params,
     responses: {
       "200": {
         description: "Success",
-        content: { "application/json": { schema: { $ref: "#/components/schemas/RouterOSItemList" } } },
+        content: {
+          "application/json": {
+            schema: {
+              type: "array",
+              items: { type: "object", properties: responseProperties },
+            },
+          },
+        },
       },
       ...errorResponses(),
     },
@@ -622,6 +676,7 @@ function standardResponses() {
       content: { "application/json": { schema: { $ref: "#/components/schemas/RouterOSItem" } } },
     },
     ...errorResponses(),
+    ...notFoundResponse(),
   };
 }
 
@@ -629,7 +684,12 @@ function errorResponses() {
   return {
     "400": { $ref: "#/components/responses/BadRequest" },
     "401": { $ref: "#/components/responses/Unauthorized" },
+    "406": { $ref: "#/components/responses/NotAcceptable" },
   };
+}
+
+function notFoundResponse() {
+  return { "404": { $ref: "#/components/responses/NotFound" } };
 }
 
 // ── CLI Entry Point ────────────────────────────────────────────────────────
