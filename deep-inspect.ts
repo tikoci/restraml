@@ -366,7 +366,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
       if (cmdName === "get") {
         // Build response properties from get args
         const responseProperties: Record<string, OpenAPISchemaObject> = {
-          ".id": { type: "string", description: "Item identifier", pattern: "^\\*[0-9A-Fa-f]+$" },
+          ".id": { type: "string", description: "Item identifier" },
         };
         for (const [name, arg] of cmdArgs) {
           responseProperties[name] = argToSchema(arg);
@@ -419,10 +419,15 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
         paths[idPath].delete = {
-          ...makeBodyOperation("Remove item", cmdArgs),
+          summary: "Remove item",
           operationId: makeOperationId("delete", idPath),
           tags: [tag],
           parameters: [{ $ref: "#/components/parameters/itemId" }],
+          responses: {
+            "204": { description: "No Content — item deleted successfully" },
+            ...errorResponses(),
+            ...notFoundResponse(),
+          },
         };
       } else {
         // Other commands (print, export, etc.) → POST /path/{cmdName}
@@ -480,12 +485,29 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
         itemId: idPathParam(),
       },
       responses: {
-        BadRequest: { description: "Bad command or error" },
+        BadRequest: {
+          description: "Bad command or error",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } },
+        },
         Unauthorized: { description: "Unauthorized" },
-        NotFound: { description: "Item not found" },
-        NotAcceptable: { description: "Not Acceptable — no such command or directory" },
+        NotFound: {
+          description: "Item not found",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } },
+        },
+        NotAcceptable: {
+          description: "Not Acceptable — no such command or directory",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } },
+        },
       },
       schemas: {
+        ErrorResponse: {
+          type: "object",
+          properties: {
+            error: { type: "integer", description: "HTTP status code" },
+            message: { type: "string", description: "Error message" },
+            detail: { type: "string", description: "Detailed error description" },
+          },
+        },
         RouterOSItem: { type: "object" },
         RouterOSItemList: { type: "array", items: { $ref: "#/components/schemas/RouterOSItem" } },
         ProplistParam: {
@@ -509,7 +531,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
 }
 
 function idPathParam(): OpenAPIParameter {
-  return { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^\\*[0-9A-Fa-f]+$" }, description: "RouterOS item identifier (e.g. *1)" };
+  return { name: "id", in: "path", required: true, schema: { type: "string" }, description: "RouterOS item identifier (*hex) or name (e.g. *1, ether1)" };
 }
 
 function makeOperationId(method: string, path: string): string {
@@ -600,7 +622,7 @@ function argToSchema(arg: InspectNode): OpenAPISchemaObject {
 function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation {
   // Build response schema with actual properties from get cmd args
   const responseProperties: Record<string, OpenAPISchemaObject> = {
-    ".id": { type: "string", description: "Item identifier", pattern: "^\\*[0-9A-Fa-f]+$" },
+    ".id": { type: "string", description: "Item identifier" },
   };
   for (const [name, arg] of args) {
     responseProperties[name] = argToSchema(arg);

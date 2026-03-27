@@ -219,12 +219,17 @@ describe("generateOpenAPI", () => {
     expect(idRef.$ref).toBe("#/components/parameters/itemId");
   });
 
-  test("DELETE /ip/address/{id} uses $ref for id parameter", () => {
+  test("DELETE /ip/address/{id} returns 204 No Content", () => {
     const deleteOp = openapi.paths["/ip/address/{id}"]?.delete;
     expect(deleteOp).toBeDefined();
     expect(deleteOp?.operationId).toBe("delete_ip_address_id");
     const idRef = deleteOp?.parameters?.[0] as OpenAPIRef;
     expect(idRef.$ref).toBe("#/components/parameters/itemId");
+    // DELETE returns 204 (empty) not 200
+    expect(deleteOp?.responses["204"]).toBeDefined();
+    expect(deleteOp?.responses["200"]).toBeUndefined();
+    // No request body
+    expect(deleteOp?.requestBody).toBeUndefined();
   });
 
   test("nested paths are generated", () => {
@@ -261,27 +266,39 @@ describe("generateOpenAPI", () => {
     expect(protocolParam && "schema" in protocolParam && protocolParam.schema.enum).toEqual(["tcp", "udp", "icmp"]);
   });
 
-  test("components/parameters/itemId has pattern for RouterOS identifiers", () => {
+  test("components/parameters/itemId accepts names and IDs", () => {
     expect(openapi.components.parameters?.itemId).toBeDefined();
     const itemId = openapi.components.parameters?.itemId;
     expect(itemId?.name).toBe("id");
     expect(itemId?.in).toBe("path");
     expect(itemId?.required).toBe(true);
-    expect(itemId?.schema.pattern).toBe("^\\*[0-9A-Fa-f]+$");
+    expect(itemId?.schema.type).toBe("string");
+    // No restrictive pattern — allows both *hex IDs and names like ether1
+    expect(itemId?.schema.pattern).toBeUndefined();
   });
 
-  test("components/responses has error responses", () => {
+  test("components/responses has error responses with ErrorResponse schema", () => {
     expect(openapi.components.responses?.BadRequest).toBeDefined();
     expect(openapi.components.responses?.Unauthorized).toBeDefined();
     expect(openapi.components.responses?.NotFound).toBeDefined();
     expect(openapi.components.responses?.NotAcceptable).toBeDefined();
+    // BadRequest, NotFound, NotAcceptable have content with ErrorResponse schema
+    const badReq = openapi.components.responses?.BadRequest as { content?: Record<string, unknown> };
+    expect(badReq.content?.["application/json"]).toBeDefined();
+    const notFound = openapi.components.responses?.NotFound as { content?: Record<string, unknown> };
+    expect(notFound.content?.["application/json"]).toBeDefined();
   });
 
   test("components/schemas has shared schemas", () => {
+    expect(openapi.components.schemas?.ErrorResponse).toBeDefined();
     expect(openapi.components.schemas?.RouterOSItem).toBeDefined();
     expect(openapi.components.schemas?.RouterOSItemList).toBeDefined();
     expect(openapi.components.schemas?.QueryOptions).toBeDefined();
     expect(openapi.components.schemas?.ProplistParam).toBeDefined();
+    const errSchema = openapi.components.schemas?.ErrorResponse;
+    expect(errSchema?.properties?.error).toEqual({ type: "integer", description: "HTTP status code" });
+    expect(errSchema?.properties?.message).toEqual({ type: "string", description: "Error message" });
+    expect(errSchema?.properties?.detail).toEqual({ type: "string", description: "Detailed error description" });
     const qo = openapi.components.schemas?.QueryOptions;
     expect(qo?.properties?.[".proplist"]).toBeDefined();
     expect(qo?.properties?.[".query"]).toBeDefined();
