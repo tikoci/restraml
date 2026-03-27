@@ -383,7 +383,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
         paths[idPath].get = {
-          summary: "Get single item",
+          summary: "get",
           operationId: makeOperationId("get", idPath),
           tags: [tag],
           parameters: [
@@ -403,7 +403,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
         paths[idPath].patch = {
-          ...makeBodyOperation("Update item", cmdArgs),
+          ...makeBodyOperation("set", cmdArgs),
           operationId: makeOperationId("patch", idPath),
           tags: [tag],
           parameters: [{ $ref: "#/components/parameters/itemId" }],
@@ -411,7 +411,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
       } else if (cmdName === "add") {
         ensurePath(paths, restPath);
         paths[restPath].put = {
-          ...makeBodyOperation("Create item", cmdArgs),
+          ...makeBodyOperation("add", cmdArgs),
           operationId: makeOperationId("put", restPath),
           tags: [tag],
         };
@@ -419,7 +419,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
         paths[idPath].delete = {
-          summary: "Remove item",
+          summary: "remove",
           operationId: makeOperationId("delete", idPath),
           tags: [tag],
           parameters: [{ $ref: "#/components/parameters/itemId" }],
@@ -645,7 +645,7 @@ function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation 
   });
 
   return {
-    summary: "List items",
+    summary: "print",
     parameters: params,
     responses: {
       "200": {
