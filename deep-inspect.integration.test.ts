@@ -160,10 +160,10 @@ describe("crawlInspectTree (live)", () => {
     expect(tree.get).toBeDefined();
     expect((tree.get as InspectNode)._type).toBe("cmd");
 
-    // get should have a 'name' arg
-    const getName = (tree.get as InspectNode).name as InspectNode;
-    expect(getName).toBeDefined();
-    expect(getName._type).toBe("arg");
+    // get should have a 'value-name' arg
+    const valueName = (tree.get as InspectNode)["value-name"] as InspectNode;
+    expect(valueName).toBeDefined();
+    expect(valueName._type).toBe("arg");
   });
 });
 

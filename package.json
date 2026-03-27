@@ -10,6 +10,7 @@
     "validate:raml": "node validraml.cjs",
     "validate:app-yaml": "echo 'Usage: bun appyamlvalidate.js <version>'",
     "test": "bun test",
+    "test:qemu": "./scripts/test-with-qemu.sh",
     "lint": "bunx @biomejs/biome check .",
     "lint:fix": "bunx @biomejs/biome check --write ."
   },
