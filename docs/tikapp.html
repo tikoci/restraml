@@ -877,7 +877,7 @@
                                             setStatus('Changes stashed. Example loaded.', true)
                                         }
                                     },
-                                    { label: 'Ignore', fn: () => showDirtyStatus(appName) }
+                                    { label: 'Cancel', fn: () => showDirtyStatus(appName) }
                                 ])
                             } else {
                                 localStorage.setItem(STASH_KEY, editor.getValue())
@@ -1189,7 +1189,7 @@
                                         else clearStatus()
                                     }
                                 },
-                                { label: 'Cancel', fn: () => clearStatus() }
+                                { label: 'Ignore', fn: () => clearStatus() }
                             ])
                         }
                     } else if (currentExampleName !== null && !isDirty()) {
