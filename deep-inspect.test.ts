@@ -6,6 +6,7 @@ import {
   CRASH_PATHS,
   type InspectNode,
   type DeepInspectOutput,
+  type OpenAPIRef,
 } from "./deep-inspect";
 
 // ── Test Fixtures ──────────────────────────────────────────────────────────
@@ -193,9 +194,9 @@ describe("generateOpenAPI", () => {
     expect(getOp?.operationId).toBe("get_ip_address");
     expect(getOp?.tags).toEqual(["ip"]);
     expect(getOp?.parameters?.length).toBeGreaterThan(0);
-    const addressParam = getOp?.parameters?.find((p) => p.name === "address");
+    const addressParam = getOp?.parameters?.find((p) => "name" in p && p.name === "address");
     expect(addressParam).toBeDefined();
-    expect(addressParam?.in).toBe("query");
+    expect(addressParam && "in" in addressParam && addressParam.in).toBe("query");
   });
 
   test("PUT /ip/address for add command", () => {
@@ -203,27 +204,27 @@ describe("generateOpenAPI", () => {
     expect(putOp).toBeDefined();
     expect(putOp?.operationId).toBe("put_ip_address");
     expect(putOp?.tags).toEqual(["ip"]);
-    expect(putOp?.requestBody?.content["application/json"]?.schema.properties?.address).toBeDefined();
+    // requestBody uses allOf with command properties + $ref to QueryOptions
+    const schema = putOp?.requestBody?.content["application/json"]?.schema;
+    expect(schema?.allOf).toBeDefined();
+    const propsSchema = schema?.allOf?.find((s) => "properties" in s);
+    expect(propsSchema && "properties" in propsSchema && propsSchema.properties?.address).toBeDefined();
   });
 
-  test("PATCH /ip/address/{id} for set command", () => {
+  test("PATCH /ip/address/{id} uses $ref for id parameter", () => {
     const patchOp = openapi.paths["/ip/address/{id}"]?.patch;
     expect(patchOp).toBeDefined();
     expect(patchOp?.operationId).toBe("patch_ip_address_id");
-    // Must have id path parameter for Postman/Swagger compatibility
-    const idParam = patchOp?.parameters?.find((p) => p.name === "id" && p.in === "path");
-    expect(idParam).toBeDefined();
-    expect(idParam?.required).toBe(true);
+    const idRef = patchOp?.parameters?.[0] as OpenAPIRef;
+    expect(idRef.$ref).toBe("#/components/parameters/itemId");
   });
 
-  test("DELETE /ip/address/{id} for remove command", () => {
+  test("DELETE /ip/address/{id} uses $ref for id parameter", () => {
     const deleteOp = openapi.paths["/ip/address/{id}"]?.delete;
     expect(deleteOp).toBeDefined();
     expect(deleteOp?.operationId).toBe("delete_ip_address_id");
-    // Must have id path parameter
-    const idParam = deleteOp?.parameters?.find((p) => p.name === "id" && p.in === "path");
-    expect(idParam).toBeDefined();
-    expect(idParam?.required).toBe(true);
+    const idRef = deleteOp?.parameters?.[0] as OpenAPIRef;
+    expect(idRef.$ref).toBe("#/components/parameters/itemId");
   });
 
   test("nested paths are generated", () => {
@@ -256,14 +257,31 @@ describe("generateOpenAPI", () => {
     const oapi = generateOpenAPI(enriched, "7.22");
     const getOp = oapi.paths["/test"]?.get;
     expect(getOp).toBeDefined();
-    const protocolParam = getOp?.parameters?.find((p) => p.name === "protocol");
-    expect(protocolParam?.schema.enum).toEqual(["tcp", "udp", "icmp"]);
+    const protocolParam = getOp?.parameters?.find((p) => "name" in p && p.name === "protocol");
+    expect(protocolParam && "schema" in protocolParam && protocolParam.schema.enum).toEqual(["tcp", "udp", "icmp"]);
   });
 
-  test("{id} path parameter has pattern for RouterOS identifiers", () => {
-    const patchOp = openapi.paths["/ip/address/{id}"]?.patch;
-    const idParam = patchOp?.parameters?.find((p) => p.name === "id");
-    expect(idParam?.schema.pattern).toBe("^\\*[0-9A-Fa-f]+$");
+  test("components/parameters/itemId has pattern for RouterOS identifiers", () => {
+    expect(openapi.components.parameters?.itemId).toBeDefined();
+    const itemId = openapi.components.parameters?.itemId;
+    expect(itemId?.name).toBe("id");
+    expect(itemId?.in).toBe("path");
+    expect(itemId?.required).toBe(true);
+    expect(itemId?.schema.pattern).toBe("^\\*[0-9A-Fa-f]+$");
+  });
+
+  test("components/responses has error responses", () => {
+    expect(openapi.components.responses?.BadRequest).toBeDefined();
+    expect(openapi.components.responses?.Unauthorized).toBeDefined();
+  });
+
+  test("components/schemas has shared schemas", () => {
+    expect(openapi.components.schemas?.RouterOSItem).toBeDefined();
+    expect(openapi.components.schemas?.RouterOSItemList).toBeDefined();
+    expect(openapi.components.schemas?.QueryOptions).toBeDefined();
+    const qo = openapi.components.schemas?.QueryOptions;
+    expect(qo?.properties?.[".proplist"]).toBeDefined();
+    expect(qo?.properties?.[".query"]).toBeDefined();
   });
 
   test("integer range desc produces type integer with min/max", () => {
@@ -277,10 +295,10 @@ describe("generateOpenAPI", () => {
       },
     };
     const oapi = generateOpenAPI(enriched, "7.22");
-    const mtuParam = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "mtu");
-    expect(mtuParam?.schema.type).toBe("integer");
-    expect(mtuParam?.schema.minimum).toBe(0);
-    expect(mtuParam?.schema.maximum).toBe(4294967295);
+    const mtuParam = oapi.paths["/test"]?.get?.parameters?.find((p) => "name" in p && p.name === "mtu");
+    expect(mtuParam && "schema" in mtuParam && mtuParam.schema.type).toBe("integer");
+    expect(mtuParam && "schema" in mtuParam && mtuParam.schema.minimum).toBe(0);
+    expect(mtuParam && "schema" in mtuParam && mtuParam.schema.maximum).toBe(4294967295);
   });
 
   test("IP address desc produces format ipv4", () => {
@@ -294,9 +312,9 @@ describe("generateOpenAPI", () => {
       },
     };
     const oapi = generateOpenAPI(enriched, "7.22");
-    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "address");
-    expect(param?.schema.type).toBe("string");
-    expect(param?.schema.format).toBe("ipv4");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => "name" in p && p.name === "address");
+    expect(param && "schema" in param && param.schema.type).toBe("string");
+    expect(param && "schema" in param && param.schema.format).toBe("ipv4");
   });
 
   test("time interval desc stays type string", () => {
@@ -310,9 +328,9 @@ describe("generateOpenAPI", () => {
       },
     };
     const oapi = generateOpenAPI(enriched, "7.22");
-    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "timeout");
-    expect(param?.schema.type).toBe("string");
-    expect(param?.schema.format).toBeUndefined();
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => "name" in p && p.name === "timeout");
+    expect(param && "schema" in param && param.schema.type).toBe("string");
+    expect(param && "schema" in param && param.schema.format).toBeUndefined();
   });
 
   test("string value with length constraints sets maxLength", () => {
@@ -326,9 +344,9 @@ describe("generateOpenAPI", () => {
       },
     };
     const oapi = generateOpenAPI(enriched, "7.22");
-    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "name");
-    expect(param?.schema.type).toBe("string");
-    expect(param?.schema.maxLength).toBe(255);
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => "name" in p && p.name === "name");
+    expect(param && "schema" in param && param.schema.type).toBe("string");
+    expect(param && "schema" in param && param.schema.maxLength).toBe(255);
   });
 
   test("IPv6 prefix desc produces format ipv6", () => {
@@ -342,9 +360,9 @@ describe("generateOpenAPI", () => {
       },
     };
     const oapi = generateOpenAPI(enriched, "7.22");
-    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "prefix");
-    expect(param?.schema.type).toBe("string");
-    expect(param?.schema.format).toBe("ipv6");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => "name" in p && p.name === "prefix");
+    expect(param && "schema" in param && param.schema.type).toBe("string");
+    expect(param && "schema" in param && param.schema.format).toBe("ipv6");
   });
 });
 

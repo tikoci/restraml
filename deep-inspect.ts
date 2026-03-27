@@ -278,7 +278,12 @@ interface OpenAPISchema {
   info: { title: string; version: string; description: string };
   servers: Array<{ url: string; description: string; variables?: Record<string, { default: string; description: string }> }>;
   paths: Record<string, OpenAPIPathItem>;
-  components: { securitySchemes: Record<string, unknown> };
+  components: {
+    securitySchemes: Record<string, unknown>;
+    parameters?: Record<string, OpenAPIParameter>;
+    responses?: Record<string, OpenAPIResponseObject>;
+    schemas?: Record<string, OpenAPISchemaObject>;
+  };
   security: Array<Record<string, string[]>>;
 }
 
@@ -290,16 +295,23 @@ interface OpenAPIPathItem {
   delete?: OpenAPIOperation;
 }
 
+export type OpenAPIRef = { $ref: string };
+
+interface OpenAPIResponseObject {
+  description: string;
+  content?: Record<string, { schema: OpenAPISchemaObject | OpenAPIRef }>;
+}
+
 interface OpenAPIOperation {
   operationId?: string;
   tags?: string[];
   summary?: string;
   description?: string;
-  parameters?: OpenAPIParameter[];
+  parameters?: Array<OpenAPIParameter | OpenAPIRef>;
   requestBody?: {
     content: { "application/json": { schema: OpenAPISchemaObject } };
   };
-  responses: Record<string, { description: string; content?: Record<string, { schema: OpenAPISchemaObject }> }>;
+  responses: Record<string, OpenAPIResponseObject | OpenAPIRef>;
 }
 
 interface OpenAPIParameter {
@@ -311,10 +323,11 @@ interface OpenAPIParameter {
 }
 
 interface OpenAPISchemaObject {
-  type: string;
+  type?: string;
   format?: string;
-  properties?: Record<string, OpenAPISchemaObject>;
-  items?: OpenAPISchemaObject;
+  properties?: Record<string, OpenAPISchemaObject | OpenAPIRef>;
+  items?: OpenAPISchemaObject | OpenAPIRef;
+  allOf?: Array<OpenAPISchemaObject | OpenAPIRef>;
   enum?: string[];
   description?: string;
   pattern?: string;
@@ -322,6 +335,7 @@ interface OpenAPISchemaObject {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  $ref?: string;
 }
 
 /** Generate OpenAPI 3.0 schema from the enriched inspect tree */
@@ -362,7 +376,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
           summary: "Get single item",
           operationId: makeOperationId("get", idPath),
           tags: [tag],
-          parameters: [idPathParam()],
+          parameters: [{ $ref: "#/components/parameters/itemId" }],
           responses: standardResponses(),
         };
       } else if (cmdName === "set") {
@@ -372,7 +386,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
           ...makeBodyOperation("Update item", cmdArgs),
           operationId: makeOperationId("patch", idPath),
           tags: [tag],
-          parameters: [idPathParam()],
+          parameters: [{ $ref: "#/components/parameters/itemId" }],
         };
       } else if (cmdName === "add") {
         ensurePath(paths, restPath);
@@ -388,7 +402,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
           ...makeBodyOperation("Remove item", cmdArgs),
           operationId: makeOperationId("delete", idPath),
           tags: [tag],
-          parameters: [idPathParam()],
+          parameters: [{ $ref: "#/components/parameters/itemId" }],
         };
       } else {
         // Other commands (print, export, etc.) → POST /path/{cmdName}
@@ -441,6 +455,24 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
     components: {
       securitySchemes: {
         basicAuth: { type: "http", scheme: "basic" },
+      },
+      parameters: {
+        itemId: idPathParam(),
+      },
+      responses: {
+        BadRequest: { description: "Bad command or error" },
+        Unauthorized: { description: "Unauthorized" },
+      },
+      schemas: {
+        RouterOSItem: { type: "object" },
+        RouterOSItemList: { type: "array", items: { $ref: "#/components/schemas/RouterOSItem" } },
+        QueryOptions: {
+          type: "object",
+          properties: {
+            ".proplist": { type: "string", description: "Property list filter" },
+            ".query": { type: "array", items: { type: "string" }, description: "Query filter" },
+          },
+        },
       },
     },
     security: [{ basicAuth: [] }],
@@ -549,7 +581,7 @@ function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation 
     responses: {
       "200": {
         description: "Success",
-        content: { "application/json": { schema: { type: "array", items: { type: "object" } } } },
+        content: { "application/json": { schema: { $ref: "#/components/schemas/RouterOSItemList" } } },
       },
       ...errorResponses(),
     },
@@ -557,25 +589,26 @@ function makeGetOperation(args: Array<[string, InspectNode]>): OpenAPIOperation 
 }
 
 function makeBodyOperation(summary: string, args: Array<[string, InspectNode]>): OpenAPIOperation {
-  const properties: Record<string, OpenAPISchemaObject> = {};
+  const properties: Record<string, OpenAPISchemaObject | OpenAPIRef> = {};
   for (const [name, arg] of args) {
     properties[name] = argToSchema(arg);
   }
 
-  // RouterOS REST API supports .proplist and .query on all POST bodies
-  properties[".proplist"] = { type: "string", description: "Property list filter" };
-  properties[".query"] = { type: "array", items: { type: "string" }, description: "Query filter" };
+  // Compose command-specific properties with shared QueryOptions via allOf
+  const schema: OpenAPISchemaObject = Object.keys(properties).length > 0
+    ? {
+      allOf: [
+        { type: "object", properties },
+        { $ref: "#/components/schemas/QueryOptions" },
+      ],
+    }
+    : { $ref: "#/components/schemas/QueryOptions" };
 
   return {
     summary,
     requestBody: {
       content: {
-        "application/json": {
-          schema: {
-            type: "object",
-            properties,
-          },
-        },
+        "application/json": { schema },
       },
     },
     responses: standardResponses(),
@@ -586,7 +619,7 @@ function standardResponses() {
   return {
     "200": {
       description: "Success",
-      content: { "application/json": { schema: { type: "object" } } },
+      content: { "application/json": { schema: { $ref: "#/components/schemas/RouterOSItem" } } },
     },
     ...errorResponses(),
   };
@@ -594,8 +627,8 @@ function standardResponses() {
 
 function errorResponses() {
   return {
-    "400": { description: "Bad command or error" },
-    "401": { description: "Unauthorized" },
+    "400": { $ref: "#/components/responses/BadRequest" },
+    "401": { $ref: "#/components/responses/Unauthorized" },
   };
 }
 
