@@ -348,7 +348,7 @@
             <span style="flex:1"></span>
             <small style="color:var(--pico-muted-color);font-size:0.72rem;align-self:center">
             <small> 
-                From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1a</kbd></small>
+                From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1b</kbd></small>
             </small>
         </div>
 
@@ -1188,7 +1188,8 @@
                                         if (app) loadExampleDirect(app.name)
                                         else clearStatus()
                                     }
-                                }
+                                },
+                                { label: 'Cancel', fn: () => clearStatus() }
                             ])
                         }
                     } else if (currentExampleName !== null && !isDirty()) {
