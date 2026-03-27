@@ -1511,8 +1511,13 @@
             const params = new URLSearchParams()
             if (verSelect.value) params.set('version', verSelect.value)
             if (storeToggle.checked) params.set('store', '1')
-            const content = editor ? editor.getValue() : ''
-            if (content) params.set('yaml', content)
+            // Clean example → short `app=name`; dirty/custom content → full `yaml=…`
+            if (isExampleClean() && currentExampleName) {
+                params.set('app', currentExampleName)
+            } else {
+                const content = editor ? editor.getValue() : ''
+                if (content) params.set('yaml', content)
+            }
             const qs = params.toString()
             return window.location.origin + window.location.pathname + (qs ? '?' + qs : '')
         }
@@ -1522,6 +1527,7 @@
             const version = params.get('version')
             const store = params.get('store')
             const yaml = params.get('yaml')
+            const appName = params.get('app')
 
             // If URL specifies a different version than the default, reload schemas for it
             if (version && [...verSelect.options].some(o => o.value === version) && verSelect.value !== version) {
@@ -1534,7 +1540,30 @@
                 registerYamlCompletions()
                 updateCopyCmdBtn()
             }
-            if (yaml && editor) {
+            // app= param: load a built-in example by name (short shareable URL)
+            if (appName && editor && !yaml) {
+                const match = allApps.find(a => a.name === appName)
+                if (match) {
+                    suppressChangeEvent = true
+                    editor.setValue(match.yaml || '')
+                    suppressChangeEvent = false
+                    setCurrentExample(match.name, match.yaml || '')
+                    runValidation()
+                    setStatus(`Loaded example "${match.name}" from shared URL.`, true)
+                    // Select it in the picker too
+                    if (appCatSelect && match.category) appCatSelect.value = match.category
+                    populateAppDropdown(allApps, match.category || '')
+                    appNameSelect.value = match.name
+                } else {
+                    // Unknown app name — start with empty editor and note the error
+                    suppressChangeEvent = true
+                    editor.setValue('')
+                    suppressChangeEvent = false
+                    clearCurrentExample()
+                    runValidation()
+                    setStatus(`Example "${appName}" not found in ${verSelect.value} — editor cleared.`)
+                }
+            } else if (yaml && editor) {
                 suppressChangeEvent = true
                 editor.setValue(yaml)
                 suppressChangeEvent = false
@@ -1549,12 +1578,13 @@
             await initVersionDropdown()
             if (schemaVersions.length === 0) return
 
-            // Apply URL query params first (version/store/yaml from shared URL)
-            const hasYamlParam = new URLSearchParams(window.location.search).has('yaml')
+            // Apply URL query params first (version/store/yaml/app from shared URL)
+            const urlParams = new URLSearchParams(window.location.search)
+            const hasContentParam = urlParams.has('yaml') || urlParams.has('app')
             await applyQueryParams()
 
-            // If no yaml param: restore autosave from last session or load default example
-            if (!hasYamlParam) {
+            // If no yaml/app param: restore autosave from last session or load default example
+            if (!hasContentParam) {
                 const autosaved = localStorage.getItem(AUTOSAVE_KEY)
                 if (autosaved?.trim()) {
                     suppressChangeEvent = true
