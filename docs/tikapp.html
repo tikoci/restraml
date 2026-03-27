@@ -877,7 +877,7 @@
                                             setStatus('Changes stashed. Example loaded.', true)
                                         }
                                     },
-                                    { label: 'Cancel', fn: () => showDirtyStatus(appName) }
+                                    { label: 'Ignore', fn: () => showDirtyStatus(appName) }
                                 ])
                             } else {
                                 localStorage.setItem(STASH_KEY, editor.getValue())
