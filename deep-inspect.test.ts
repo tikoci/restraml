@@ -259,6 +259,93 @@ describe("generateOpenAPI", () => {
     const protocolParam = getOp?.parameters?.find((p) => p.name === "protocol");
     expect(protocolParam?.schema.enum).toEqual(["tcp", "udp", "icmp"]);
   });
+
+  test("{id} path parameter has pattern for RouterOS identifiers", () => {
+    const patchOp = openapi.paths["/ip/address/{id}"]?.patch;
+    const idParam = patchOp?.parameters?.find((p) => p.name === "id");
+    expect(idParam?.schema.pattern).toBe("^\\*[0-9A-Fa-f]+$");
+  });
+
+  test("integer range desc produces type integer with min/max", () => {
+    const enriched: InspectNode = {
+      test: {
+        _type: "dir",
+        get: {
+          _type: "cmd",
+          mtu: { _type: "arg", desc: "0..4294967295" },
+        },
+      },
+    };
+    const oapi = generateOpenAPI(enriched, "7.22");
+    const mtuParam = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "mtu");
+    expect(mtuParam?.schema.type).toBe("integer");
+    expect(mtuParam?.schema.minimum).toBe(0);
+    expect(mtuParam?.schema.maximum).toBe(4294967295);
+  });
+
+  test("IP address desc produces format ipv4", () => {
+    const enriched: InspectNode = {
+      test: {
+        _type: "dir",
+        get: {
+          _type: "cmd",
+          address: { _type: "arg", desc: "A.B.C.D    (IP address)" },
+        },
+      },
+    };
+    const oapi = generateOpenAPI(enriched, "7.22");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "address");
+    expect(param?.schema.type).toBe("string");
+    expect(param?.schema.format).toBe("ipv4");
+  });
+
+  test("time interval desc stays type string", () => {
+    const enriched: InspectNode = {
+      test: {
+        _type: "dir",
+        get: {
+          _type: "cmd",
+          timeout: { _type: "arg", desc: "0s..1w    (time interval)" },
+        },
+      },
+    };
+    const oapi = generateOpenAPI(enriched, "7.22");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "timeout");
+    expect(param?.schema.type).toBe("string");
+    expect(param?.schema.format).toBeUndefined();
+  });
+
+  test("string value with length constraints sets maxLength", () => {
+    const enriched: InspectNode = {
+      test: {
+        _type: "dir",
+        get: {
+          _type: "cmd",
+          name: { _type: "arg", desc: "string value, max length 255" },
+        },
+      },
+    };
+    const oapi = generateOpenAPI(enriched, "7.22");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "name");
+    expect(param?.schema.type).toBe("string");
+    expect(param?.schema.maxLength).toBe(255);
+  });
+
+  test("IPv6 prefix desc produces format ipv6", () => {
+    const enriched: InspectNode = {
+      test: {
+        _type: "dir",
+        get: {
+          _type: "cmd",
+          prefix: { _type: "arg", desc: "IPv6/0..128    (IPv6 prefix)" },
+        },
+      },
+    };
+    const oapi = generateOpenAPI(enriched, "7.22");
+    const param = oapi.paths["/test"]?.get?.parameters?.find((p) => p.name === "prefix");
+    expect(param?.schema.type).toBe("string");
+    expect(param?.schema.format).toBe("ipv6");
+  });
 });
 
 // ── deep-inspect.json Output Shape ─────────────────────────────────────────

@@ -122,14 +122,14 @@ export class RouterOSClient {
   async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
     return this.fetchPost<InspectChildResponse[]>(
       `${this.baseUrl}/console/inspect`,
-      { request: "child", path: path.toString() },
+      { request: "child", path: path.join(",") },
     );
   }
 
   async fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
     return this.fetchPost<InspectSyntaxResponse[]>(
       `${this.baseUrl}/console/inspect`,
-      { request: "syntax", path: path.toString() },
+      { request: "syntax", path: path.join(",") },
       signal,
     );
   }
@@ -137,7 +137,7 @@ export class RouterOSClient {
   async fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
     return this.fetchPost<InspectCompletionResponse[]>(
       `${this.baseUrl}/console/inspect`,
-      { request: "completion", path: path.toString() },
+      { request: "completion", path: path.join(",") },
       signal,
     );
   }
@@ -312,10 +312,16 @@ interface OpenAPIParameter {
 
 interface OpenAPISchemaObject {
   type: string;
+  format?: string;
   properties?: Record<string, OpenAPISchemaObject>;
   items?: OpenAPISchemaObject;
   enum?: string[];
   description?: string;
+  pattern?: string;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
 }
 
 /** Generate OpenAPI 3.0 schema from the enriched inspect tree */
@@ -442,7 +448,7 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
 }
 
 function idPathParam(): OpenAPIParameter {
-  return { name: "id", in: "path", required: true, schema: { type: "string" }, description: "RouterOS item identifier (e.g. *1)" };
+  return { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^\\*[0-9A-Fa-f]+$" }, description: "RouterOS item identifier (e.g. *1)" };
 }
 
 function makeOperationId(method: string, path: string): string {
@@ -460,9 +466,70 @@ function collectArgs(node: InspectNode): Array<[string, InspectNode]> {
   ) as Array<[string, InspectNode]>;
 }
 
+function parseDescType(desc: string): OpenAPISchemaObject {
+  // Integer range: "0..4294967295" (pure digits, no time suffixes)
+  const intRange = desc.match(/^(\d+)\.\.(\d+)$/);
+  if (intRange) {
+    const min = Number(intRange[1]);
+    const max = Number(intRange[2]);
+    if (max <= Number.MAX_SAFE_INTEGER) {
+      return { type: "integer", minimum: min, maximum: max };
+    }
+    return { type: "integer" };
+  }
+
+  // Time interval (various range formats or bare "time interval")
+  if (desc.includes("(time interval)") || desc === "time interval") {
+    return { type: "string" };
+  }
+
+  // IP address: "A.B.C.D    (IP address)" or "none | A.B.C.D" / "unspecified | A.B.C.D"
+  if (desc.includes("(IP address)")) {
+    return { type: "string", format: "ipv4" };
+  }
+
+  // IP prefix: "A.B.C.D/M    (IP prefix)"
+  if (desc.includes("(IP prefix)")) {
+    return { type: "string" };
+  }
+
+  // IPv6 prefix
+  if (desc.includes("(IPv6 prefix)") || desc.startsWith("IPv6")) {
+    return { type: "string", format: "ipv6" };
+  }
+
+  // MAC address: "AB[:|-|.]CD..."
+  if (desc.includes("(MAC address)")) {
+    return { type: "string" };
+  }
+
+  // String with length constraints: "string value, max length N", "string value, min length N"
+  const strLenMatch = desc.match(/^string value(?:,\s*min length (\d+))?(?:,\s*max length (\d+))?$/);
+  if (strLenMatch) {
+    const schema: OpenAPISchemaObject = { type: "string" };
+    if (strLenMatch[1]) schema.minLength = Number(strLenMatch[1]);
+    if (strLenMatch[2]) schema.maxLength = Number(strLenMatch[2]);
+    return schema;
+  }
+  // Also handle "string value, min length N, max length M"
+  const strMinMax = desc.match(/^string value,\s*min length (\d+),\s*max length (\d+)$/);
+  if (strMinMax) {
+    return { type: "string", minLength: Number(strMinMax[1]), maxLength: Number(strMinMax[2]) };
+  }
+
+  // Hexadecimal string: "hexadecimal string value[, max/min length N]"
+  if (desc.startsWith("hexadecimal string value")) {
+    return { type: "string" };
+  }
+
+  // Fallback
+  return { type: "string" };
+}
+
 function argToSchema(arg: InspectNode): OpenAPISchemaObject {
-  const schema: OpenAPISchemaObject = { type: "string" };
-  if (arg.desc) schema.description = arg.desc as string;
+  const desc = arg.desc as string | undefined;
+  const schema: OpenAPISchemaObject = desc ? parseDescType(desc) : { type: "string" };
+  if (desc) schema.description = desc;
   if (arg._completion && Object.keys(arg._completion).length > 0) {
     schema.enum = Object.keys(arg._completion);
   }
