@@ -44,7 +44,7 @@ export interface DeepInspectMeta {
 
 export interface DeepInspectOutput {
   _meta: DeepInspectMeta;
-  [key: string]: InspectNode | DeepInspectMeta;
+  [key: string]: InspectNode | DeepInspectMeta | string | undefined | Record<string, CompletionEntry>;
 }
 
 /** Raw response item from /console/inspect with request=child */
@@ -291,6 +291,8 @@ interface OpenAPIPathItem {
 }
 
 interface OpenAPIOperation {
+  operationId?: string;
+  tags?: string[];
   summary?: string;
   description?: string;
   parameters?: OpenAPIParameter[];
@@ -338,37 +340,59 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
     for (const [cmdName, cmdNode] of cmds) {
       const cmdArgs = collectArgs(cmdNode);
 
+      const tag = restPath.split("/").filter(Boolean)[0] || "root";
+
       if (cmdName === "get") {
         // GET /path → list, GET /path/{id} → single item
         ensurePath(paths, restPath);
-        paths[restPath].get = makeGetOperation(cmdArgs);
+        paths[restPath].get = {
+          ...makeGetOperation(cmdArgs),
+          operationId: makeOperationId("get", restPath),
+          tags: [tag],
+        };
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
         paths[idPath].get = {
-          summary: `Get single item`,
-          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          summary: "Get single item",
+          operationId: makeOperationId("get", idPath),
+          tags: [tag],
+          parameters: [idPathParam()],
           responses: standardResponses(),
         };
       } else if (cmdName === "set") {
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
-        paths[idPath].patch = makeBodyOperation("Update item", cmdArgs);
-        if (!paths[idPath].get) {
-          // Ensure id parameter exists
-          paths[idPath].get = undefined;
-        }
+        paths[idPath].patch = {
+          ...makeBodyOperation("Update item", cmdArgs),
+          operationId: makeOperationId("patch", idPath),
+          tags: [tag],
+          parameters: [idPathParam()],
+        };
       } else if (cmdName === "add") {
         ensurePath(paths, restPath);
-        paths[restPath].put = makeBodyOperation("Create item", cmdArgs);
+        paths[restPath].put = {
+          ...makeBodyOperation("Create item", cmdArgs),
+          operationId: makeOperationId("put", restPath),
+          tags: [tag],
+        };
       } else if (cmdName === "remove") {
         const idPath = `${restPath}/{id}`;
         ensurePath(paths, idPath);
-        paths[idPath].delete = makeBodyOperation("Remove item", cmdArgs);
+        paths[idPath].delete = {
+          ...makeBodyOperation("Remove item", cmdArgs),
+          operationId: makeOperationId("delete", idPath),
+          tags: [tag],
+          parameters: [idPathParam()],
+        };
       } else {
         // Other commands (print, export, etc.) → POST /path/{cmdName}
         const cmdPath = `${restPath}/${cmdName}`;
         ensurePath(paths, cmdPath);
-        paths[cmdPath].post = makeBodyOperation(cmdNode.desc || cmdName, cmdArgs);
+        paths[cmdPath].post = {
+          ...makeBodyOperation(cmdNode.desc || cmdName, cmdArgs),
+          operationId: makeOperationId("post", cmdPath),
+          tags: [tag],
+        };
       }
     }
 
@@ -392,10 +416,18 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
     servers: [
       {
         url: "https://{host}:{port}/rest",
-        description: "RouterOS device",
+        description: "RouterOS device (HTTPS)",
         variables: {
           host: { default: "192.168.88.1", description: "RouterOS IP or hostname" },
           port: { default: "443", description: "HTTPS port" },
+        },
+      },
+      {
+        url: "http://{host}:{port}/rest",
+        description: "RouterOS device (HTTP)",
+        variables: {
+          host: { default: "192.168.88.1", description: "RouterOS IP or hostname" },
+          port: { default: "80", description: "HTTP port" },
         },
       },
     ],
@@ -407,6 +439,15 @@ export function generateOpenAPI(tree: InspectNode, version: string): OpenAPISche
     },
     security: [{ basicAuth: [] }],
   };
+}
+
+function idPathParam(): OpenAPIParameter {
+  return { name: "id", in: "path", required: true, schema: { type: "string" }, description: "RouterOS item identifier (e.g. *1)" };
+}
+
+function makeOperationId(method: string, path: string): string {
+  const segments = path.split("/").filter(Boolean).map((s) => s.replace(/[{}]/g, ""));
+  return `${method}_${segments.join("_") || "root"}`;
 }
 
 function ensurePath(paths: Record<string, OpenAPIPathItem>, path: string) {
@@ -454,13 +495,13 @@ function makeBodyOperation(summary: string, args: Array<[string, InspectNode]>):
     properties[name] = argToSchema(arg);
   }
 
-  const op: OpenAPIOperation = {
-    summary,
-    responses: standardResponses(),
-  };
+  // RouterOS REST API supports .proplist and .query on all POST bodies
+  properties[".proplist"] = { type: "string", description: "Property list filter" };
+  properties[".query"] = { type: "array", items: { type: "string" }, description: "Query filter" };
 
-  if (Object.keys(properties).length > 0) {
-    op.requestBody = {
+  return {
+    summary,
+    requestBody: {
       content: {
         "application/json": {
           schema: {
@@ -469,14 +510,9 @@ function makeBodyOperation(summary: string, args: Array<[string, InspectNode]>):
           },
         },
       },
-    };
-  }
-
-  // Add .proplist and .query for POST operations
-  properties[".proplist"] = { type: "string", description: "Property list filter" };
-  properties[".query"] = { type: "array", items: { type: "string" }, description: "Query filter" };
-
-  return op;
+    },
+    responses: standardResponses(),
+  };
 }
 
 function standardResponses() {

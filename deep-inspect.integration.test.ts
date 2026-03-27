@@ -136,7 +136,7 @@ describe("testCrashPaths (live)", () => {
     expect(results).toHaveLength(CRASH_PATHS.length);
 
     for (const result of results) {
-      expect(CRASH_PATHS).toContain(result.path);
+      expect((CRASH_PATHS as readonly string[]).includes(result.path)).toBe(true);
       expect(typeof result.safe).toBe("boolean");
     }
 

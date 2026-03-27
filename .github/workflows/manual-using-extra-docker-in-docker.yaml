@@ -192,6 +192,9 @@ jobs:
           --output-dir . \
           --test-crash-paths
 
+    - name: Validate OpenAPI 3.0 schema
+      run: bun validate-openapi.ts openapi.json
+
     - name: Run deep-inspect integration tests
       run: bun test deep-inspect.integration.test.ts
 

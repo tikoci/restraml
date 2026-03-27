@@ -169,8 +169,11 @@ describe("generateOpenAPI", () => {
   });
 
   test("has server with variables", () => {
-    expect(openapi.servers).toHaveLength(1);
+    expect(openapi.servers).toHaveLength(2);
+    expect(openapi.servers[0].url).toContain("https");
     expect(openapi.servers[0].variables?.host.default).toBe("192.168.88.1");
+    expect(openapi.servers[1].url).toContain("http");
+    expect(openapi.servers[1].variables?.port.default).toBe("80");
   });
 
   test("has basicAuth security scheme", () => {
@@ -187,6 +190,8 @@ describe("generateOpenAPI", () => {
   test("GET /ip/address has parameters", () => {
     const getOp = openapi.paths["/ip/address"]?.get;
     expect(getOp).toBeDefined();
+    expect(getOp?.operationId).toBe("get_ip_address");
+    expect(getOp?.tags).toEqual(["ip"]);
     expect(getOp?.parameters?.length).toBeGreaterThan(0);
     const addressParam = getOp?.parameters?.find((p) => p.name === "address");
     expect(addressParam).toBeDefined();
@@ -196,17 +201,29 @@ describe("generateOpenAPI", () => {
   test("PUT /ip/address for add command", () => {
     const putOp = openapi.paths["/ip/address"]?.put;
     expect(putOp).toBeDefined();
+    expect(putOp?.operationId).toBe("put_ip_address");
+    expect(putOp?.tags).toEqual(["ip"]);
     expect(putOp?.requestBody?.content["application/json"]?.schema.properties?.address).toBeDefined();
   });
 
   test("PATCH /ip/address/{id} for set command", () => {
     const patchOp = openapi.paths["/ip/address/{id}"]?.patch;
     expect(patchOp).toBeDefined();
+    expect(patchOp?.operationId).toBe("patch_ip_address_id");
+    // Must have id path parameter for Postman/Swagger compatibility
+    const idParam = patchOp?.parameters?.find((p) => p.name === "id" && p.in === "path");
+    expect(idParam).toBeDefined();
+    expect(idParam?.required).toBe(true);
   });
 
   test("DELETE /ip/address/{id} for remove command", () => {
     const deleteOp = openapi.paths["/ip/address/{id}"]?.delete;
     expect(deleteOp).toBeDefined();
+    expect(deleteOp?.operationId).toBe("delete_ip_address_id");
+    // Must have id path parameter
+    const idParam = deleteOp?.parameters?.find((p) => p.name === "id" && p.in === "path");
+    expect(idParam).toBeDefined();
+    expect(idParam?.required).toBe(true);
   });
 
   test("nested paths are generated", () => {

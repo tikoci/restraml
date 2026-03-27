@@ -8,16 +8,19 @@
     "schema:version": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js --version'",
     "deep-inspect": "bun deep-inspect.ts",
     "validate:raml": "node validraml.cjs",
+    "validate:openapi": "bun validate-openapi.ts",
     "validate:app-yaml": "echo 'Usage: bun appyamlvalidate.js <version>'",
     "test": "bun test",
     "test:qemu": "./scripts/test-with-qemu.sh",
-    "lint": "bunx @biomejs/biome check .",
+    "typecheck": "bunx tsc --noEmit",
+    "lint": "bunx @biomejs/biome check . && bunx tsc --noEmit",
     "lint:fix": "bunx @biomejs/biome check --write ."
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@biomejs/biome": "^2.0.0",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
