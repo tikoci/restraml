@@ -718,6 +718,7 @@ function notFoundResponse() {
 
 interface CliOptions {
   inspectFile?: string;
+  rosVersion?: string;
   live: boolean;
   outputDir: string;
   skipOpenapi: boolean;
@@ -732,6 +733,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     args: Bun.argv,
     options: {
       "inspect-file": { type: "string" },
+      "ros-version": { type: "string" },
       live: { type: "boolean", default: false },
       "output-dir": { type: "string", default: "." },
       "skip-openapi": { type: "boolean", default: false },
@@ -749,6 +751,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
   return {
     opts: {
       inspectFile: values["inspect-file"],
+      rosVersion: values["ros-version"],
       live: values.live ?? false,
       outputDir: values["output-dir"] ?? ".",
       skipOpenapi: values["skip-openapi"] ?? false,
@@ -770,6 +773,7 @@ Usage:
 
 Options:
   --inspect-file <path>   Input inspect.json file (offline enrichment)
+  --ros-version <ver>     Override RouterOS version (e.g. 7.23beta4)
   --live                  Query live router (URLBASE/BASICAUTH env vars)
   --output-dir <dir>      Output directory (default: .)
   --skip-openapi          Skip OpenAPI 3.0 generation
@@ -858,10 +862,14 @@ async function main() {
     inspectTree = await file.json();
     console.log(`Loaded inspect tree from ${opts.inspectFile}`);
 
-    // Try to determine version from path (e.g. docs/7.22/inspect.json)
-    const versionMatch = opts.inspectFile.match(/(\d+\.\d+(?:\.\d+)?(?:(?:beta|rc)\d+)?)\//);
-    if (versionMatch) {
-      version = versionMatch[1];
+    // Use explicit --ros-version if provided, otherwise try path extraction
+    if (opts.rosVersion) {
+      version = opts.rosVersion;
+    } else {
+      const versionMatch = opts.inspectFile.match(/(\d+\.\d+(?:\.\d+)?(?:(?:beta|rc)\d+)?)\//);
+      if (versionMatch) {
+        version = versionMatch[1];
+      }
     }
   } else {
     console.error("Error: specify --inspect-file <path> or --live");

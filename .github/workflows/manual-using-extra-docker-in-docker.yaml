@@ -189,6 +189,7 @@ jobs:
       run: |
         bun deep-inspect.ts \
           --inspect-file ros-inspect-all.json \
+          --ros-version "${{ steps.connection-check.outputs.rosver }}" \
           --output-dir . \
           --test-crash-paths
 
