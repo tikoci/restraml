@@ -106,24 +106,80 @@ function rebuildSelect(sel, versions, showAll) {
 }
 
 // --- GitHub API: fetch version directory listing ---------------------
+// Cached in localStorage to minimise GitHub API calls (60/hour unauth).
+// All docs/*.html pages share this cache via the same origin.
+// On 403 (rate limited), falls back to stale cache if available.
+
+const _VER_CACHE_KEY = 'restraml_versions'
+const _VER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+/** In-memory promise so concurrent calls within the same page share one request. */
+let _verListPromise = null
 
 /**
  * Fetch the list of built versions from the GitHub API.
  * Returns a promise resolving to an array of GitHub content objects,
  * sorted newest-first by version. Each has { name, path, type, ... }.
+ *
+ * Results are cached in localStorage for 5 minutes to reduce API calls
+ * across page navigations (all docs pages share the same GH Pages origin).
+ * On 403 (rate limited), falls back to stale cache regardless of TTL.
  */
 function fetchVersionList() {
+    if (_verListPromise) return _verListPromise
+    _verListPromise = _fetchVersionListInner()
+    // Clear the in-memory dedup after settling so future calls can retry
+    _verListPromise.finally(() => { _verListPromise = null })
+    return _verListPromise
+}
+
+function _fetchVersionListInner() {
+    // Check localStorage cache first
+    try {
+        const raw = localStorage.getItem(_VER_CACHE_KEY)
+        if (raw) {
+            const cached = JSON.parse(raw)
+            if (cached?.ts && Date.now() - cached.ts < _VER_CACHE_TTL) {
+                return Promise.resolve(cached.data)
+            }
+        }
+    } catch { /* ignore corrupted cache */ }
+
     return fetch(RESTRAML.apiContentsUrl)
         .then(r => {
+            if (r.status === 403) {
+                // Rate limited — try stale cache regardless of TTL
+                const stale = _readStaleVersionCache()
+                if (stale) return stale
+                throw new Error(`GitHub API returned 403 (rate limited) — no cached version list available`)
+            }
             if (!r.ok) throw new Error(`GitHub API returned ${r.status} ${r.statusText}`)
             return r.json()
         })
         .then(data => {
             if (!Array.isArray(data)) throw new Error('Unexpected GitHub API response')
-            return data
+            const versions = data
                 .filter(f => f.type === 'dir' && f.name !== 'extra')
                 .sort((a, b) => compareVersions(a.name, b.name))
+            // Persist to localStorage
+            try {
+                localStorage.setItem(_VER_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: versions }))
+            } catch { /* storage full or unavailable */ }
+            return versions
         })
+}
+
+function _readStaleVersionCache() {
+    try {
+        const raw = localStorage.getItem(_VER_CACHE_KEY)
+        if (raw) {
+            const cached = JSON.parse(raw)
+            if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
+                return cached.data
+            }
+        }
+    } catch { /* ignore */ }
+    return null
 }
 
 // --- Dark mode theme switcher ----------------------------------------

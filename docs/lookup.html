@@ -675,19 +675,11 @@
         })
 
         // -----------------------------------------------------------------
-        // Bootstrap: fetch version list from GitHub API, then run initial lookup
+        // Bootstrap: fetch version list (cached in localStorage by shared JS)
         // -----------------------------------------------------------------
-        fetch(RESTRAML.apiContentsUrl)
-            .then(r => {
-                if (!r.ok) throw new Error(`GitHub API returned ${r.status}`)
-                return r.json()
-            })
+        fetchVersionList()
             .then(data => {
-                if (!Array.isArray(data)) return
-                allVersions = data
-                    .filter(f => f.type === 'dir' && f.name !== 'extra')
-                    .map(f => f.name)
-                    .sort(compareVersions)
+                allVersions = data.map(f => f.name)
                 // Apply query params before rebuilding select (so testing flag is set)
                 const qVersion = applyQueryParams()
                 rebuildVersionSelect()

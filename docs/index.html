@@ -624,25 +624,10 @@
         }
 
         // -----------------------------------------------------------------
-        // Main: fetch version list from GitHub API, dispatch builddir events
+        // Main: fetch version list (cached in localStorage by shared JS)
         // -----------------------------------------------------------------
-        fetch(RESTRAML.apiContentsUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`GitHub API returned ${response.status} ${response.statusText}`)
-                }
-                return response.json()
-            })
-            .then(data => {
-                if (!Array.isArray(data)) {
-                    console.error('Unexpected GitHub API payload for contents:', data)
-                    return
-                }
-                // Filter to version directories, sort by semver, then dispatch events
-                const versionDirs = data
-                    .filter(file => file.type === 'dir' && file.name !== 'extra')
-                    .sort((a, b) => compareVersions(a.name, b.name))
-
+        fetchVersionList()
+            .then(versionDirs => {
                 versionDirs.forEach(file => {
                     file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
                     document.dispatchEvent(new CustomEvent('builddir', { detail: file }))

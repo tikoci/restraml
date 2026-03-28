@@ -743,18 +743,10 @@
                 })
         }
 
-        // Fetch version list from GitHub API and dispatch builddir events
-        fetch(RESTRAML.apiContentsUrl)
-            .then(r => {
-                if (!r.ok) throw new Error('GitHub API: ' + r.status)
-                return r.json()
-            })
+        // Fetch version list (cached in localStorage by shared JS)
+        fetchVersionList()
             .then(data => {
-                if (!Array.isArray(data)) return
-                data
-                    .filter(f => f.type === 'dir' && f.name !== 'extra')
-                    .sort((a, b) => compareVersions(a.name, b.name))
-                    .forEach(f => document.dispatchEvent(new CustomEvent('builddir', { detail: f })))
+                data.forEach(f => document.dispatchEvent(new CustomEvent('builddir', { detail: f })))
                 // Apply URL query params after all version options are populated
                 applyQueryParams()
             })
