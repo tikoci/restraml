@@ -473,8 +473,8 @@
         // --- Dark mode: let Scalar handle it; header follows OS preference initially ---
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-        // --- Minimum version for OpenAPI (7.21.1+) ---
-        const MIN_VERSION = { major: 7, minor: 21, patch: 1 };
+        // --- Minimum version for OpenAPI (7.22.1+) ---
+        const MIN_VERSION = { major: 7, minor: 22, patch: 1 };
 
         function meetsMinVersion(name) {
             const v = parseVersion(name);
@@ -521,7 +521,7 @@
             history.replaceState(null, '', url);
         }
 
-        // --- Version list (filtered to >= 7.21.1) ---
+        // --- Version list (filtered to >= 7.22.1) ---
         function rebuildVersionSelect() {
             const filtered = allVersions
                 .map(v => v.name)
@@ -564,7 +564,7 @@
                 const altLabel = extra ? 'base schema (without extra-packages)' : 'extra-packages schema';
                 scalarStatus.innerHTML = `<p><strong>No OpenAPI schema found</strong> for
                     <code>${version}</code>${extra ? ' (extra-packages)' : ''}. OpenAPI generation
-                    was added in 7.21.1 &mdash; older versions have RAML only.
+                    was added in 7.22.1 &mdash; older versions have RAML only.
                     Try the ${altLabel} or a different version.</p>`;
                 return;
             }
