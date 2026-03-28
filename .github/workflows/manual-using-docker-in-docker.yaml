@@ -166,6 +166,10 @@ jobs:
         bun enrich-openapi.ts --openapi openapi.json --db ros-help.db
         rm -f ros-help.db ros-help.db.gz
 
+    - name: Validate enriched OpenAPI 3.0 schema
+      if: hashFiles('openapi.json') != ''
+      run: bun validate-openapi.ts openapi.json
+
     - name: Run deep-inspect integration tests
       run: bun test deep-inspect.integration.test.ts
 
