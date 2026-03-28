@@ -210,18 +210,42 @@
             transform: translateX(1rem);
         }
 
-        /* CORS / test-request link */
-        #cors-note {
+        /* Right-aligned actions: CORS note + download + share */
+        #actions-group {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             font-size: 0.82rem;
             color: var(--pico-muted-color);
-            margin-left: auto;
         }
-        #cors-note a {
+        #actions-group a {
             color: var(--pico-primary);
             cursor: pointer;
             text-decoration: none;
         }
-        #cors-note a:hover { text-decoration: underline; }
+        #actions-group a:hover { text-decoration: underline; }
+        #actions-group a[hidden] { display: none; }
+
+        /* Download + Share as small inline buttons */
+        #openapi-download, #share-btn {
+            padding: 0.25rem 0.55rem;
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius);
+            text-decoration: none !important;
+            white-space: nowrap;
+        }
+        #share-btn {
+            font-family: inherit;
+            font-size: 0.82rem;
+            background: transparent;
+            color: var(--pico-muted-color);
+            cursor: pointer;
+        }
+        #share-btn:hover, #openapi-download:hover {
+            color: var(--pico-primary);
+            border-color: var(--pico-primary);
+        }
 
         /* Dropdown menu (replaces Pico's <details class="dropdown">) */
         #app-header details.dropdown { position: relative; }
@@ -376,12 +400,13 @@
                 <code>extra-packages</code>
             </label>
             <label class="toggle-label">
-                <input id="includeTesting" type="checkbox" checked>
+                <input id="includeTesting" type="checkbox">
                 <code>testing</code>
             </label>
-            <span id="cors-note">
-                Test requests require CORS.
-                <a id="toggle-test-request" href="#">Show</a>
+            <span id="actions-group">
+                <span id="cors-note">Test requests (<a id="toggle-test-request" href="#">show</a>) requires CORS.</span>
+                <a id="openapi-download" href="#" download hidden>Download Schema</a>
+                <button id="share-btn" type="button">Share</button>
             </span>
         </div>
     </header>
@@ -435,6 +460,8 @@
         const testingCheck = document.getElementById('includeTesting');
         const scalarStatus = document.getElementById('scalar-status');
         const toggleTestLink = document.getElementById('toggle-test-request');
+        const downloadAnchor = document.getElementById('openapi-download');
+        const shareBtn = document.getElementById('share-btn');
 
         // --- State ---
         let allVersions = [];
@@ -487,7 +514,7 @@
             const params = new URLSearchParams();
             if (versionSelect.value) params.set('version', versionSelect.value);
             if (!extraCheck.checked) params.set('extra', 'false');
-            if (!testingCheck.checked) params.set('testing', 'false');
+            if (testingCheck.checked) params.set('testing', 'true');
             const qs = params.toString();
             const url = qs ? `${location.pathname}?${qs}` : location.pathname;
             history.replaceState(null, '', url);
@@ -528,6 +555,7 @@
             // Show loading state
             scalarStatus.hidden = false;
             scalarStatus.innerHTML = '<p aria-busy="true">Loading OpenAPI schema&hellip;</p>';
+            downloadAnchor.hidden = true;
 
             // Check if the file exists
             const exists = await checkOpenApiExists(version, extra);
@@ -542,6 +570,10 @@
 
             scalarStatus.hidden = true;
             currentUrl = url;
+
+            // Show download link
+            downloadAnchor.href = url;
+            downloadAnchor.hidden = false;
 
             if (scalarApp) {
                 scalarApp.updateConfiguration({ url: url });
@@ -581,14 +613,23 @@
             e.preventDefault();
             testRequestEnabled = !testRequestEnabled;
             toggleTestLink.textContent = testRequestEnabled
-                ? 'Hide'
-                : 'Show';
+                ? 'hide'
+                : 'show';
             if (scalarApp) {
                 scalarApp.destroy();
                 scalarApp = null;
                 currentUrl = null;
             }
             loadScalar();
+        });
+
+        // --- Share button ---
+        shareBtn.addEventListener('click', () => {
+            writeQueryParams();
+            navigator.clipboard.writeText(location.href).then(() => {
+                shareBtn.textContent = '✓ Copied!';
+                setTimeout(() => { shareBtn.textContent = 'Share'; }, 1800);
+            });
         });
 
         // --- Event listeners ---

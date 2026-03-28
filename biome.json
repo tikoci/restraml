@@ -65,6 +65,19 @@
                         "useAriaPropsForRole": "off",
                         "useButtonType": "off",
                         "useAnchorContent": "off"
+                    },
+                    "style": {
+                        "noDescendingSpecificity": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["docs/openapi.html"],
+            "linter": {
+                "rules": {
+                    "complexity": {
+                        "noImportantStyles": "off"
                     }
                 }
             }
