@@ -365,12 +365,21 @@
             }
 
             makeVerCellExtra('raml', 'schema.raml')
-            makeVerCellExtra('openapi', 'openapi.json')
+            // OpenAPI with docs shipped from 7.22.1+; older versions only have oas2.json
+            const hasOpenApi = compareVersions(file.name, '7.22.1') <= 0
+            if (hasOpenApi) {
+                makeVerCellExtra('openapi', 'openapi.json')
+            }
             makeVerCellExtra('json', 'inspect.json')
 
-            // Add "explore" link to OpenAPI cell pointing to the API Explorer
+            // Add "explore" link (and label for older versions) to the OpenAPI cell
             const openapiCell = verrow.querySelector('.cell-openapi')
             if (openapiCell) {
+                if (!hasOpenApi) {
+                    const label = document.createElement('small')
+                    label.innerHTML = '<mark>OPENAPI</mark>'
+                    openapiCell.appendChild(label)
+                }
                 const exploreLink = document.createElement('a')
                 exploreLink.href = `openapi.html?version=${file.name}`
                 exploreLink.textContent = 'explore \u2197'
