@@ -154,6 +154,19 @@ jobs:
     - name: Validate OpenAPI 3.0 schema
       run: bun validate-openapi.ts openapi.json
 
+    - name: Enrich OpenAPI schema with documentation from rosetta
+      if: hashFiles('openapi.json') != ''
+      run: |
+        curl -fsSL -o ros-help.db.gz \
+          https://github.com/tikoci/rosetta/releases/latest/download/ros-help.db.gz
+        bun -e "
+          import { gunzipSync } from 'bun';
+          const gz = new Uint8Array(await Bun.file('ros-help.db.gz').arrayBuffer());
+          await Bun.write('ros-help.db', gunzipSync(gz));
+        "
+        bun enrich-openapi.ts --openapi openapi.json --db ros-help.db
+        rm -f ros-help.db ros-help.db.gz
+
     - name: Run deep-inspect integration tests
       run: bun test deep-inspect.integration.test.ts
 
