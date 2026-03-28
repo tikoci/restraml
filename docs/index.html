@@ -209,7 +209,8 @@
                 <b><u>base</u></b> <i>links cover just the <code>routeros.npk</code> package.<br>
                 </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
                     <code>extra-packages.zip</code> available for X86.</i><br>
-                <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> to explore the RouterOS REST API — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small>
+                <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small><br>
+                <small>🔍 <strong>OpenAPI 3</strong> schemas power the <a href="openapi.html">API Explorer</a> — an interactive browser for the RouterOS REST API with enriched descriptions.</small>
             </article>
             <table>
                 <thead>
@@ -217,7 +218,7 @@
                         <th scope="col">Version</th>
                         <td>REST Schema</td>
                         <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
-                        <td>API Docs</td>
+                        <td>OpenAPI 3</td>
                         <td>SNMP MIB</td>
                     </tr>
                 </thead>
@@ -236,7 +237,7 @@
                             <th class="cell-vername"><a href="#"></a></th>
                             <td class="cell-raml"></td>
                             <td class="cell-json"></td>
-                            <td class="cell-html"></td>
+                            <td class="cell-openapi"></td>
                             <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
                         </tr>
                     </template>
@@ -364,8 +365,18 @@
             }
 
             makeVerCellExtra('raml', 'schema.raml')
-            makeVerCellExtra('html', 'docs')
+            makeVerCellExtra('openapi', 'openapi.json')
             makeVerCellExtra('json', 'inspect.json')
+
+            // Add "explore" link to OpenAPI cell pointing to the API Explorer
+            const openapiCell = verrow.querySelector('.cell-openapi')
+            if (openapiCell) {
+                const exploreLink = document.createElement('a')
+                exploreLink.href = `openapi.html?version=${file.name}`
+                exploreLink.textContent = 'explore \u2197'
+                exploreLink.style.cssText = 'display:block; font-size:0.75em; margin-top:0.15em'
+                openapiCell.appendChild(exploreLink)
+            }
 
             // SNMP MIB link
             verrow.querySelector('.cell-mib a').href =

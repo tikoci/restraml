@@ -11,9 +11,8 @@
 The pipeline is:
 1. Boot a RouterOS CHR (Cloud Hosted Router) directly in QEMU on the GitHub Actions runner
 2. Query the router's `/console/inspect` REST endpoint to extract the full command/API tree
-3. Convert that tree to [RAML 1.0](https://raml.org/) schema format
-4. Generate an HTML reference page from RAML
-5. Commit everything to `/docs/` and publish via GitHub Pages
+3. Convert that tree to [RAML 1.0](https://raml.org/) schema format and OpenAPI 3.0
+4. Commit everything to `/docs/` and publish via GitHub Pages
 
 The generated schemas live at https://tikoci.github.io/restraml — with per-version folders in `/docs/`.
 
@@ -42,11 +41,10 @@ restraml/
 │   ├── {version}/
 │   │   ├── schema.raml                          # RAML 1.0 schema (presence = "this version is built")
 │   │   ├── inspect.json                         # Raw /console/inspect output from RouterOS
+│   │   ├── openapi.json                         # OpenAPI 3.0 schema (7.21.1+)
 │   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
-│   │   ├── routeros-app-yaml-store-schema.json  # /app store schema for this version
-│   │   └── docs/
-│   │       └── index.html  # Generated HTML documentation
+│   │   └── routeros-app-yaml-store-schema.json  # /app store schema for this version
 │   └── {version}/extra/  # Same files, but built with all_packages (extra features)
 ├── CLAUDE.md             # Full architecture guide for AI agents
 ├── AGENTS.md             # GitHub Copilot agent-specific instructions
@@ -225,8 +223,7 @@ docker run --rm -d --device /dev/kvm -p 9180:80 -p 9122:22 chr-qemu
 After schema generation, files are committed directly to `main` branch by `github-actions[bot]`.
 The commit structure is:
 ```
-docs/{rosver}/{schema.raml,inspect.json}
-docs/{rosver}/docs/index.html
+docs/{rosver}/{schema.raml,inspect.json,openapi.json}
 docs/{rosver}/extra/{schema.raml,...}   # extra-packages build only
 ```
 
@@ -704,8 +701,8 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 | `js-yaml` | `rest2raml.js`, `appyamlvalidate.js` (Bun) | Serialize RAML output as YAML; parse /app YAML for validation |
 | `ajv` | `appyamlvalidate.js` (Bun) | JSON Schema validation (draft-07) for /app YAML schemas |
 | `ajv-formats` | `appyamlvalidate.js` (Bun) | AJV plugin for format validators (uri, email, etc.) |
-| `raml2html` | CI workflows | Generate HTML from RAML |
-| `raml2html-slate-theme` | CI workflows | Slate theme for raml2html |
+| `raml2html` | _(retired)_ | Previously generated HTML from RAML; replaced by OpenAPI 3 + API Explorer |
+| `raml2html-slate-theme` | _(retired)_ | Previously used as raml2html theme |
 | `webapi-parser` | `validraml.cjs` | RAML validation |
 | `qemu-system-x86` | CI workflows (apt) | Runs RouterOS CHR VM (Ubuntu package; provides `qemu-system-x86_64` binary) |
 | `qemu-utils` | CI workflows (apt) | Provides `qemu-img` for VDI→qcow2 disk conversion |

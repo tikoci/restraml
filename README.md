@@ -1,6 +1,6 @@
 # RouterOS API Schema Tools
 
-> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, a command lookup tool, and a browser-based `/app` YAML editor for the MikroTik RouterOS REST API. No install needed, runs in your browser.
+> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, an interactive API explorer, a command lookup tool, and a browser-based `/app` YAML editor for the MikroTik RouterOS REST API. No install needed, runs in your browser.
 >
 > For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — [setup details below](#using-the-app-yaml-schema-in-vscode).
 
@@ -19,7 +19,7 @@ Pre-built schema files for the RouterOS REST API are available at
 Each RouterOS version includes:
 
 * **RAML** — RAML 1.0 schema, usable in [Postman](#usage-with-postman), MuleSoft, and other API tools
-* **HTML** — human-readable API documentation generated from the schema
+* **OpenAPI 3** — OpenAPI 3.0 schema (7.21.1+), viewable in the [API Explorer](https://tikoci.github.io/restraml/openapi.html) with enriched descriptions from MikroTik documentation
 * **JSON** — raw `/console/inspect` output from RouterOS, useful for data analysis and diffs
 * **MIB** — link to the official MikroTik MIB for SNMP
 
@@ -27,6 +27,10 @@ There may be a _base_ and _+extra_ download for each version:
 
 * **base** — just the `routeros.npk` system package
 * **+extra** — all x86 packages: `routeros`, `dude`, `container`, `rose-storage`, `gps`, `lora`, `calea`, `user-manager`, `ups`, `iot`, `wifiwave2`, `tr069-client`
+
+### API Explorer
+
+An **interactive API explorer** at [tikoci.github.io/restraml/openapi.html](https://tikoci.github.io/restraml/openapi.html) lets you browse the RouterOS REST API using the OpenAPI 3 schema. Powered by [Scalar](https://github.com/scalar/scalar), it provides endpoint documentation enriched with descriptions from MikroTik's official documentation, request/response examples, and a built-in HTTP client for testing.
 
 ### `diff` RouterOS Commands
 
@@ -151,9 +155,13 @@ restraml/
 │   └── entrypoint.sh         # QEMU launcher for local Docker use
 ├── docs/                     # GitHub Pages root (one subdirectory per version)
 │   ├── index.html            # Main website: version list, diff tool, downloads
+│   ├── openapi.html          # Interactive API Explorer (Scalar-based)
+│   ├── lookup.html           # Command search tool
+│   ├── diff.html             # Schema diff tool
+│   ├── tikapp.html           # /app YAML editor (Monaco-based)
 │   ├── routeros-app-yaml-schema.latest.json
 │   ├── routeros-app-yaml-store-schema.latest.json
-│   └── {version}/            # Per-version schemas and docs
+│   └── {version}/            # Per-version schemas (RAML, OpenAPI 3, inspect JSON)
 ├── CLAUDE.md                 # Full architecture guide for AI agents
 ├── AGENTS.md                 # GitHub Copilot agent instructions
 └── .github/workflows/
