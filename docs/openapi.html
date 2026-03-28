@@ -405,7 +405,7 @@
                 <code>testing</code>
             </label>
             <span id="actions-group">
-                <span id="cors-note">Test requests (<a id="toggle-test-request" href="#">show</a>) requires CORS.</span>
+                <span id="cors-note">Test requests (<a id="toggle-test-request" href="#">hide</a>) requires CORS.</span>
                 <a id="openapi-download" href="#" download hidden>Download Schema</a>
                 <button id="share-btn" type="button">Share</button>
             </span>
@@ -468,7 +468,7 @@
         let allVersions = [];
         let scalarApp = null;
         let currentUrl = null;
-        let testRequestEnabled = false;
+        let testRequestEnabled = true;
 
         // --- Dark mode: let Scalar handle it; header follows OS preference initially ---
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
