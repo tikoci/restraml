@@ -130,6 +130,7 @@ describe("enrichWithCompletions (live)", () => {
 // ── CRASH_PATHS Tests ──────────────────────────────────────────────────────
 
 describe("testCrashPaths (live)", () => {
+  // Each crash path gets a 5s timeout probe — with 6 paths that's up to 30s
   test("tests all CRASH_PATHS and reports results", async () => {
     if (requireRouter()) return;
     const results = await testCrashPaths(client);
@@ -145,7 +146,7 @@ describe("testCrashPaths (live)", () => {
     const crashed = results.filter((r) => !r.safe).map((r) => r.path);
     console.log(`CRASH_PATHS safe: [${safe.join(", ")}]`);
     console.log(`CRASH_PATHS crashed: [${crashed.join(", ")}]`);
-  });
+  }, 60_000);
 });
 
 // ── Live Crawl Tests ───────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ describe("crawlInspectTree (live)", () => {
     const valueName = (tree.get as InspectNode)["value-name"] as InspectNode;
     expect(valueName).toBeDefined();
     expect(valueName._type).toBe("arg");
-  });
+  }, 30_000);
 });
 
 // ── End-to-End: deep-inspect.json + openapi.json ──────────────────────────
@@ -216,5 +217,5 @@ describe("end-to-end (live)", () => {
     // Cleanup
     const { rmSync } = await import("fs");
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, 30_000);
 });
