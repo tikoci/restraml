@@ -79,9 +79,9 @@ jobs:
           echo "Long-term: $ROSVER"
 
       - name: Determine which builds are needed
-        # Checks all three build artifacts for each channel version:
-        #   1. docs/{version}/schema.raml — base schema (triggers base build)
-        #   2. docs/{version}/extra/schema.raml — extra-packages schema (triggers extra build)
+        # Checks all build artifacts for each channel version:
+        #   1. docs/{version}/schema.raml + openapi.json — base schema (triggers base build)
+        #   2. docs/{version}/extra/schema.raml + extra/openapi.json — extra-packages schema (triggers extra build)
         #   3. docs/{version}/routeros-app-yaml-schema.json — /app YAML schemas (triggers app schema build)
         # Each is tracked independently so a failed extra build can be retried without
         # re-running the base build. Deduplication is applied so the same version reported
@@ -108,20 +108,20 @@ jobs:
           done
 
           for VER in "${UNIQUE_VERSIONS[@]}"; do
-            # Check base schema
-            if [ ! -f "docs/${VER}/schema.raml" ]; then
-              echo "docs/${VER}/schema.raml not found — $VER needs base build"
+            # Check base schema (schema.raml + openapi.json)
+            if [ ! -f "docs/${VER}/schema.raml" ] || [ ! -f "docs/${VER}/openapi.json" ]; then
+              echo "docs/${VER}/schema.raml or openapi.json not found — $VER needs base build"
               BASE_VERSIONS+=("$VER")
             else
-              echo "docs/${VER}/schema.raml exists — base OK"
+              echo "docs/${VER}/schema.raml + openapi.json exist — base OK"
             fi
 
-            # Check extra-packages schema
-            if [ ! -f "docs/${VER}/extra/schema.raml" ]; then
-              echo "docs/${VER}/extra/schema.raml not found — $VER needs extra-packages build"
+            # Check extra-packages schema (extra/schema.raml + extra/openapi.json)
+            if [ ! -f "docs/${VER}/extra/schema.raml" ] || [ ! -f "docs/${VER}/extra/openapi.json" ]; then
+              echo "docs/${VER}/extra/schema.raml or extra/openapi.json not found — $VER needs extra-packages build"
               EXTRA_VERSIONS+=("$VER")
             else
-              echo "docs/${VER}/extra/schema.raml exists — extra OK"
+              echo "docs/${VER}/extra/schema.raml + extra/openapi.json exist — extra OK"
             fi
 
             # Check /app YAML schema
