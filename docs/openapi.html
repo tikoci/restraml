@@ -675,6 +675,42 @@
             scalarStatus.innerHTML = `<p>Failed to load version list: ${err.message}</p>`;
         });
 
+        // --- WebMCP: get_openapi_schema_url tool ---
+        const _wmcp = registerWebMCPTools();
+        _wmcp.register({
+            name: 'get_openapi_schema_url',
+            description: 'Get the download URL for a RouterOS OpenAPI 3.0 schema. Available for versions 7.22.1 and newer. Returns the URL and availability status.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version, e.g. "7.22.1". Must be 7.22.1 or newer.',
+                    },
+                    extraPackages: {
+                        type: 'boolean',
+                        description: 'Use extra-packages schema variant (default: false)',
+                    },
+                },
+            },
+            execute: async ({ version, extraPackages }) => {
+                try {
+                    const vers = await fetchVersionList();
+                    const stableVersions = vers.map(v => v.name).filter(v => !isPreRelease(v) && meetsMinVersion(v));
+                    const ver = version || (stableVersions.length > 0 ? stableVersions[0] : null);
+                    if (!ver) return JSON.stringify({ error: 'No OpenAPI-capable version available' });
+                    if (!meetsMinVersion(ver)) return JSON.stringify({ error: `Version ${ver} is below minimum 7.22.1 for OpenAPI schemas` });
+
+                    const extra = !!extraPackages;
+                    const url = getOpenApiUrl(ver, extra);
+                    const available = await checkOpenApiExists(ver, extra);
+                    return JSON.stringify({ url, version: ver, available });
+                } catch (e) {
+                    return JSON.stringify({ error: e.message });
+                }
+            },
+        });
+
     })();
     </script>
 </body>

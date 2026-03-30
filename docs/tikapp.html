@@ -1630,6 +1630,96 @@
         }
 
         initMonaco()
+
+        // --- WebMCP: validate_routeros_app_yaml + list_builtin_apps ---
+        const _wmcp = registerWebMCPTools()
+        _wmcp.register({
+            name: 'validate_routeros_app_yaml',
+            description: 'Validate a RouterOS /app YAML string against the JSON Schema. Returns validation result with errors and line numbers. The YAML format is RouterOS-specific (docker-compose-like but not identical).',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    yaml: {
+                        type: 'string',
+                        description: 'The YAML content to validate',
+                    },
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version for schema (default: latest stable with schema, e.g. "7.22.1")',
+                    },
+                    storeMode: {
+                        type: 'boolean',
+                        description: 'Validate as app-store-urls array instead of single /app YAML (default: false)',
+                    },
+                },
+                required: ['yaml'],
+            },
+            execute: async ({ yaml: yamlContent, version, storeMode }) => {
+                try {
+                    const ver = version || latestStableVer
+                    if (!ver) return JSON.stringify({ error: 'No schema version available. Load the page first.' })
+
+                    // Ensure schemas are loaded for the requested version
+                    if (!validateSingle || !validateStore) {
+                        await loadSchemas(ver)
+                    }
+                    const fn = storeMode ? validateStore : validateSingle
+                    if (!fn) return JSON.stringify({ error: `Failed to load schema for version ${ver}` })
+
+                    let parsed
+                    try {
+                        parsed = jsyaml.load(yamlContent)
+                    } catch (e) {
+                        const mark = e.mark || {}
+                        return JSON.stringify({
+                            valid: false,
+                            errors: [{ path: '', message: `YAML syntax error: ${e.reason || e.message}`, line: (mark.line || 0) + 1 }],
+                            schemaVersion: ver,
+                        })
+                    }
+
+                    fn(parsed)
+                    const errors = fn.errors
+                        ? fn.errors.map(err => ({
+                            path: err.dataPath || err.instancePath || '',
+                            message: err.message,
+                            line: findLineForPath(yamlContent, err.dataPath || err.instancePath || ''),
+                        }))
+                        : []
+
+                    return JSON.stringify({ valid: !errors.length, errors, schemaVersion: ver })
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
+        _wmcp.register({
+            name: 'list_builtin_apps',
+            description: 'List built-in RouterOS /app container applications for a version. Returns app names, categories, and descriptions.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version (default: latest stable with /app support, e.g. "7.22.1")',
+                    },
+                },
+            },
+            execute: async ({ version }) => {
+                try {
+                    const ver = version || latestStableVer
+                    if (!ver) return JSON.stringify({ error: 'No version available' })
+                    const apps = await loadAppJson(ver)
+                    return JSON.stringify(apps.map(a => ({
+                        name: a.name,
+                        category: a.category || '',
+                        descr: a.descr || '',
+                    })))
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
     </script>
 
     <script>initThemeSwitcher()</script>

@@ -772,6 +772,75 @@
                 shareBtn.title = 'Could not copy — copy the URL from the address bar.'
             })
         })
+
+        // --- WebMCP: lookup_routeros_command tool ---
+        const _wmcp = registerWebMCPTools()
+        _wmcp.register({
+            name: 'lookup_routeros_command',
+            description: 'Look up a RouterOS CLI command or attribute in the inspect schema. Returns whether the path exists, its type (dir/cmd/arg), and child commands or attributes. Use list_routeros_versions first to find available versions.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    path: {
+                        type: 'string',
+                        description: 'RouterOS CLI path, e.g. "ip/address" or "ip/address/set". No leading slash needed.',
+                    },
+                    attribute: {
+                        type: 'string',
+                        description: 'Optional attribute name to look up within a command, e.g. "address"',
+                    },
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version to search, e.g. "7.22.1". Defaults to latest stable.',
+                    },
+                    allVersions: {
+                        type: 'boolean',
+                        description: 'Search across all published versions (default: false). Limited to 15 versions.',
+                    },
+                    extraPackages: {
+                        type: 'boolean',
+                        description: 'Use extra-packages schema variant (default: false)',
+                    },
+                },
+                required: ['path'],
+            },
+            execute: async ({ path, attribute, version, allVersions: searchAll, extraPackages }) => {
+                try {
+                    const useExtra = !!extraPackages
+                    const segments = (path || '').replace(/^\/+/, '').split('/').filter(Boolean)
+                    if (segments.length === 0) return JSON.stringify({ error: 'path is required' })
+
+                    const vers = await fetchVersionList()
+                    const stableVersions = vers.map(v => v.name).filter(v => !isPreRelease(v))
+
+                    let versionsToSearch
+                    if (searchAll) {
+                        versionsToSearch = stableVersions.slice(0, 15)
+                    } else if (version) {
+                        versionsToSearch = [version]
+                    } else {
+                        versionsToSearch = stableVersions.length > 0 ? [stableVersions[0]] : []
+                    }
+
+                    const results = []
+                    for (const ver of versionsToSearch) {
+                        try {
+                            const json = await loadInspectJson(ver, useExtra)
+                            const result = lookupInInspect(json, segments, attribute || '')
+                            results.push({ version: ver, ...result })
+                        } catch (e) {
+                            results.push({ version: ver, found: false, error: e.message })
+                        }
+                    }
+                    return JSON.stringify({
+                        query: { path: segments.join('/'), attribute: attribute || null },
+                        results,
+                    })
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
     </script>
 
     <script>initThemeSwitcher()</script>

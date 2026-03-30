@@ -829,6 +829,90 @@
             })
             plausible('SideBySideDiff Share', {})
         })
+
+        // --- WebMCP: diff_routeros_versions tool ---
+        const _wmcp = registerWebMCPTools()
+        _wmcp.register({
+            name: 'diff_routeros_versions',
+            description: 'Compare two RouterOS versions and return a structured summary of added/removed commands and attributes. Returns delta statistics and lists of changed paths (capped at 200). Use list_routeros_versions first to find available versions.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    version1: {
+                        type: 'string',
+                        description: 'First (older) RouterOS version, e.g. "7.21.3"',
+                    },
+                    version2: {
+                        type: 'string',
+                        description: 'Second (newer) RouterOS version, e.g. "7.22"',
+                    },
+                    extraPackages: {
+                        type: 'boolean',
+                        description: 'Use extra-packages schema variant (default: false)',
+                    },
+                },
+                required: ['version1', 'version2'],
+            },
+            execute: async ({ version1, version2, extraPackages }) => {
+                try {
+                    const extra = !!extraPackages
+                    const [json1, json2] = await Promise.all([
+                        fetchInspect(version1, extra),
+                        fetchInspect(version2, extra),
+                    ])
+
+                    // Count commands and attributes
+                    const countAll = (obj) => {
+                        let cmds = 0, args = 0
+                        const walk = (o) => {
+                            for (const k of Object.keys(o)) {
+                                if (k.startsWith('_')) continue
+                                const v = o[k]
+                                if (typeof v !== 'object' || !v || !v._type) continue
+                                if (v._type === 'cmd') cmds++
+                                else if (v._type === 'arg') args++
+                                walk(v)
+                            }
+                        }
+                        walk(obj)
+                        return { commands: cmds, attributes: args }
+                    }
+
+                    const stats1 = countAll(json1)
+                    const stats2 = countAll(json2)
+
+                    // Compute added/removed paths
+                    const lines1 = new Set(inspectToRosLines(json1))
+                    const lines2 = new Set(inspectToRosLines(json2))
+                    const added = [], removed = []
+                    const CAP = 200
+                    for (const l of lines2) {
+                        if (!lines1.has(l)) {
+                            if (added.length < CAP) added.push(l)
+                        }
+                    }
+                    for (const l of lines1) {
+                        if (!lines2.has(l)) {
+                            if (removed.length < CAP) removed.push(l)
+                        }
+                    }
+
+                    return JSON.stringify({
+                        version1: { version: version1, ...stats1 },
+                        version2: { version: version2, ...stats2 },
+                        delta: {
+                            commands: stats2.commands - stats1.commands,
+                            attributes: stats2.attributes - stats1.attributes,
+                        },
+                        addedPaths: added,
+                        removedPaths: removed,
+                        truncated: added.length >= CAP || removed.length >= CAP,
+                    })
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
     </script>
 
     <script>initThemeSwitcher()</script>

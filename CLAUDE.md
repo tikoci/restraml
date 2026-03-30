@@ -260,6 +260,52 @@ pattern.** The `git checkout -- .` / `git clean -fd` are required because `bun i
 
 ---
 
+## WebMCP — Structured Tools for AI Agents
+
+The `docs/*.html` pages expose [WebMCP](https://github.com/webmachinelearning/webmcp) tools
+(Chrome 146+, `chrome://flags/#enable-webmcp-testing`) via the imperative API
+(`navigator.modelContext.registerTool()`). This lets agentic browsers discover and call the
+pages' data functions directly, returning structured JSON instead of requiring screen-scraping.
+
+**Implementation is progressive enhancement** — all code is behind `webMCPAvailable()` feature
+detection in `restraml-shared.js`. Zero impact on browsers without WebMCP support.
+
+### Shared Infrastructure (`restraml-shared.js`)
+
+- `webMCPAvailable()` — returns `true` if `navigator.modelContext.registerTool` exists
+- `registerWebMCPTools()` — registers the shared `list_routeros_versions` tool, returns
+  `{ register(toolDef) }` helper for page-specific tools. Called once per page.
+
+### Registered Tools by Page
+
+| Tool Name | Page | Description |
+|---|---|---|
+| `list_routeros_versions` | All pages | List published versions with metadata (shared) |
+| `lookup_routeros_command` | `lookup.html` | Look up a CLI path/attribute in inspect.json |
+| `diff_routeros_versions` | `diff.html` | Compare two versions — delta stats + added/removed paths |
+| `get_routeros_changelog` | `index.html` | Fetch & parse MikroTik CHANGELOG into structured entries |
+| `validate_routeros_app_yaml` | `tikapp.html` | Validate /app YAML against JSON Schema |
+| `list_builtin_apps` | `tikapp.html` | List built-in /app container applications |
+| `get_openapi_schema_url` | `openapi.html` | Get OpenAPI 3.0 schema download URL + availability |
+
+### Tool Design Conventions
+
+- All `execute` functions return `JSON.stringify(result)` — structured JSON, not HTML
+- Error responses: `JSON.stringify({ error: "message" })` with descriptive text for agent self-correction
+- Large data is summarized (diff returns stats + capped path lists, not full unified patch)
+- Version parameters default to latest stable when omitted
+- `list_routeros_versions` should be called first to discover valid version strings
+
+### Adding a New WebMCP Tool
+
+1. In the page's main `<script>`, get the helper: `const _wmcp = registerWebMCPTools()`
+2. Register tools: `_wmcp.register({ name, description, inputSchema, execute })`
+3. Follow the naming convention: `verb_routeros_noun` in `snake_case`
+4. Return JSON strings from `execute` (always wrap in try/catch)
+5. Add the tool to the table above
+
+---
+
 ## Web Pages in `docs/` — Standards and Conventions
 
 All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable conventions:

@@ -540,3 +540,74 @@ function initGitHubDropdown(listId) {
         })
         .catch(() => { /* keep static fallback */ })
 }
+
+
+// --- WebMCP: expose structured tools to AI agents --------------------
+// Progressive enhancement — only registers tools when the browser
+// supports navigator.modelContext (Chrome 146+ with flag enabled).
+// Each page calls registerWebMCPTools() to get the shared
+// list_routeros_versions tool, then registers page-specific tools
+// via the returned helper.
+// =====================================================================
+
+/**
+ * Check whether the WebMCP imperative API is available.
+ * @returns {boolean}
+ */
+function webMCPAvailable() {
+    return typeof navigator !== 'undefined' &&
+        navigator.modelContext &&
+        typeof navigator.modelContext.registerTool === 'function'
+}
+
+/**
+ * Register shared WebMCP tools (available on every page) and return
+ * a convenience wrapper for registering page-specific tools.
+ *
+ * Call once per page after DOMContentLoaded, e.g.:
+ *   const wmcp = registerWebMCPTools()
+ *   wmcp.register({ name: 'my_tool', ... })
+ *
+ * @returns {{ register: function(toolDef: object): void }}
+ */
+function registerWebMCPTools() {
+    const noop = { register() {} }
+    if (!webMCPAvailable()) return noop
+
+    // Shared tool: list_routeros_versions
+    navigator.modelContext.registerTool({
+        name: 'list_routeros_versions',
+        description: 'List all published RouterOS schema versions with metadata. Call this first to discover available versions before using other tools.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                includePreRelease: {
+                    type: 'boolean',
+                    description: 'Include beta and RC versions (default: false)',
+                },
+            },
+        },
+        execute: async ({ includePreRelease }) => {
+            try {
+                const versions = await fetchVersionList()
+                const filtered = includePreRelease
+                    ? versions
+                    : versions.filter(v => !isPreRelease(v.name))
+                return JSON.stringify(filtered.map(v => ({
+                    name: v.name,
+                    path: v.path,
+                })))
+            } catch (e) {
+                return JSON.stringify({ error: e.message })
+            }
+        },
+    })
+
+    return {
+        register(toolDef) {
+            if (webMCPAvailable()) {
+                navigator.modelContext.registerTool(toolDef)
+            }
+        },
+    }
+}

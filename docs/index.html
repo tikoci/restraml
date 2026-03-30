@@ -648,6 +648,78 @@
                 applyQueryParams()
             })
             .catch(error => console.error('Error fetching build list from GitHub:', error))
+
+        // --- WebMCP: get_routeros_changelog tool ---
+        const _wmcp = registerWebMCPTools()
+        _wmcp.register({
+            name: 'get_routeros_changelog',
+            description: 'Fetch and parse RouterOS release notes (CHANGELOG) for a version. Returns structured entries with subsystem, description, and importance flag. Optionally filter by keyword.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version, e.g. "7.22"',
+                    },
+                    query: {
+                        type: 'string',
+                        description: 'Optional filter keyword to match entries (case-insensitive)',
+                    },
+                },
+                required: ['version'],
+            },
+            execute: async ({ version, query }) => {
+                const url = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
+                try {
+                    const resp = await fetch(url)
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+                    const text = await resp.text()
+
+                    const q = query ? query.toLowerCase() : ''
+                    let releaseDate = null
+                    const entries = []
+                    let totalEntries = 0
+
+                    for (const line of text.split('\n')) {
+                        const trimmed = line.trim()
+                        if (/^What's new in /i.test(trimmed)) {
+                            const dateMatch = trimmed.match(/\(([^)]+)\)/)
+                            const vPart = trimmed.replace(/^What's new in /i, '').split(' ')[0]
+                            if (vPart === version && dateMatch) releaseDate = dateMatch[1]
+                            continue
+                        }
+                        if (/^[*!]\)/.test(trimmed)) {
+                            totalEntries++
+                            const isImportant = trimmed.startsWith('!)')
+                            const body = trimmed.replace(/^[*!]\)\s*/, '')
+                            const dashIdx = body.indexOf(' - ')
+                            let subsystem = '', entryText = body
+                            if (dashIdx > 0 && dashIdx < 30) {
+                                subsystem = body.substring(0, dashIdx).trim()
+                                entryText = body.substring(dashIdx + 3)
+                            }
+                            if (!q || trimmed.toLowerCase().includes(q)) {
+                                entries.push({ subsystem, text: entryText, important: isImportant })
+                            }
+                        }
+                    }
+
+                    return JSON.stringify({
+                        version,
+                        releaseDate,
+                        entries,
+                        totalEntries,
+                        matchedEntries: entries.length,
+                    })
+                } catch (e) {
+                    return JSON.stringify({
+                        error: e.message,
+                        fallbackUrl: url,
+                        hint: 'CHANGELOG may be blocked by CORS. The fallbackUrl can be opened directly.',
+                    })
+                }
+            },
+        })
     </script>
 
     <script>initThemeSwitcher()</script>
