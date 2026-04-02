@@ -11,7 +11,8 @@
             "*.cjs",
             "*.ts",
             "docs/*.js",
-            "docs/*.html"
+            "docs/*.html",
+            "scripts/*.js"
         ]
     },
     "formatter": {
