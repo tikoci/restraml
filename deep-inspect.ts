@@ -70,8 +70,26 @@ interface InspectCompletionResponse {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-/** Paths known to crash the RouterOS REST server in older versions.
- *  deep-inspect.ts tests these with a timeout to discover which are safe. */
+/** RouterOS scripting keyword paths that may crash the REST server.
+ *
+ *  Investigation against live routers (April 2026) found:
+ *  - RouterOS 7.20.8 (long-term): `POST /rest/console/inspect {"request":"syntax","path":"do"}`
+ *    hangs the entire HTTP server for ~30 seconds with no response. The same hang occurs with
+ *    `request=completion`. Only `"do"` causes the hang; the others (where, else, rule, command,
+ *    on-error) are safe on 7.20.8 — they just return an empty array [] instantly.
+ *    Crucially: since testCrashPaths probes sequentially, any path tested AFTER "do" appears
+ *    to crash too (the server is already hung). This was the cause of false CI failures on 7.20.8.
+ *  - RouterOS 7.22 and 7.23beta5: all paths return HTTP 200 immediately — the bug is fixed.
+ *    (7.21 not tested; fix likely landed in 7.21 or 7.22 based on successful 7.22 builds.)
+ *  - `"do"` with `request=child` is safe on all tested versions — returns its args immediately.
+ *  - Nested paths (e.g. ["do","command"]) with any request type are safe on all versions.
+ *
+ *  These paths are skipped by crawlInspectTree (and rest2raml.js parseChildren) by default.
+ *  testCrashPaths() probes them with fetchSyntax and waits for server recovery between probes.
+ *
+ *  MikroTik bug: /console/inspect with request=syntax or request=completion at bare path "do"
+ *  deadlocks the REST scripting engine on RouterOS ≤7.21 (exact fix version unconfirmed).
+ */
 export const CRASH_PATHS = [
   "where",
   "do",
@@ -208,11 +226,41 @@ export interface CrashPathResult {
   error?: string;
 }
 
-/** Test each CRASH_PATH to see if it still crashes the router */
+/** Wait for the REST server to recover (e.g. after a crash path probe).
+ *  Uses /system/resource/get (not /console/inspect which may still be hung).
+ *  Tries up to maxAttempts times with delays between attempts. */
+async function waitForServerRecovery(client: RouterOSClient, maxAttempts = 8): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await client.fetchVersion();
+      return true;
+    } catch {
+      // Server still recovering — wait with increasing delay (3s each)
+      await new Promise<void>((resolve) => setTimeout(resolve, 3_000));
+    }
+  }
+  return false;
+}
+
+/** Test each CRASH_PATH to see if it still crashes the router.
+ *  Includes a health check between probes so that a crash from one path
+ *  doesn't cause all subsequent paths to be falsely reported as crashed. */
 export async function testCrashPaths(client: RouterOSClient): Promise<CrashPathResult[]> {
   const results: CrashPathResult[] = [];
 
   for (const crashPath of CRASH_PATHS) {
+    // Health check: ensure server is responsive before probing the next path
+    if (results.length > 0 && results[results.length - 1].safe === false) {
+      console.log(`  ⏳ Waiting for server recovery after "${results[results.length - 1].path}"...`);
+      const recovered = await waitForServerRecovery(client);
+      if (!recovered) {
+        // Server is still down — mark remaining paths as unknown/skipped
+        results.push({ path: crashPath, safe: false, error: "server unresponsive (previous path crashed it)" });
+        console.log(`  ⚠ "${crashPath}" skipped — server still unresponsive`);
+        continue;
+      }
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CRASH_PATH_TIMEOUT_MS);
 
@@ -238,7 +286,7 @@ export async function testCrashPaths(client: RouterOSClient): Promise<CrashPathR
 export async function crawlInspectTree(
   client: RouterOSClient,
   rpath: string[] = [],
-  skipPaths: Set<string> = new Set(),
+  skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
   const children = await client.fetchChild(rpath);

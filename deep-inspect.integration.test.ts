@@ -127,34 +127,12 @@ describe("enrichWithCompletions (live)", () => {
   });
 });
 
-// ── CRASH_PATHS Tests ──────────────────────────────────────────────────────
-
-describe("testCrashPaths (live)", () => {
-  // Each crash path gets a 5s timeout probe — with 6 paths that's up to 30s
-  test("tests all CRASH_PATHS and reports results", async () => {
-    if (requireRouter()) return;
-    const results = await testCrashPaths(client);
-    expect(results).toHaveLength(CRASH_PATHS.length);
-
-    for (const result of results) {
-      expect((CRASH_PATHS as readonly string[]).includes(result.path)).toBe(true);
-      expect(typeof result.safe).toBe("boolean");
-    }
-
-    // Log results for visibility
-    const safe = results.filter((r) => r.safe).map((r) => r.path);
-    const crashed = results.filter((r) => !r.safe).map((r) => r.path);
-    console.log(`CRASH_PATHS safe: [${safe.join(", ")}]`);
-    console.log(`CRASH_PATHS crashed: [${crashed.join(", ")}]`);
-  }, 60_000);
-});
-
 // ── Live Crawl Tests ───────────────────────────────────────────────────────
 
 describe("crawlInspectTree (live)", () => {
   test("crawls a small subtree", async () => {
     if (requireRouter()) return;
-    // Crawl just system/identity — very small tree
+    // Crawl just system/identity — very small tree (default skipPaths = CRASH_PATHS)
     const tree = await crawlInspectTree(client, ["system", "identity"]);
 
     // system/identity should have get, set, print commands
@@ -174,11 +152,11 @@ describe("end-to-end (live)", () => {
   test("generates deep-inspect.json and openapi.json from live subtree", async () => {
     if (requireRouter()) return;
 
-    // Crawl system/identity (tiny tree) and enrich
+    // Crawl system/identity (tiny tree) and enrich (default skipPaths = CRASH_PATHS)
     const tree: InspectNode = {
       system: {
         _type: "dir",
-        ...(await crawlInspectTree(client, ["system", "identity"], new Set())),
+        ...(await crawlInspectTree(client, ["system", "identity"])),
       },
     };
 
@@ -218,4 +196,34 @@ describe("end-to-end (live)", () => {
     const { rmSync } = await import("fs");
     rmSync(tmpDir, { recursive: true, force: true });
   }, 30_000);
+});
+
+// ── CRASH_PATHS Tests ──────────────────────────────────────────────────────
+// IMPORTANT: This block MUST be the last describe() in the file.
+// On RouterOS ≤7.20.8, POST /rest/console/inspect with request=syntax or
+// request=completion for bare path "do" hangs the entire HTTP server for ~30s.
+// Only "do" actually crashes it — the other paths in CRASH_PATHS return 200 fine.
+// But since probes are sequential, a crash from "do" makes all subsequent paths
+// appear crashed too. Fixed in RouterOS 7.22+ (7.21 untested).
+// Running this describe() last ensures other tests complete before the disruption.
+
+describe("testCrashPaths (live)", () => {
+  // Each crash path gets a 5s timeout probe; if a probe crashes the server,
+  // recovery can take ~30s. With 6 paths total, budget 120s.
+  test("tests all CRASH_PATHS and reports results", async () => {
+    if (requireRouter()) return;
+    const results = await testCrashPaths(client);
+    expect(results).toHaveLength(CRASH_PATHS.length);
+
+    for (const result of results) {
+      expect((CRASH_PATHS as readonly string[]).includes(result.path)).toBe(true);
+      expect(typeof result.safe).toBe("boolean");
+    }
+
+    // Log results for visibility
+    const safe = results.filter((r) => r.safe).map((r) => r.path);
+    const crashed = results.filter((r) => !r.safe).map((r) => r.path);
+    console.log(`CRASH_PATHS safe: [${safe.join(", ")}]`);
+    console.log(`CRASH_PATHS crashed: [${crashed.join(", ")}]`);
+  }, 120_000);
 });
