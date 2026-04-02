@@ -716,10 +716,11 @@ schedule (cron), the same default applies via an `||` fallback in the `env:` blo
   the issue remains open.
 
 **How to update the skip list without a code change:**
-Trigger `auto.yaml` via `workflow_dispatch` in the GitHub UI and fill in the `skip_versions`
-input manually (e.g. clear it to un-skip, or add a new version). The default in the workflow
-file (`7.23beta5`) is what the daily cron uses; to change it permanently, update the `||`
-fallback in `auto.yaml`.
+Trigger `auto.yaml` via `workflow_dispatch` in the GitHub UI and set the `skip_versions`
+input explicitly (for example, `7.23beta5,7.23rc3` to skip multiple versions). Leaving this
+input blank does **not** clear the skip list; the workflow treats an empty value the same as
+the default (`7.23beta5`) via the `||` fallback in `auto.yaml`, which is also what the daily
+cron uses. To change the default skip list used by cron, update the `||` fallback in `auto.yaml`.
 
 ### Open Process Questions — /app YAML Schema Validation in CI
 

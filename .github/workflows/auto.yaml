@@ -106,7 +106,7 @@ jobs:
           TESTING: ${{ steps.get-testing.outputs.version }}
           DEVELOPMENT: ${{ steps.get-development.outputs.version }}
           LONGTERM: ${{ steps.get-longterm.outputs.version }}
-          SKIP_VERSIONS_INPUT: ${{ inputs.skip_versions || '7.23beta5' }}
+          SKIP_VERSIONS_INPUT: ${{ github.event_name == 'schedule' && '7.23beta5' || inputs.skip_versions }}
         run: |
           BASE_VERSIONS=()
           EXTRA_VERSIONS=()
