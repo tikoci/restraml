@@ -688,13 +688,64 @@ node validraml.cjs ros-rest-all.raml
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks 3 artifacts (`schema.raml`, `extra/schema.raml`, `routeros-app-yaml-schema.json`) and dispatches only the builds that are missing; outputs a step summary table |
+| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks 3 artifacts (`schema.raml`, `extra/schema.raml`, `routeros-app-yaml-schema.json`) and dispatches only the builds that are missing; outputs a step summary table. Accepts a `skip_versions` input (see below). |
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
+
+### `auto.yaml` — `skip_versions` Input
+
+`auto.yaml` accepts a `skip_versions` workflow_dispatch input (comma-separated list of RouterOS
+version strings, e.g. `7.23beta5,7.23beta6`). Versions in this list are excluded from **all**
+build types (base, extra-packages, and /app YAML schemas) for that run.
+
+The default for the `workflow_dispatch` input is `7.23beta5`. When triggered by the daily
+schedule (cron), the same default applies via an `||` fallback in the `env:` block.
+
+**When to add a version to `skip_versions`:**
+- A beta/RC version's built-in `/app` YAML collection contains entries that fail validation,
+  and the failure is due to an upstream MikroTik bug (not a missing schema pattern) — so the
+  correct action is to wait for MikroTik to fix their app YAML rather than relaxing the schema.
+- Common upstream bugs: duplicate YAML mapping keys (invalid pure YAML, MikroTik parser is
+  permissive); `[placeholder]` values parsed as YAML arrays instead of strings.
+- In these cases `appyamlschemas.yaml` will keep returning exit code 2 → filing a new GitHub
+  Issue on every daily run. Adding the version to `skip_versions` stops the retry loop while
+  the issue remains open.
+
+**How to update the skip list without a code change:**
+Trigger `auto.yaml` via `workflow_dispatch` in the GitHub UI and set the `skip_versions`
+input explicitly (for example, `7.23beta5,7.23rc3` to skip multiple versions). Leaving this
+input blank does **not** clear the skip list; the workflow treats an empty value the same as
+the default (`7.23beta5`) via the `||` fallback in `auto.yaml`, which is also what the daily
+cron uses. To change the default skip list used by cron, update the `||` fallback in `auto.yaml`.
+
+### Open Process Questions — /app YAML Schema Validation in CI
+
+These questions are deliberately **unresolved** and tracked in GitHub Issues. Do not resolve them
+unilaterally; flag them in code comments and issue discussions.
+
+1. **Duplicate YAML keys**: RouterOS `/app` can ship built-in entries with duplicate YAML mapping
+   keys (seen in `lorawan-stack` in 7.23beta5). Pure YAML parsers reject this; RouterOS's own
+   parser is permissive (first or last key wins — unclear which). Should the schema (or the
+   validator) relax the YAML parse to allow duplicates to match RouterOS behavior?
+
+2. **Array-typed environment variables as placeholders**: `ROUTER_HOST: [routerIP]` is valid
+   YAML (single-element array) but RouterOS treats it as a string placeholder. The current
+   schema allows `string | number | boolean | null` for env var values but not arrays. Should
+   YAML arrays be added as an allowed type for env vars, or is the better fix to ensure
+   MikroTik uses quoted strings (`ROUTER_HOST: "[routerIP]"`)?
+
+3. **Beta/RC schema coverage and `latest`**: Should `routeros-app-yaml-schema.latest.json`
+   (the public URL) ever be updated based on syntax found only in beta/RC releases? Or should
+   it track only stable releases? Currently there is no policy for this.
+
+4. **Retry vs. skip policy**: When `appyamlschemas.yaml` exits with code 2 (live validation
+   failed), `auto.yaml` retries the build on every daily run (because the schema file is
+   missing). The `skip_versions` mechanism is a manual escape hatch. A future improvement
+   could be an automatic "pause after N failures" mechanism.
 
 ## Runtime and Tooling
 

@@ -18,6 +18,15 @@ name: "Auto-Build New RouterOS Versions"
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_versions:
+        description: >
+          Comma-separated list of RouterOS versions to skip ALL builds for.
+          Use this for beta/RC versions with known schema issues that are pending
+          a fix from MikroTik (e.g. duplicate YAML keys, array-typed env vars).
+          Versions here are excluded from base, extra-packages, and /app YAML schema builds.
+        required: false
+        default: "7.23beta5"
   schedule:
     - cron: "0 4 * * *"
 
@@ -31,6 +40,7 @@ jobs:
       base_versions: ${{ steps.needs-builds.outputs.base_versions }}
       extra_versions: ${{ steps.needs-builds.outputs.extra_versions }}
       app_schema_versions: ${{ steps.needs-builds.outputs.app_schema_versions }}
+      skipped_versions: ${{ steps.needs-builds.outputs.skipped_versions }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,16 +96,39 @@ jobs:
         # Each is tracked independently so a failed extra build can be retried without
         # re-running the base build. Deduplication is applied so the same version reported
         # by multiple channels only triggers one build per artifact type.
+        #
+        # Versions in skip_versions input are excluded from ALL build types. Use this for
+        # beta/RC releases with known upstream issues (e.g. duplicate YAML keys, invalid app YAML)
+        # that are pending a fix from MikroTik rather than a schema change.
         id: needs-builds
         env:
           STABLE: ${{ steps.get-stable.outputs.version }}
           TESTING: ${{ steps.get-testing.outputs.version }}
           DEVELOPMENT: ${{ steps.get-development.outputs.version }}
           LONGTERM: ${{ steps.get-longterm.outputs.version }}
+          SKIP_VERSIONS_INPUT: ${{ github.event_name == 'schedule' && '7.23beta5' || inputs.skip_versions }}
         run: |
           BASE_VERSIONS=()
           EXTRA_VERSIONS=()
           APP_SCHEMA_VERSIONS=()
+          SKIPPED_VERSIONS=()
+
+          # Parse the skip list (comma-separated, trim whitespace)
+          SKIP_LIST=()
+          IFS=',' read -ra SKIP_RAW <<< "$SKIP_VERSIONS_INPUT"
+          for S in "${SKIP_RAW[@]}"; do
+            S=$(echo "$S" | tr -d ' ')
+            [ -n "$S" ] && SKIP_LIST+=("$S")
+          done
+
+          # Helper: returns 0 (true) if version is in skip list
+          is_skipped() {
+            local ver="$1"
+            for s in "${SKIP_LIST[@]}"; do
+              [ "$s" = "$ver" ] && return 0
+            done
+            return 1
+          }
 
           # Collect unique versions across all channels
           UNIQUE_VERSIONS=()
@@ -108,6 +141,13 @@ jobs:
           done
 
           for VER in "${UNIQUE_VERSIONS[@]}"; do
+            # Skip versions explicitly listed in skip_versions input
+            if is_skipped "$VER"; then
+              echo "$VER is in skip list — skipping all builds for this version"
+              SKIPPED_VERSIONS+=("$VER")
+              continue
+            fi
+
             # Check base schema (schema.raml + openapi.json)
             if [ ! -f "docs/${VER}/schema.raml" ] || [ ! -f "docs/${VER}/openapi.json" ]; then
               echo "docs/${VER}/schema.raml or openapi.json not found — $VER needs base build"
@@ -144,11 +184,14 @@ jobs:
           BASE_JSON=$(to_json BASE_VERSIONS)
           EXTRA_JSON=$(to_json EXTRA_VERSIONS)
           APP_JSON=$(to_json APP_SCHEMA_VERSIONS)
+          SKIPPED_JSON=$(to_json SKIPPED_VERSIONS)
 
           echo "base_versions=${BASE_JSON}" >> $GITHUB_OUTPUT
           echo "extra_versions=${EXTRA_JSON}" >> $GITHUB_OUTPUT
           echo "app_schema_versions=${APP_JSON}" >> $GITHUB_OUTPUT
+          echo "skipped_versions=${SKIPPED_JSON}" >> $GITHUB_OUTPUT
 
+          echo "Skipped versions: ${SKIPPED_JSON}"
           echo "Base builds needed: ${BASE_JSON}"
           echo "Extra-packages builds needed: ${EXTRA_JSON}"
           echo "/app YAML schema builds needed: ${APP_JSON}"
@@ -172,6 +215,13 @@ jobs:
           echo "- Base: ${{ steps.needs-builds.outputs.base_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "- Extra-packages: ${{ steps.needs-builds.outputs.extra_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "- /app YAML schemas: ${{ steps.needs-builds.outputs.app_schema_versions }}" >> $GITHUB_STEP_SUMMARY
+          SKIPPED='${{ steps.needs-builds.outputs.skipped_versions }}'
+          if [ "$SKIPPED" != "[]" ] && [ -n "$SKIPPED" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Skipped Versions" >> $GITHUB_STEP_SUMMARY
+            echo "> Versions below were excluded from all builds (see \`skip_versions\` input)." >> $GITHUB_STEP_SUMMARY
+            echo "- $SKIPPED" >> $GITHUB_STEP_SUMMARY
+          fi
 
   build-base:
     needs: check
