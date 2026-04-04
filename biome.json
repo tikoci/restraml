@@ -113,6 +113,16 @@
                     }
                 }
             }
+        },
+        {
+            "includes": ["ros-api-protocol.ts"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noExplicitAny": "off"
+                    }
+                }
+            }
         }
     ]
 }

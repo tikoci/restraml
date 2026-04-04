@@ -12,6 +12,7 @@
  */
 
 import { parseArgs } from "util";
+import { RosAPI, type RosError } from "./ros-api-protocol";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,16 @@ interface InspectCompletionResponse {
  *  MikroTik bug: /console/inspect with request=syntax or request=completion at bare path "do"
  *  deadlocks the REST scripting engine on RouterOS ≤7.21 (exact fix version unconfirmed).
  */
+// ── Client interface ──────────────────────────────────────────────────────
+
+export interface IRouterOSClient {
+  fetchVersion(): Promise<string>;
+  fetchChild(path: string[]): Promise<InspectChildResponse[]>;
+  fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]>;
+  fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]>;
+  close?(): void;
+}
+
 export const CRASH_PATHS = [
   "where",
   "do",
@@ -115,7 +126,7 @@ const COMPLETION_TIMEOUT_MS = 5_000;
 
 // ── RouterOS API Client ────────────────────────────────────────────────────
 
-export class RouterOSClient {
+export class RouterOSClient implements IRouterOSClient {
   private baseUrl: string;
   private authHeader: string;
 
@@ -172,6 +183,65 @@ export class RouterOSClient {
   }
 }
 
+// ── Native API Client ─────────────────────────────────────────────────────
+
+/** RouterOS native API (port 8728/8729) client implementing IRouterOSClient.
+ *  Uses `/console/inspect` via the wire protocol for each operation.
+ *  All values from the native API are strings — normalization happens downstream
+ *  in completionsToObject() exactly as it does for the REST client.
+ */
+export class NativeRouterOSClient implements IRouterOSClient {
+  private api: RosAPI;
+
+  constructor(host: string, port: number, user: string, password: string) {
+    this.api = new RosAPI(host, port, user, password);
+  }
+
+  async connect(): Promise<void> {
+    await this.api.connect();
+  }
+
+  close(): void {
+    this.api.close();
+  }
+
+  async fetchVersion(): Promise<string> {
+    const sentences = await this.api.write("/system/resource/print");
+    const version = sentences[0]?.data.version;
+    if (!version) throw new Error("Could not read RouterOS version from native API");
+    return version.split(" ")[0];
+  }
+
+  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+    const sentences = await this.api.write(
+      "/console/inspect",
+      "=request=child",
+      `=path=${path.join(",")}`,
+    );
+    return sentences.map((s) => s.data as unknown as InspectChildResponse);
+  }
+
+  async fetchSyntax(path: string[], _signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
+    const sentences = await this.api.write(
+      "/console/inspect",
+      "=request=syntax",
+      `=path=${path.join(",")}`,
+    );
+    return sentences.map((s) => s.data as unknown as InspectSyntaxResponse);
+  }
+
+  async fetchCompletion(path: string[], _signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
+    const sentences = await this.api.write(
+      "/console/inspect",
+      "=request=completion",
+      `=path=${path.join(",")}`,
+    );
+    // Native API returns strings for all fields. completionsToObject() normalises:
+    // show (string "true"/"false"), preference (string→number), text→desc fallback.
+    return sentences.map((s) => s.data as unknown as InspectCompletionResponse);
+  }
+}
+
 // ── Completion Enrichment ──────────────────────────────────────────────────
 
 /** Filter completion responses to only those that should be shown */
@@ -203,7 +273,7 @@ export function completionsToObject(completions: InspectCompletionResponse[]): R
 /** Walk the inspect tree and fetch completions for all arg nodes */
 export async function enrichWithCompletions(
   tree: InspectNode,
-  client: RouterOSClient,
+  client: IRouterOSClient,
   path: string[] = [],
   stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
 ): Promise<typeof stats> {
@@ -247,7 +317,7 @@ export interface CrashPathResult {
 /** Wait for the REST server to recover (e.g. after a crash path probe).
  *  Uses /system/resource/get (not /console/inspect which may still be hung).
  *  Tries up to maxAttempts times with delays between attempts. */
-async function waitForServerRecovery(client: RouterOSClient, maxAttempts = 8): Promise<boolean> {
+async function waitForServerRecovery(client: IRouterOSClient, maxAttempts = 8): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       await client.fetchVersion();
@@ -263,7 +333,7 @@ async function waitForServerRecovery(client: RouterOSClient, maxAttempts = 8): P
 /** Test each CRASH_PATH to see if it still crashes the router.
  *  Includes a health check between probes so that a crash from one path
  *  doesn't cause all subsequent paths to be falsely reported as crashed. */
-export async function testCrashPaths(client: RouterOSClient): Promise<CrashPathResult[]> {
+export async function testCrashPaths(client: IRouterOSClient): Promise<CrashPathResult[]> {
   const results: CrashPathResult[] = [];
 
   for (const crashPath of CRASH_PATHS) {
@@ -302,7 +372,7 @@ export async function testCrashPaths(client: RouterOSClient): Promise<CrashPathR
 
 /** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren) */
 export async function crawlInspectTree(
-  client: RouterOSClient,
+  client: IRouterOSClient,
   rpath: string[] = [],
   skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
 ): Promise<InspectNode> {
@@ -792,6 +862,9 @@ interface CliOptions {
   testCrashPaths: boolean;
   version: boolean;
   help: boolean;
+  transport: "auto" | "rest" | "native";
+  apiHost?: string;
+  apiPort: number;
 }
 
 function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
@@ -807,10 +880,18 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       "test-crash-paths": { type: "boolean", default: false },
       version: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
+      transport: { type: "string", default: "auto" },
+      "api-host": { type: "string" },
+      "api-port": { type: "string", default: "8728" },
     },
     strict: true,
     allowPositionals: true,
   });
+
+  const transportRaw = values.transport ?? "auto";
+  if (transportRaw !== "auto" && transportRaw !== "rest" && transportRaw !== "native") {
+    throw new Error(`--transport must be auto, rest, or native; got "${transportRaw}"`);
+  }
 
   const [, , ...pathArgs] = positionals;
 
@@ -825,6 +906,9 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       testCrashPaths: values["test-crash-paths"] ?? false,
       version: values.version ?? false,
       help: values.help ?? false,
+      transport: transportRaw,
+      apiHost: values["api-host"],
+      apiPort: parseInt(values["api-port"] ?? "8728", 10),
     },
     pathArgs,
   };
@@ -845,6 +929,9 @@ Options:
   --skip-openapi          Skip OpenAPI 3.0 generation
   --skip-completion       Skip completion data fetching
   --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
+  --transport <mode>      Transport: auto (default), rest, or native
+  --api-host <host>       Native API host (default: derived from URLBASE)
+  --api-port <port>       Native API port (default: 8728)
   --version               Print RouterOS version and exit
   --help                  Show this help
 
@@ -852,18 +939,23 @@ Environment:
   URLBASE     RouterOS REST base URL (e.g. http://localhost:9180/rest)
   BASICAUTH   Credentials as user:pass (e.g. admin:)
 
+Transport selection (--transport):
+  auto   Try native API (port 8728) first; fall back to REST if not reachable (default)
+  rest   Use REST API only (port 80 via URLBASE)
+  native Use native API only (port 8728); fails if not reachable
+
 Examples:
   # Offline enrichment (no completion data, just structure + OpenAPI)
   # Note: Bun auto-loads .env — add --skip-completion if URLBASE is set in .env
   bun deep-inspect.ts --inspect-file docs/7.22/inspect.json --output-dir /tmp --skip-completion
 
-  # Live enrichment with completions
+  # Live enrichment with completions (auto-selects native API if port 8728 is open)
   URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
     bun deep-inspect.ts --inspect-file docs/7.22/inspect.json
 
-  # Full live crawl
+  # Full live crawl via native API (fastest)
   URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
-    bun deep-inspect.ts --live --output-dir docs/7.22
+    bun deep-inspect.ts --live --transport native --output-dir docs/7.22
 `.trim());
 }
 
@@ -878,10 +970,39 @@ async function main() {
   // Build client if we have connection info
   const urlBase = process.env.URLBASE;
   const basicAuth = process.env.BASICAUTH;
-  let client: RouterOSClient | null = null;
+  let client: IRouterOSClient | null = null;
+  let activeTransport: string | undefined;
 
   if (urlBase && basicAuth) {
-    client = new RouterOSClient(urlBase, basicAuth);
+    const colonIdx = basicAuth.indexOf(":");
+    const user = basicAuth.substring(0, colonIdx);
+    const password = basicAuth.substring(colonIdx + 1);
+    const apiHost = opts.apiHost ?? new URL(urlBase).hostname;
+    const apiPort = opts.apiPort;
+
+    if (opts.transport === "native") {
+      const nc = new NativeRouterOSClient(apiHost, apiPort, user, password);
+      await nc.connect();
+      client = nc;
+      activeTransport = "native";
+    } else if (opts.transport === "rest") {
+      client = new RouterOSClient(urlBase, basicAuth);
+      activeTransport = "rest";
+    } else {
+      // auto: try native API first, fall back to REST
+      try {
+        const nc = new NativeRouterOSClient(apiHost, apiPort, user, password);
+        await nc.connect();
+        client = nc;
+        activeTransport = "native";
+        console.log(`Transport: native API (${apiHost}:${apiPort})`);
+      } catch (err) {
+        const code = (err as RosError).code ?? (err as NodeJS.ErrnoException).code ?? "";
+        console.log(`Transport: REST (native API unavailable: ${code || (err as Error).message})`);
+        client = new RouterOSClient(urlBase, basicAuth);
+        activeTransport = "rest";
+      }
+    }
   }
 
   // --version: print version and exit
@@ -975,13 +1096,13 @@ async function main() {
   }
 
   // Build _meta
-  // apiTransport is only set when completion enrichment was actually performed via REST.
-  // It remains undefined when --skip-completion is passed or no client is configured, so
-  // downstream consumers can distinguish "REST transport used" from "no enrichment done".
+  // apiTransport is only set when completion enrichment was actually performed.
+  // It reflects the transport that was used ("rest" or "native"), or undefined when
+  // --skip-completion was passed or no client was configured.
   const meta: DeepInspectMeta = {
     version,
     generatedAt: new Date().toISOString(),
-    apiTransport: (!opts.skipCompletion && client !== null) ? "rest" : undefined,
+    apiTransport: (!opts.skipCompletion && client !== null) ? activeTransport : undefined,
     enrichmentDurationMs,
     crashPathsTested: crashPathResults.map((r) => r.path),
     crashPathsSafe: crashPathResults.filter((r) => r.safe).map((r) => r.path),
@@ -1004,6 +1125,9 @@ async function main() {
   }
 
   console.log("Done.");
+
+  // Close native API connection if open
+  client?.close?.();
 }
 
 // Only run main when executed directly (not imported in tests)
