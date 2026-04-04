@@ -117,6 +117,36 @@ describe("completionsToObject", () => {
     expect("desc" in result.test).toBe(false);
   });
 
+  test("normalizes preference from string to number (REST API returns strings)", () => {
+    const result = completionsToObject([
+      { completion: "accept", show: true, style: "none", preference: "80" },
+    ]);
+    expect(result.accept.preference).toBe(80);
+    expect(typeof result.accept.preference).toBe("number");
+  });
+
+  test("accepts preference already as number", () => {
+    const result = completionsToObject([
+      { completion: "drop", show: true, style: "none", preference: 60 },
+    ]);
+    expect(result.drop.preference).toBe(60);
+    expect(typeof result.drop.preference).toBe("number");
+  });
+
+  test("uses 'text' field as desc when 'desc' is absent (REST API field name)", () => {
+    const result = completionsToObject([
+      { completion: "reject", show: true, style: "none", text: "Reject with ICMP" },
+    ]);
+    expect(result.reject.desc).toBe("Reject with ICMP");
+  });
+
+  test("prefers 'desc' over 'text' when both present", () => {
+    const result = completionsToObject([
+      { completion: "action", show: true, style: "none", desc: "canonical", text: "raw" },
+    ]);
+    expect(result.action.desc).toBe("canonical");
+  });
+
   test("handles empty input", () => {
     expect(completionsToObject([])).toEqual({});
   });

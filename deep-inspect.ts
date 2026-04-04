@@ -72,7 +72,10 @@ interface InspectCompletionResponse {
   completion: string;
   show: boolean | string;
   style?: string;
-  preference?: number;
+  /** RouterOS REST API returns preference as a string (e.g. "80"), not a number */
+  preference?: number | string;
+  /** RouterOS REST API uses "text" for the description field; "desc" is the normalized form */
+  text?: string;
   desc?: string;
 }
 
@@ -178,13 +181,20 @@ export function filterCompletions(completions: InspectCompletionResponse[]): Ins
   );
 }
 
-/** Convert filtered completion responses to the _completion object format */
+/** Convert filtered completion responses to the _completion object format.
+ *  Normalizes API inconsistencies at the boundary:
+ *  - preference: REST API returns a string (e.g. "80"); convert to number
+ *  - desc: REST API uses the field name "text"; fall back to "text" if "desc" is absent
+ */
 export function completionsToObject(completions: InspectCompletionResponse[]): Record<string, CompletionEntry> {
   const result: Record<string, CompletionEntry> = {};
   for (const c of completions) {
     const entry: CompletionEntry = { style: c.style || "none" };
-    if (c.preference !== undefined) entry.preference = c.preference;
-    if (c.desc) entry.desc = c.desc;
+    if (c.preference !== undefined) {
+      entry.preference = typeof c.preference === "string" ? Number(c.preference) : c.preference;
+    }
+    const description = c.desc || c.text;
+    if (description) entry.desc = description;
     result[c.completion] = entry;
   }
   return result;
@@ -844,7 +854,8 @@ Environment:
 
 Examples:
   # Offline enrichment (no completion data, just structure + OpenAPI)
-  bun deep-inspect.ts --inspect-file docs/7.22/inspect.json --output-dir /tmp
+  # Note: Bun auto-loads .env — add --skip-completion if URLBASE is set in .env
+  bun deep-inspect.ts --inspect-file docs/7.22/inspect.json --output-dir /tmp --skip-completion
 
   # Live enrichment with completions
   URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
@@ -964,10 +975,13 @@ async function main() {
   }
 
   // Build _meta
+  // apiTransport is only set when completion enrichment was actually performed via REST.
+  // It remains undefined when --skip-completion is passed or no client is configured, so
+  // downstream consumers can distinguish "REST transport used" from "no enrichment done".
   const meta: DeepInspectMeta = {
     version,
     generatedAt: new Date().toISOString(),
-    apiTransport: "rest",
+    apiTransport: (!opts.skipCompletion && client !== null) ? "rest" : undefined,
     enrichmentDurationMs,
     crashPathsTested: crashPathResults.map((r) => r.path),
     crashPathsSafe: crashPathResults.filter((r) => r.safe).map((r) => r.path),
