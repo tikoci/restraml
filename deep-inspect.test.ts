@@ -34,6 +34,24 @@ describe("filterCompletions", () => {
     expect(result).toHaveLength(1);
   });
 
+  test("keeps entries with show='true' (string from REST API)", () => {
+    const result = filterCompletions([
+      { completion: "tcp", show: "true", style: "none" },
+      { completion: "udp", show: "true", style: "none", preference: 50 },
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].completion).toBe("tcp");
+  });
+
+  test("filters out show='false' (string from REST API)", () => {
+    const result = filterCompletions([
+      { completion: "hidden", show: "false", style: "none" },
+      { completion: "visible", show: "true", style: "none" },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].completion).toBe("visible");
+  });
+
   test("filters out show=false", () => {
     const result = filterCompletions([
       { completion: "hidden", show: false, style: "none" },
@@ -54,16 +72,18 @@ describe("filterCompletions", () => {
     expect(filterCompletions([])).toHaveLength(0);
   });
 
-  test("handles mixed show values", () => {
+  test("handles mixed show values including string 'true'", () => {
     const result = filterCompletions([
       { completion: "a", show: true, style: "none" },
       { completion: "b", show: false, style: "none" },
       { completion: "c", show: "yes", style: "none" },
       { completion: "d", show: "no", style: "none" },
       { completion: "e", show: true, style: "none", preference: 50 },
+      { completion: "f", show: "true", style: "none" },
+      { completion: "g", show: "false", style: "none" },
     ]);
-    expect(result).toHaveLength(3);
-    expect(result.map((r) => r.completion)).toEqual(["a", "c", "e"]);
+    expect(result).toHaveLength(4);
+    expect(result.map((r) => r.completion)).toEqual(["a", "c", "e", "f"]);
   });
 });
 

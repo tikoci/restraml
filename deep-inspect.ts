@@ -32,6 +32,9 @@ export interface CompletionEntry {
 export interface DeepInspectMeta {
   version: string;
   generatedAt: string;
+  architecture?: string;
+  apiTransport?: string;
+  enrichmentDurationMs?: number;
   crashPathsTested: string[];
   crashPathsSafe: string[];
   crashPathsCrashed: string[];
@@ -39,6 +42,11 @@ export interface DeepInspectMeta {
     argsTotal: number;
     argsWithCompletion: number;
     argsFailed: number;
+  };
+  mergeStats?: {
+    x86OnlyNodes: number;
+    arm64OnlyNodes: number;
+    sharedNodes: number;
   };
 }
 
@@ -166,7 +174,7 @@ export class RouterOSClient {
 /** Filter completion responses to only those that should be shown */
 export function filterCompletions(completions: InspectCompletionResponse[]): InspectCompletionResponse[] {
   return completions.filter(
-    (c) => c.show === true || c.show === "yes",
+    (c) => c.show === true || c.show === "true" || c.show === "yes",
   );
 }
 
@@ -940,12 +948,16 @@ async function main() {
 
   // Enrich with completion data
   let completionStats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 };
+  let enrichmentDurationMs: number | undefined;
   if (!opts.skipCompletion && client) {
     console.log("Enriching with completion data...");
+    const enrichStart = performance.now();
     completionStats = await enrichWithCompletions(inspectTree, client);
+    enrichmentDurationMs = Math.round(performance.now() - enrichStart);
     console.log(
       `Completions: ${completionStats.argsWithCompletion}/${completionStats.argsTotal} args enriched` +
-      (completionStats.argsFailed > 0 ? `, ${completionStats.argsFailed} failed` : ""),
+      (completionStats.argsFailed > 0 ? `, ${completionStats.argsFailed} failed` : "") +
+      ` (${(enrichmentDurationMs / 1000).toFixed(1)}s)`,
     );
   } else if (!opts.skipCompletion && !client) {
     console.log("Skipping completions (no live router connection)");
@@ -955,6 +967,8 @@ async function main() {
   const meta: DeepInspectMeta = {
     version,
     generatedAt: new Date().toISOString(),
+    apiTransport: "rest",
+    enrichmentDurationMs,
     crashPathsTested: crashPathResults.map((r) => r.path),
     crashPathsSafe: crashPathResults.filter((r) => r.safe).map((r) => r.path),
     crashPathsCrashed: crashPathResults.filter((r) => !r.safe).map((r) => r.path),
