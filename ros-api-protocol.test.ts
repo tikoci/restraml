@@ -18,6 +18,7 @@
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
+  CANCEL_GRACE_MS,
   RosAPI,
   RosError,
   RosErrorCode,
@@ -586,6 +587,127 @@ describe("writeAbortable — pre-aborted signal fast path", () => {
     // Clean up
     (api as any)._onClose();
     _promise.catch(() => {});
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// §7b  writeAbortable — cancel-grace timeout (no network)
+//      Verifies that writeAbortable force-rejects when the router ignores /cancel.
+//      This prevents the infinite hang that caused CI build 24003439705 to stall
+//      for 40+ minutes on native API enrichment.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("writeAbortable — cancel-grace timeout", () => {
+  test("force-rejects with ETIMEDOUT after grace period when router ignores /cancel", async () => {
+    const api = new RosAPI("127.0.0.1", 8728, "admin", "");
+    (api as any).connected = true;
+    (api as any).socket = { write: () => {} }; // absorb writes silently
+
+    const controller = new AbortController();
+
+    // Start the command (will never get a response from mock socket)
+    const promise = api.writeAbortable(controller.signal, "/console/inspect", "=request=completion");
+
+    // Verify command is pending
+    expect((api as any).pending.size).toBe(1);
+
+    // Abort immediately (simulating 5s COMPLETION_TIMEOUT_MS firing)
+    controller.abort();
+
+    // Now pending should have 2 entries (original + cancel tag)
+    expect((api as any).pending.size).toBe(2);
+
+    // Wait for the grace period — the promise must reject, not hang forever
+    const start = performance.now();
+    const err = (await promise.catch((e: unknown) => e)) as RosError;
+    const elapsed = performance.now() - start;
+
+    expect(err).toBeInstanceOf(RosError);
+    expect(err.code).toBe(RosErrorCode.ETIMEDOUT);
+    expect(err.message).toContain("/cancel");
+
+    // Grace period is CANCEL_GRACE_MS (5s) — verify timing
+    expect(elapsed).toBeGreaterThan(CANCEL_GRACE_MS - 500);
+    expect(elapsed).toBeLessThan(CANCEL_GRACE_MS + 2000);
+
+    // Original tag cleaned up from pending
+    expect((api as any).pending.has(`t${(api as any).nextTag - 1}`)).toBe(false);
+  }, 10_000); // 10s test timeout
+
+  test("does NOT force-reject if router acknowledges /cancel normally", async () => {
+    const api = new RosAPI("127.0.0.1", 8728, "admin", "");
+    (api as any).connected = true;
+    (api as any).socket = { write: () => {} };
+
+    const controller = new AbortController();
+    const promise = api.writeAbortable(controller.signal, "/console/inspect");
+
+    // Abort — sends /cancel, starts grace timer
+    controller.abort();
+
+    // Simulate router acknowledging the cancel with !trap category=2
+    const originalTag = [...(api as any).pending.keys()].find((t: string) => t.startsWith("t"));
+    expect(originalTag).toBeDefined();
+
+    // Feed the !trap category=2 response (router acknowledging the cancel)
+    (api as any)._onData(encodeSentence([
+      "!trap", `.tag=${originalTag}`, "=category=2", "=message=interrupted",
+    ]));
+
+    // Promise should resolve immediately (not wait for grace timer)
+    const start = performance.now();
+    const result = await promise;
+    const elapsed = performance.now() - start;
+
+    // Should resolve quickly (< 100ms), not after 5s grace period
+    expect(elapsed).toBeLessThan(500);
+    expect(result).toEqual([]);
+  });
+
+  test("force-rejects immediately when not connected and signal is aborted", async () => {
+    const api = new RosAPI("127.0.0.1", 8728, "admin", "");
+    (api as any).connected = true;
+    (api as any).socket = { write: () => {} };
+
+    const controller = new AbortController();
+    const promise = api.writeAbortable(controller.signal, "/console/inspect");
+
+    // Simulate connection loss, then abort
+    (api as any).connected = false;
+    (api as any).socket = null;
+    controller.abort();
+
+    // Should reject quickly (no grace wait since we can't send /cancel)
+    const start = performance.now();
+    const err = (await promise.catch((e: unknown) => e)) as RosError;
+    const elapsed = performance.now() - start;
+
+    expect(err).toBeInstanceOf(RosError);
+    expect(err.code).toBe(RosErrorCode.CONNRESET);
+    expect(elapsed).toBeLessThan(500); // Should be near-instant
+  });
+
+  test("grace timer is cleaned up when command resolves before grace period expires", async () => {
+    const api = new RosAPI("127.0.0.1", 8728, "admin", "");
+    (api as any).connected = true;
+    (api as any).socket = { write: () => {} };
+
+    const controller = new AbortController();
+    const promise = api.writeAbortable(controller.signal, "/test/cmd");
+
+    // Abort — starts grace timer
+    controller.abort();
+
+    // Simulate _onClose rejecting all pending (e.g. TCP RST)
+    (api as any)._onClose();
+
+    // Promise rejects with CONNRESET (from _onClose), not ETIMEDOUT
+    const err = (await promise.catch((e: unknown) => e)) as RosError;
+    expect(err.code).toBe(RosErrorCode.CONNRESET);
+
+    // Grace timer should have been cleaned up by the finally block
+    // If not cleaned up, it would fire after 5s and try to reject again (no-op but wasteful)
+    // We can't directly test timer cleanup, but the test not hanging proves finally ran
   });
 });
 

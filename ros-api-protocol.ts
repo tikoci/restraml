@@ -177,6 +177,13 @@ class RosError extends Error {
   }
 }
 
+// ── Constants ──
+
+/** Grace period (ms) after /cancel is sent before forcibly rejecting the command.
+ *  Prevents infinite hang when the router ignores /cancel (e.g. command handler
+ *  is deadlocked on a specific /console/inspect path). */
+const CANCEL_GRACE_MS = 5_000;
+
 // ── Main client ──
 
 class RosAPI {
@@ -363,10 +370,28 @@ class RosAPI {
     });
 
     let cancelSent = false;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+
     const onAbort = (): void => {
       // Only send cancel once, and only if the command is still pending.
       if (cancelSent || !this.pending.has(tag)) return;
       cancelSent = true;
+
+      // Start grace timer — if the router doesn't acknowledge /cancel within
+      // CANCEL_GRACE_MS, forcibly reject the command to prevent infinite hang.
+      // This covers the case where the router's command handler is deadlocked
+      // (e.g. on specific /console/inspect paths) and never processes /cancel.
+      graceTimer = setTimeout(() => {
+        const cmd = this.pending.get(tag);
+        if (cmd) {
+          this.pending.delete(tag);
+          cmd.reject(new RosError(
+            "Timed out waiting for /cancel acknowledgement — router may be unresponsive",
+            RosErrorCode.ETIMEDOUT,
+          ));
+        }
+      }, CANCEL_GRACE_MS);
+
       if (this.connected && this.socket) {
         try {
           const cancelTag = `cc${++this.nextTag}`;
@@ -380,6 +405,18 @@ class RosAPI {
         } catch {
           // Socket gone — _onClose will reject commandPromise via CONNRESET
         }
+      } else {
+        // Not connected — can't send /cancel; force-reject immediately.
+        const cmd = this.pending.get(tag);
+        if (cmd) {
+          this.pending.delete(tag);
+          cmd.reject(new RosError(
+            "Cannot send /cancel — connection lost",
+            RosErrorCode.CONNRESET,
+          ));
+        }
+        clearTimeout(graceTimer);
+        graceTimer = undefined;
       }
     };
 
@@ -390,6 +427,7 @@ class RosAPI {
       return result.re;
     } finally {
       signal?.removeEventListener("abort", onAbort);
+      if (graceTimer) clearTimeout(graceTimer);
     }
   }
 
@@ -602,6 +640,7 @@ class RosAPI {
 }
 
 export {
+  CANCEL_GRACE_MS,
   RosAPI,
   RosError,
   RosErrorCode,

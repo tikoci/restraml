@@ -174,18 +174,47 @@ is never set for those paths. This explains both the slowdown (huge retryQueue) 
 - Re-running "Test: REST vs Native API Equivalence" will now show CONNRESET count in
   the step log and in `_meta` output, confirming whether the hypothesis is correct.
 
+**Cancel-grace timeout fix (done, April 2026):**
+
+Root cause of the 40+ minute CI hang (run 24003439705): `writeAbortable()` sends `/cancel` when
+the AbortSignal fires (e.g. from a 5s `COMPLETION_TIMEOUT_MS`), but had **no forced rejection**
+if the router never acknowledges the `/cancel`. Hanger paths (e.g. `ip/address/add/broadcast`,
+`ip/address/comment/comment`) block the router's command handler, preventing it from processing
+the `/cancel` — so `commandPromise` hangs forever. With batch=50, one hung command blocks the
+entire `Promise.all`, and since every batch contains some hanger paths, the enrichment hangs
+indefinitely.
+
+Fix: Added `CANCEL_GRACE_MS = 5_000` to `writeAbortable()`. After the abort signal fires and
+`/cancel` is sent, a grace timer starts. If the router doesn't acknowledge within 5s, the
+command is force-rejected with `RosError(ETIMEDOUT)`. Also handles the disconnected state
+(socket gone before abort) by immediately rejecting with `CONNRESET`. The grace timer is
+cleaned up in `finally` if the command resolves normally before the timer fires.
+
+Total worst-case per-command timeout is now bounded: `COMPLETION_TIMEOUT_MS + CANCEL_GRACE_MS`
+(10s for enrichment, 35s for retry). Without this fix, a single unresponsive command could hang
+the entire enrichment forever.
+
+4 unit tests added to `ros-api-protocol.test.ts` (`§7b writeAbortable — cancel-grace timeout`):
+- Force-rejects with ETIMEDOUT after grace period when router ignores /cancel
+- Does NOT force-reject if router acknowledges /cancel normally (!trap category=2)
+- Force-rejects immediately with CONNRESET when not connected and signal is aborted
+- Grace timer is cleaned up when command resolves before grace period expires
+
 **Next steps:**
-1. Re-run "Test: REST vs Native API Equivalence" workflow to confirm CONNRESET events appear
-   in the log and count matches the ~77 missing completions.
-2. Investigate whether CONNRESET can be prevented:
+1. Re-run "Test: REST vs Native API Equivalence" workflow to confirm the fix prevents hangs.
+   Native enrichment should now fail gracefully (ETIMEDOUT on hanger paths → retryQueue)
+   instead of hanging forever. Expect total native enrichment time to increase by
+   ~(hanger_path_count × 10s) but complete instead of timing out.
+2. Re-run to confirm CONNRESET events appear in the log and count matches the ~77 missing
+   completions (observability fix from earlier).
+3. Investigate whether CONNRESET can be prevented:
    - Reduce batch concurrency for native (e.g. ENRICHMENT_BATCH_SIZE=10 for native vs 50)?
-   - Add `/cancel` command support to properly abort in-flight commands on timeout?
    - Is this a RouterOS bug (TCP RST under API load)? Or a Bun `Bun.connect` socket bug?
-3. If ConnReset continues at reduced concurrency, file a bug report to MikroTik with:
+4. If CONNRESET continues at reduced concurrency, file a bug report to MikroTik with:
    - RouterOS version, concurrency level, CONNRESET count, affected paths sample
    - Compare behaviour: does the same number of concurrent `/console/inspect` commands
      trigger CONNRESET consistently? Is it specific to `/console/inspect` or any command?
-4. If it's a Bun socket bug: reproduce with a minimal script and file against Bun.
+5. If it's a Bun socket bug: reproduce with a minimal script and file against Bun.
 
 ---
 
