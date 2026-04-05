@@ -14,6 +14,7 @@ was reviewed. Updated with post-review findings and known future wrinkles.
 |-------|------|--------|
 | Phase 1 | Fix Completion Bug + Metadata | ✅ Done (post-review fixes applied) |
 | Phase 2 | Native API Protocol for Performance | ✅ Done (committed 65199b9) |
+| Phase 2.9 | Native API CONNRESET Investigation | 🔄 In progress |
 | Phase 3 | ARM64 Multi-Architecture Support | 🔲 Not started |
 
 ---
@@ -127,6 +128,64 @@ Both transports are now fast, reliable, and produce identical outputs.
 - [x] `auto` mode: unit test simulates port-closed scenario and confirms REST fallback
 - [x] `apiTransport` in `_meta` reflects actual transport used (not hardcoded)
 - [x] `bun run lint` produces zero errors
+
+---
+
+## Phase 2.9: Native API CONNRESET Investigation 🔄 In progress
+
+**Context:** First CI run of "Test: REST vs Native API Equivalence" (run 24002242406, April 2026)
+showed native API taking **3.5× longer than REST** (271s vs 77s) and producing 77 fewer
+completions, with 1 argsFailed. REST was definitively better on both metrics — the opposite of
+the expected outcome (native API should be marginally faster, not 3× slower).
+
+**What the data shows:**
+- `argsWithCompletion`: REST=9357, Native=9280 (77 missing on native)
+- `argsFailed`: REST=0, Native=1
+- Missing completions are scattered across subsystems (certificate, console, interface, etc.)
+- Every difference is native *missing* a `_completion` that REST has — no reverse case
+
+**Root cause hypothesis:** The `RosAPI` TCP connection is being dropped under concurrent load
+(50 commands in-flight via tag multiplexing). When `_onClose()` fires, all 50 in-flight
+commands are rejected with `CONNRESET` at once. They pile into the sequential retry queue.
+`RosAPI.write()` auto-reconnects (calls `connect()` when `!this.connected`), but some
+completions come back empty after reconnect — silently, without `throw` — so `_completion`
+is never set for those paths. This explains both the slowdown (huge retryQueue) and the
+77 missing completions (reconnect-after-drop returns empty results for some paths).
+
+**What was NOT the cause (ruled out):**
+- `withAbortSignal` orphaned promises: when abort fires, the `_send()` promise remains in
+  `this.pending` but the router responds to it eventually and it's cleaned up via
+  `_routeSentence()`. No leak, no protocol corruption.
+- Batch size: 50 was verified to work well for REST. The issue is specific to the
+  single shared TCP connection of the native API under concurrent load.
+
+**Safety fix (done, April 2026):**
+- Build workflows (`manual-using-docker-in-docker.yaml`, `manual-using-extra-docker-in-docker.yaml`)
+  changed from `--transport auto` to `--transport rest`. Ensures production schema builds use
+  the proven REST path while native API investigation continues.
+
+**Observability fix (done, April 2026):**
+- `NativeRouterOSClient` now catches `CONNRESET` errors in `fetchChild/fetchSyntax/fetchCompletion`
+  and logs them to stderr with the path that triggered the drop and an incrementing counter.
+- `getReconnectStats()` method returns `{ count, firstPaths }` for the session.
+- `DeepInspectMeta` has a new optional field `nativeApiReconnects: { count, firstPaths }` —
+  only set when native transport is used AND at least one CONNRESET was observed.
+- `main()` logs a prominent warning summarising total CONNRESET count after enrichment.
+- Re-running "Test: REST vs Native API Equivalence" will now show CONNRESET count in
+  the step log and in `_meta` output, confirming whether the hypothesis is correct.
+
+**Next steps:**
+1. Re-run "Test: REST vs Native API Equivalence" workflow to confirm CONNRESET events appear
+   in the log and count matches the ~77 missing completions.
+2. Investigate whether CONNRESET can be prevented:
+   - Reduce batch concurrency for native (e.g. ENRICHMENT_BATCH_SIZE=10 for native vs 50)?
+   - Add `/cancel` command support to properly abort in-flight commands on timeout?
+   - Is this a RouterOS bug (TCP RST under API load)? Or a Bun `Bun.connect` socket bug?
+3. If ConnReset continues at reduced concurrency, file a bug report to MikroTik with:
+   - RouterOS version, concurrency level, CONNRESET count, affected paths sample
+   - Compare behaviour: does the same number of concurrent `/console/inspect` commands
+     trigger CONNRESET consistently? Is it specific to `/console/inspect` or any command?
+4. If it's a Bun socket bug: reproduce with a minimal script and file against Bun.
 
 ---
 

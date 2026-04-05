@@ -12,7 +12,7 @@
  */
 
 import { parseArgs } from "util";
-import { RosAPI, type RosError } from "./ros-api-protocol";
+import { RosAPI, RosErrorCode, type RosError } from "./ros-api-protocol";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,15 @@ export interface DeepInspectMeta {
     argsTotal: number;
     argsWithCompletion: number;
     argsFailed: number;
+  };
+  /** Present only when native transport was used. Tracks TCP connection resets
+   *  observed during enrichment — each reset rejects all in-flight commands on the
+   *  shared connection. Non-zero values indicate a potential RouterOS or Bun bug
+   *  worth reporting upstream. */
+  nativeApiReconnects?: {
+    count: number;
+    /** First up to 20 arg paths that experienced a CONNRESET (for bug diagnosis) */
+    firstPaths: string[];
   };
   mergeStats?: {
     x86OnlyNodes: number;
@@ -210,6 +219,12 @@ function withAbortSignal<T>(signal: AbortSignal | undefined, promise: Promise<T>
  */
 export class NativeRouterOSClient implements IRouterOSClient {
   private api: RosAPI;
+  /** Number of CONNRESET errors observed — each one means the TCP connection
+   *  dropped and all in-flight commands on the shared connection were rejected.
+   *  Tracked for bug diagnosis (MikroTik / Bun). */
+  private connResetCount = 0;
+  /** First N arg paths that experienced a CONNRESET (sampled for bug reports). */
+  private connResetPaths: string[] = [];
 
   constructor(host: string, port: number, user: string, password: string) {
     this.api = new RosAPI(host, port, user, password);
@@ -223,6 +238,30 @@ export class NativeRouterOSClient implements IRouterOSClient {
     this.api.close();
   }
 
+  /** Returns reconnect diagnostics accumulated during this session.
+   *  A non-zero count means the TCP connection dropped at least once.
+   *  The next write() call after a drop auto-reconnects (RosAPI.write recontects
+   *  when !connected), so enrichment continues — but missed completions and
+   *  slowdown are side-effects worth tracking and reporting. */
+  getReconnectStats(): { count: number; firstPaths: string[] } {
+    return { count: this.connResetCount, firstPaths: [...this.connResetPaths] };
+  }
+
+  /** Log a CONNRESET event. Call from catch blocks in fetch* methods.
+   *  Only acts on CONNRESET; lets other errors (timeout, trap) pass silently. */
+  private _logIfConnReset(method: string, path: string[], err: unknown): void {
+    if ((err as RosError).code === RosErrorCode.CONNRESET) {
+      this.connResetCount++;
+      if (this.connResetPaths.length < 20) {
+        this.connResetPaths.push(path.join("/"));
+      }
+      console.warn(
+        `[native-api] CONNRESET #${this.connResetCount} in ${method}(${path.join("/")}) — ` +
+        "RosAPI will auto-reconnect on next call",
+      );
+    }
+  }
+
   async fetchVersion(): Promise<string> {
     const sentences = await this.api.write("/system/resource/print");
     const version = sentences[0]?.data.version;
@@ -231,30 +270,45 @@ export class NativeRouterOSClient implements IRouterOSClient {
   }
 
   async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
-    const sentences = await this.api.write(
-      "/console/inspect",
-      "=request=child",
-      `=path=${path.join(",")}`,
-    );
-    return sentences.map((s) => s.data as unknown as InspectChildResponse);
+    try {
+      const sentences = await this.api.write(
+        "/console/inspect",
+        "=request=child",
+        `=path=${path.join(",")}`,
+      );
+      return sentences.map((s) => s.data as unknown as InspectChildResponse);
+    } catch (err) {
+      this._logIfConnReset("fetchChild", path, err);
+      throw err;
+    }
   }
 
   async fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
-    const sentences = await withAbortSignal(
-      signal,
-      this.api.write("/console/inspect", "=request=syntax", `=path=${path.join(",")}`),
-    );
-    return sentences.map((s) => s.data as unknown as InspectSyntaxResponse);
+    try {
+      const sentences = await withAbortSignal(
+        signal,
+        this.api.write("/console/inspect", "=request=syntax", `=path=${path.join(",")}`),
+      );
+      return sentences.map((s) => s.data as unknown as InspectSyntaxResponse);
+    } catch (err) {
+      this._logIfConnReset("fetchSyntax", path, err);
+      throw err;
+    }
   }
 
   async fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
-    const sentences = await withAbortSignal(
-      signal,
-      this.api.write("/console/inspect", "=request=completion", `=path=${path.join(",")}`),
-    );
-    // Native API returns strings for all fields. completionsToObject() normalises:
-    // show (string "true"/"false"), preference (string→number), text→desc fallback.
-    return sentences.map((s) => s.data as unknown as InspectCompletionResponse);
+    try {
+      const sentences = await withAbortSignal(
+        signal,
+        this.api.write("/console/inspect", "=request=completion", `=path=${path.join(",")}`),
+      );
+      // Native API returns strings for all fields. completionsToObject() normalises:
+      // show (string "true"/"false"), preference (string→number), text→desc fallback.
+      return sentences.map((s) => s.data as unknown as InspectCompletionResponse);
+    } catch (err) {
+      this._logIfConnReset("fetchCompletion", path, err);
+      throw err;
+    }
   }
 }
 
@@ -1174,6 +1228,21 @@ async function main() {
     crashPathsCrashed: crashPathResults.filter((r) => !r.safe).map((r) => r.path),
     completionStats,
   };
+
+  // Attach native API reconnect diagnostics when present.
+  // A non-zero count signals potential RouterOS or Bun TCP bug — see BACKLOG.md.
+  if (activeTransport === "native" && client instanceof NativeRouterOSClient) {
+    const rcStats = client.getReconnectStats();
+    if (rcStats.count > 0) {
+      meta.nativeApiReconnects = rcStats;
+      console.warn(
+        `[native-api] ${rcStats.count} CONNRESET event(s) observed during enrichment. ` +
+        "This indicates the RouterOS TCP connection dropped under concurrent load. " +
+        "See _meta.nativeApiReconnects for affected paths. " +
+        "This may be a MikroTik RouterOS or Bun TCP socket bug — please report.",
+      );
+    }
+  }
 
   // Write deep-inspect.json
   const deepInspect: DeepInspectOutput = { _meta: meta, ...inspectTree };
