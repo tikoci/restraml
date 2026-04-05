@@ -1,0 +1,461 @@
+name: "Test: REST vs Native API Equivalence"
+
+# Clean A/B test: run the entire deep-inspect enrichment pipeline once via REST,
+# once via native API, then diff the outputs. If they're identical, native API is
+# a proven drop-in replacement for REST for /console/inspect completion calls.
+#
+# This is the definitive CI gate for transport equivalence. Both paths run
+# independently end-to-end — no hybrid, no mixed transport. The full inspect tree
+# (30k–40k+ nodes, 27k+ args) is enriched by each transport, and the resulting
+# deep-inspect.json + openapi.json files are compared byte-for-byte.
+#
+# Expected runtime: ~15–30 min depending on license level (p1 trial = fast, free = slow).
+# The user has said an hour is fine if it gives a definitive answer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rosver:
+        description: 'RouterOS version (e.g. 7.22, 7.22.1, 7.23beta5)'
+        required: true
+        default: "7.22.1"
+
+jobs:
+  transport-equivalence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      URLBASE: http://localhost:9180/rest
+      BASICAUTH: "admin:"
+      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
+      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install QEMU
+      run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86 qemu-utils
+
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        ls -la /dev/kvm
+
+    - name: Download RouterOS CHR image
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        echo "Downloading RouterOS $ROUTEROS_VERSION CHR image..."
+        wget -q "https://download.mikrotik.com/routeros/${ROUTEROS_VERSION}/chr-${ROUTEROS_VERSION}.vdi.zip" \
+            -O "chr-${ROUTEROS_VERSION}.vdi.zip" \
+        || (rm -f "chr-${ROUTEROS_VERSION}.vdi.zip" && \
+            wget -q "https://cdn.mikrotik.com/routeros/${ROUTEROS_VERSION}/chr-${ROUTEROS_VERSION}.vdi.zip" \
+                -O "chr-${ROUTEROS_VERSION}.vdi.zip")
+        unzip -q "chr-${ROUTEROS_VERSION}.vdi.zip"
+        rm -f "chr-${ROUTEROS_VERSION}.vdi.zip"
+
+    - name: Convert CHR image to qcow2
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        qemu-img convert -f vdi -O qcow2 \
+            "chr-${ROUTEROS_VERSION}.vdi" \
+            "chr-${ROUTEROS_VERSION}.qcow2"
+        rm -f "chr-${ROUTEROS_VERSION}.vdi"
+
+    - name: Start RouterOS CHR in QEMU
+      run: |
+        ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
+        KVM_OPTS=""
+        if [ -e /dev/kvm ]; then
+          KVM_OPTS="-enable-kvm -cpu host"
+          echo "KVM available — using hardware acceleration."
+        else
+          echo "::warning::KVM not found — QEMU will run in software emulation mode (slow)."
+        fi
+        nohup qemu-system-x86_64 \
+            ${KVM_OPTS} \
+            -m 256 \
+            -nographic \
+            -drive file=chr-${ROUTEROS_VERSION}.qcow2,format=qcow2,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22,hostfwd=tcp::8728-:8728 \
+            -device virtio-net-pci,netdev=net0 \
+            &>/tmp/qemu.log &
+        echo "$!" > /tmp/qemu.pid
+        echo "QEMU PID: $(cat /tmp/qemu.pid)"
+
+    - name: Wait for RouterOS REST API
+      run: |
+        echo "Waiting for RouterOS HTTP server (up to 5 min)..."
+        for i in {1..30}; do
+          if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+            echo "REST API up after $i attempt(s)."
+            exit 0
+          fi
+          echo "Attempt $i/30: not ready, retrying in 10s..."
+          sleep 10
+        done
+        echo "::error::RouterOS did not start within 5 minutes."
+        cat /tmp/qemu.log
+        exit 1
+
+    - name: Wait for native API (port 8728)
+      run: |
+        echo "Waiting for native API on port 8728 (up to 60s)..."
+        for i in {1..12}; do
+          if (echo "" | nc -w 2 localhost 8728) >/dev/null 2>&1; then
+            echo "Native API reachable after $i attempt(s)."
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "::error::Native API port 8728 not reachable after 60s."
+        exit 1
+
+    - name: Activate CHR trial license
+      if: env.MIKROTIK_ACCOUNT != ''
+      run: |
+        curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
+          -H 'Content-Type: application/json' \
+          -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+          && echo "License activated to p1 (trial)" \
+          || echo "::warning::License activation failed — enrichment will run at free license speed"
+
+    - name: Setup Bun Runtime
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 'latest'
+
+    - name: Install dependencies
+      run: bun install
+
+    - name: Record environment
+      id: env-info
+      run: |
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Transport Equivalence Test — Environment"
+        echo "═══════════════════════════════════════════════════════"
+
+        ROSVER=$(URLBASE=http://localhost:9180/rest BASICAUTH=admin: bun rest2raml.js --version)
+        echo "rosver=$ROSVER" >> "$GITHUB_OUTPUT"
+        echo "  RouterOS version: $ROSVER"
+
+        LICENSE=$(curl -sS -X POST http://admin:@localhost:9180/rest/system/license/get \
+          -H 'Content-Type: application/json' -d '{"value-name":"level"}' | jq -r '.ret // "unknown"')
+        echo "license=$LICENSE" >> "$GITHUB_OUTPUT"
+        echo "  License:          $LICENSE"
+
+        ARCH=$(curl -sS -X POST http://admin:@localhost:9180/rest/system/resource/get \
+          -H 'Content-Type: application/json' -d '{"value-name":"architecture-name"}' | jq -r '.ret // "unknown"')
+        echo "  Architecture:     $ARCH"
+
+        PKGS=$(curl -sS http://admin@localhost:9180/rest/system/package | jq -r '[.[].name] | join(", ")')
+        echo "  Packages:         $PKGS"
+
+        echo "  KVM:              $([ -e /dev/kvm ] && echo 'yes' || echo 'no')"
+        echo "  Runner:           $(uname -m) / $(uname -s)"
+        echo "  Timestamp:        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "═══════════════════════════════════════════════════════"
+
+    # ── Step 1: Crawl the full inspect tree (REST, once — shared input for both enrichments) ──
+
+    - name: Crawl full inspect tree via REST (rest2raml.js)
+      run: |
+        echo "Crawling full inspect tree via REST..."
+        CRAWL_START=$(date +%s)
+        bun rest2raml.js
+        CRAWL_END=$(date +%s)
+        CRAWL_DURATION=$((CRAWL_END - CRAWL_START))
+        echo "Crawl completed in ${CRAWL_DURATION}s"
+        echo "crawl_duration=${CRAWL_DURATION}" >> "$GITHUB_OUTPUT"
+
+        # Verify inspect.json was created
+        if [ ! -f ros-inspect-all.json ]; then
+          echo "::error::rest2raml.js did not produce ros-inspect-all.json"
+          exit 1
+        fi
+        FILE_SIZE=$(stat -c%s ros-inspect-all.json)
+        echo "Inspect tree file size: ${FILE_SIZE} bytes"
+
+        # Copy the shared input for both enrichment runs
+        cp ros-inspect-all.json inspect-input.json
+      id: crawl
+
+    # ── Step 2: Enrich via REST ──
+
+    - name: Enrich via REST transport
+      run: |
+        ROSVER="${{ steps.env-info.outputs.rosver }}"
+        mkdir -p output-rest
+
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Enrichment: REST transport"
+        echo "═══════════════════════════════════════════════════════"
+        REST_START=$(date +%s)
+
+        bun deep-inspect.ts \
+          --inspect-file inspect-input.json \
+          --ros-version "$ROSVER" \
+          --output-dir output-rest \
+          --transport rest
+
+        REST_END=$(date +%s)
+        REST_DURATION=$((REST_END - REST_START))
+        echo "REST enrichment completed in ${REST_DURATION}s"
+        echo "rest_duration=${REST_DURATION}" >> "$GITHUB_OUTPUT"
+
+        # Show stats
+        echo "REST _meta:"
+        jq '._meta' output-rest/deep-inspect.json
+      id: rest-enrich
+
+    # ── Step 3: Enrich via native API ──
+
+    - name: Enrich via native API transport
+      run: |
+        ROSVER="${{ steps.env-info.outputs.rosver }}"
+        mkdir -p output-native
+
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Enrichment: native API transport"
+        echo "═══════════════════════════════════════════════════════"
+        NATIVE_START=$(date +%s)
+
+        bun deep-inspect.ts \
+          --inspect-file inspect-input.json \
+          --ros-version "$ROSVER" \
+          --output-dir output-native \
+          --transport native
+
+        NATIVE_END=$(date +%s)
+        NATIVE_DURATION=$((NATIVE_END - NATIVE_START))
+        echo "Native enrichment completed in ${NATIVE_DURATION}s"
+        echo "native_duration=${NATIVE_DURATION}" >> "$GITHUB_OUTPUT"
+
+        # Show stats
+        echo "Native _meta:"
+        jq '._meta' output-native/deep-inspect.json
+      id: native-enrich
+
+    # ── Step 4: Compare outputs ──
+
+    - name: Compare deep-inspect.json (strip _meta, diff everything else)
+      id: diff-deep-inspect
+      run: |
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Comparing deep-inspect.json: REST vs Native"
+        echo "═══════════════════════════════════════════════════════"
+
+        # Strip _meta (contains timing, transport name, timestamp — expected to differ)
+        jq -S 'del(._meta)' output-rest/deep-inspect.json > /tmp/rest-stripped.json
+        jq -S 'del(._meta)' output-native/deep-inspect.json > /tmp/native-stripped.json
+
+        # File sizes for context
+        REST_SIZE=$(stat -c%s /tmp/rest-stripped.json 2>/dev/null || stat -f%z /tmp/rest-stripped.json)
+        NATIVE_SIZE=$(stat -c%s /tmp/native-stripped.json 2>/dev/null || stat -f%z /tmp/native-stripped.json)
+        echo "  REST   deep-inspect.json (sans _meta): ${REST_SIZE} bytes"
+        echo "  Native deep-inspect.json (sans _meta): ${NATIVE_SIZE} bytes"
+
+        # SHA256 for definitive comparison
+        REST_SHA=$(sha256sum /tmp/rest-stripped.json | cut -d' ' -f1)
+        NATIVE_SHA=$(sha256sum /tmp/native-stripped.json | cut -d' ' -f1)
+        echo "  REST   SHA256: $REST_SHA"
+        echo "  Native SHA256: $NATIVE_SHA"
+
+        if [ "$REST_SHA" = "$NATIVE_SHA" ]; then
+          echo ""
+          echo "  ✅ IDENTICAL — REST and native API produce byte-identical deep-inspect.json"
+          echo ""
+          echo "identical=true" >> "$GITHUB_OUTPUT"
+          echo "diff_lines=0" >> "$GITHUB_OUTPUT"
+        else
+          echo ""
+          echo "  ❌ DIFFERENT — REST and native API produce different deep-inspect.json"
+          echo ""
+          echo "identical=false" >> "$GITHUB_OUTPUT"
+
+          # Show the diff (first 200 lines, with context)
+          diff -u /tmp/rest-stripped.json /tmp/native-stripped.json > /tmp/deep-inspect.diff || true
+          DIFF_LINES=$(wc -l < /tmp/deep-inspect.diff)
+          echo "diff_lines=${DIFF_LINES}" >> "$GITHUB_OUTPUT"
+          echo "  Diff lines: $DIFF_LINES"
+          echo ""
+          head -200 /tmp/deep-inspect.diff
+          if [ "$DIFF_LINES" -gt 200 ]; then
+            echo "... (truncated, $DIFF_LINES total lines — see artifact for full diff)"
+          fi
+        fi
+
+    - name: Compare openapi.json
+      id: diff-openapi
+      run: |
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Comparing openapi.json: REST vs Native"
+        echo "═══════════════════════════════════════════════════════"
+
+        # OpenAPI has no _meta field, but sort keys for deterministic comparison
+        jq -S . output-rest/openapi.json > /tmp/rest-openapi.json
+        jq -S . output-native/openapi.json > /tmp/native-openapi.json
+
+        REST_SHA=$(sha256sum /tmp/rest-openapi.json | cut -d' ' -f1)
+        NATIVE_SHA=$(sha256sum /tmp/native-openapi.json | cut -d' ' -f1)
+        echo "  REST   SHA256: $REST_SHA"
+        echo "  Native SHA256: $NATIVE_SHA"
+
+        if [ "$REST_SHA" = "$NATIVE_SHA" ]; then
+          echo ""
+          echo "  ✅ IDENTICAL — REST and native API produce byte-identical openapi.json"
+          echo "openapi_identical=true" >> "$GITHUB_OUTPUT"
+        else
+          echo ""
+          echo "  ❌ DIFFERENT — REST and native API produce different openapi.json"
+          echo "openapi_identical=false" >> "$GITHUB_OUTPUT"
+          diff -u /tmp/rest-openapi.json /tmp/native-openapi.json | head -100 || true
+        fi
+
+    # ── Step 5: Detailed enrichment stats comparison ──
+
+    - name: Compare enrichment statistics
+      run: |
+        echo "═══════════════════════════════════════════════════════"
+        echo "  Enrichment Statistics Comparison"
+        echo "═══════════════════════════════════════════════════════"
+
+        echo ""
+        echo "  REST _meta:"
+        jq '._meta | {apiTransport, enrichmentDurationMs, completionStats}' \
+          output-rest/deep-inspect.json
+
+        echo ""
+        echo "  Native _meta:"
+        jq '._meta | {apiTransport, enrichmentDurationMs, completionStats}' \
+          output-native/deep-inspect.json
+
+        # Validate 0 argsFailed on both
+        REST_FAILED=$(jq '._meta.completionStats.argsFailed // 0' output-rest/deep-inspect.json)
+        NATIVE_FAILED=$(jq '._meta.completionStats.argsFailed // 0' output-native/deep-inspect.json)
+
+        echo ""
+        echo "  REST argsFailed:   $REST_FAILED"
+        echo "  Native argsFailed: $NATIVE_FAILED"
+
+        if [ "$REST_FAILED" -ne 0 ] || [ "$NATIVE_FAILED" -ne 0 ]; then
+          echo "::error::argsFailed must be 0 on both transports. REST=$REST_FAILED, Native=$NATIVE_FAILED"
+          exit 1
+        fi
+
+        # Completion counts from _meta (faster than recursive jq walk)
+        REST_COMPLETIONS=$(jq '._meta.completionStats.argsWithCompletion // 0' output-rest/deep-inspect.json)
+        NATIVE_COMPLETIONS=$(jq '._meta.completionStats.argsWithCompletion // 0' output-native/deep-inspect.json)
+        echo "  REST args with completions:   $REST_COMPLETIONS"
+        echo "  Native args with completions: $NATIVE_COMPLETIONS"
+
+        if [ "$REST_COMPLETIONS" -ne "$NATIVE_COMPLETIONS" ]; then
+          echo "::warning::Completion count differs: REST=$REST_COMPLETIONS, Native=$NATIVE_COMPLETIONS"
+        fi
+
+    # ── Step 6: Generate summary ──
+
+    - name: Write step summary
+      if: always()
+      run: |
+        ROSVER="${{ steps.env-info.outputs.rosver }}"
+        LICENSE="${{ steps.env-info.outputs.license }}"
+        DI_IDENTICAL="${{ steps.diff-deep-inspect.outputs.identical }}"
+        OA_IDENTICAL="${{ steps.diff-openapi.outputs.openapi_identical }}"
+        DIFF_LINES="${{ steps.diff-deep-inspect.outputs.diff_lines }}"
+        REST_DUR="${{ steps.rest-enrich.outputs.rest_duration }}"
+        NATIVE_DUR="${{ steps.native-enrich.outputs.native_duration }}"
+
+        REST_META=$(jq -c '._meta | {argsTotal: .completionStats.argsTotal, argsWithCompletion: .completionStats.argsWithCompletion, argsFailed: .completionStats.argsFailed, enrichmentDurationMs}' \
+          output-rest/deep-inspect.json 2>/dev/null || echo '{}')
+        NATIVE_META=$(jq -c '._meta | {argsTotal: .completionStats.argsTotal, argsWithCompletion: .completionStats.argsWithCompletion, argsFailed: .completionStats.argsFailed, enrichmentDurationMs}' \
+          output-native/deep-inspect.json 2>/dev/null || echo '{}')
+
+        # Build summary as a temp file to avoid heredoc-in-YAML issues
+        {
+          echo "## Transport Equivalence Test Results"
+          echo ""
+          echo "| | Value |"
+          echo "|---|---|"
+          echo "| **RouterOS version** | \`${ROSVER}\` |"
+          echo "| **License** | \`${LICENSE}\` |"
+          if [ "$DI_IDENTICAL" = "true" ]; then
+            echo "| **deep-inspect.json identical?** | ✅ Yes |"
+          else
+            echo "| **deep-inspect.json identical?** | ❌ No ($DIFF_LINES diff lines) |"
+          fi
+          if [ "$OA_IDENTICAL" = "true" ]; then
+            echo "| **openapi.json identical?** | ✅ Yes |"
+          else
+            echo "| **openapi.json identical?** | ❌ No |"
+          fi
+          echo ""
+          echo "### Enrichment Timing"
+          echo ""
+          echo "| Transport | Wall time | enrichmentDurationMs | argsTotal | argsWithCompletion | argsFailed |"
+          echo "|---|---|---|---|---|---|"
+          echo "| REST | ${REST_DUR}s | $(echo "$REST_META" | jq '.enrichmentDurationMs // "?"') | $(echo "$REST_META" | jq '.argsTotal // "?"') | $(echo "$REST_META" | jq '.argsWithCompletion // "?"') | $(echo "$REST_META" | jq '.argsFailed // "?"') |"
+          echo "| Native | ${NATIVE_DUR}s | $(echo "$NATIVE_META" | jq '.enrichmentDurationMs // "?"') | $(echo "$NATIVE_META" | jq '.argsTotal // "?"') | $(echo "$NATIVE_META" | jq '.argsWithCompletion // "?"') | $(echo "$NATIVE_META" | jq '.argsFailed // "?"') |"
+          echo ""
+          echo "### Verdict"
+          echo ""
+          if [ "$DI_IDENTICAL" = "true" ] && [ "$OA_IDENTICAL" = "true" ]; then
+            echo "**✅ Native API is a drop-in replacement for REST API for /console/inspect enrichment.**"
+            echo ""
+            echo "Both transports produce byte-identical \`deep-inspect.json\` and \`openapi.json\` output"
+            echo "on the full inspect tree. Native API can safely replace REST API in any project that"
+            echo "makes \`/console/inspect request=completion\` calls (e.g. lsp-routeros-ts)."
+          elif [ "$DI_IDENTICAL" = "false" ]; then
+            echo "**❌ REST and native API produce different outputs.** See the diff artifact for details."
+            echo ""
+            echo "Investigate the differences before relying on native API as a REST replacement."
+          else
+            echo "**⚠️ Test did not complete — check logs for errors.**"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    # ── Step 7: Assert — fail the workflow if outputs differ ──
+
+    - name: Assert transport equivalence
+      run: |
+        DI_IDENTICAL="${{ steps.diff-deep-inspect.outputs.identical }}"
+        OA_IDENTICAL="${{ steps.diff-openapi.outputs.openapi_identical }}"
+
+        if [ "$DI_IDENTICAL" != "true" ]; then
+          echo "::error::deep-inspect.json differs between REST and native API transports"
+          exit 1
+        fi
+        if [ "$OA_IDENTICAL" != "true" ]; then
+          echo "::error::openapi.json differs between REST and native API transports"
+          exit 1
+        fi
+        echo "✅ Both outputs are byte-identical across transports."
+
+    # ── Artifacts ──
+
+    - name: Prepare artifacts
+      if: always()
+      run: |
+        mkdir -p artifacts
+        cp -r output-rest output-native artifacts/ 2>/dev/null || true
+        cp inspect-input.json artifacts/ 2>/dev/null || true
+        cp /tmp/deep-inspect.diff artifacts/ 2>/dev/null || true
+        cp /tmp/qemu.log artifacts/ 2>/dev/null || true
+
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: transport-equivalence-${{ steps.env-info.outputs.rosver }}
+        retention-days: 30
+        path: artifacts/
+
+    - name: Stop QEMU
+      if: always()
+      run: |
+        if [ -f /tmp/qemu.pid ]; then
+          kill "$(cat /tmp/qemu.pid)" 2>/dev/null || true
+        fi

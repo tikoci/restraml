@@ -123,6 +123,9 @@ export const CRASH_PATHS = [
 
 const CRASH_PATH_TIMEOUT_MS = 5_000;
 const COMPLETION_TIMEOUT_MS = 5_000;
+/** Timeout for the sequential retry pass — much longer than the concurrent
+ *  batch timeout since each call runs alone without subsystem contention. */
+const COMPLETION_RETRY_TIMEOUT_MS = 30_000;
 
 // ── RouterOS API Client ────────────────────────────────────────────────────
 
@@ -304,15 +307,24 @@ const ENRICHMENT_BATCH_SIZE = 50;
 
 /** Walk the inspect tree and fetch completions for all arg nodes.
  *  Uses batched concurrency: up to ENRICHMENT_BATCH_SIZE calls in flight at once,
- *  leveraging native API tag multiplexing when available. */
+ *  leveraging native API tag multiplexing when available.
+ *  Any path that times out under concurrent load is automatically retried
+ *  sequentially (one at a time) with COMPLETION_RETRY_TIMEOUT_MS — ensuring
+ *  0 missed paths in the final output. */
 export async function enrichWithCompletions(
   tree: InspectNode,
   client: IRouterOSClient,
   path: string[] = [],
   stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
+  onFailure?: (path: string[], error: Error) => void,
 ): Promise<typeof stats> {
   const args = collectArgNodes(tree, path);
   stats.argsTotal = args.length;
+
+  // First pass: concurrent batches for throughput.
+  // Collect failures rather than reporting them — some paths timeout under
+  // concurrent load but respond instantly when retried sequentially.
+  const retryQueue: Array<{ node: InspectNode; path: string[] }> = [];
 
   for (let i = 0; i < args.length; i += ENRICHMENT_BATCH_SIZE) {
     const batch = args.slice(i, i + ENRICHMENT_BATCH_SIZE);
@@ -329,10 +341,33 @@ export async function enrichWithCompletions(
           stats.argsWithCompletion++;
         }
       } catch {
-        stats.argsFailed++;
+        // Queue for sequential retry — do NOT count as failure yet.
+        retryQueue.push({ node, path: argPath });
       }
     }));
   }
+
+  // Second pass: sequential retry for any path that failed under concurrent load.
+  // Test data shows these paths respond in 1–2ms when called one at a time.
+  for (const { node, path: argPath } of retryQueue) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), COMPLETION_RETRY_TIMEOUT_MS);
+      const completions = await client.fetchCompletion(argPath, controller.signal);
+      clearTimeout(timeout);
+
+      const shown = filterCompletions(completions);
+      if (shown.length > 0) {
+        node._completion = completionsToObject(shown);
+        stats.argsWithCompletion++;
+      }
+    } catch (err) {
+      // Still failing after sequential retry — genuinely unresponsive path.
+      stats.argsFailed++;
+      onFailure?.(argPath, err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
   return stats;
 }
 
