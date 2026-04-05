@@ -190,7 +190,8 @@ jobs:
           --inspect-file ros-inspect-all.json \
           --ros-version "${{ steps.connection-check.outputs.rosver }}" \
           --output-dir . \
-          --test-crash-paths
+          --test-crash-paths \
+          --transport rest
 
     - name: Validate OpenAPI 3.0 schema
       run: bun validate-openapi.ts openapi.json
