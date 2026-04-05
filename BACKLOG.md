@@ -273,11 +273,27 @@ produces identical trees to the REST crawl, then retire the REST-only `rest2raml
   ~2400s (crawl+enrich REST) to ~90s (crawl+enrich native) on X86 — potentially below the
   GitHub Actions job minimum and well within free-tier limits.
 
-### Multiplexed batch enrichment
-`enrichWithCompletions` calls one arg at a time sequentially. Could batch N concurrent calls.
-- X86 benefit: ~2x (0.5ms vs 1ms per call via native API multiplexing)
-- ARM64 benefit: none (TCG is CPU-bound single-core; no concurrency speedup)
-- Phase 2 shipped native transport; this is now viable but low priority given ~17s total enrichment
+### Multiplexed batch enrichment — investigation needed
+`enrichWithCompletions` now uses batched concurrency (ENRICHMENT_BATCH_SIZE=50, `Promise.all`).
+The native API protocol supports tag-multiplexed concurrent commands on a single TCP connection.
+
+**Current status (April 2026):**
+- Microbenchmarks (1000 `/ip/*` paths, user-mode QEMU): native mux50 = 0.05s vs REST seq = 0.86s (14×)
+- Full-tree enrichment (35k args): native batched = 101s vs native sequential = 100s (**no improvement**)
+- This is unexplained and needs investigation (see Benchmark Test Suite below)
+
+**Hypotheses to test:**
+1. RouterOS `/console/inspect` processes commands sequentially server-side — multiplexing only
+   saves RTT (which matters for shallow paths like `/ip/*` but not deep full-tree traversal)
+2. Per-path latency varies by **which service/package** handles the path, not by depth —
+   RouterOS likely dispatches `/console/inspect` to the owning service via internal IPC
+   (observable in RouterOS logs). Some services (e.g. routing, wireless) may reflect their
+   schema slower than others (e.g. ip, interface). The `/ip/*` microbenchmark hit only fast
+   services; full-tree hits everything including slow ones, and slow services dominate wall time
+   regardless of batching. Test 3 below should group by service, not by depth.
+3. Bun's event loop or TCP buffering may serialize the writes at the transport layer despite
+   `Promise.all` — needs packet-level verification (tcpdump)
+4. AbortController/setTimeout overhead per call (35k timers) may negate batching gains
 
 ### Deep-inspect backfill for stable versions
 Generate `deep-inspect.json` (and enriched `openapi.json`) for all current release channels,
@@ -306,14 +322,150 @@ native-API-vs-REST difference. Low priority — the test no longer asserts on it
 
 ---
 
-## Reference: Performance Baselines (April 2026, 7.23beta5)
+## Benchmark Test Suite Design
 
-| Transport | X86 (KVM) | ARM64 (TCG) |
-|-----------|-----------|-------------|
-| REST enrichment (34k args) | ~760s | ~1105s |
-| Native API enrichment | ~17s | ~276s |
-| Full REST crawl | ~1645s | — |
-| Enrichment speedup (native vs REST) | ~45x | ~4x |
+Repeatable tests for comparing native API vs REST performance. Future agents should re-run
+these and compare against baselines to validate changes.
 
-These baselines are captured in `deep-inspect.integration.test.ts` and
-`native-api.test.ts` (Phase 2). Phase 3 will add `arm64-inspect.test.ts`.
+### Controlled variables
+
+Every benchmark run MUST record these in the results:
+
+| Variable | How to check | Why it matters |
+|----------|-------------|----------------|
+| CHR license level | `curl -sS -X POST http://admin:@HOST:PORT/rest/system/license/get -H 'Content-Type: application/json' -d '{"value-name":"level"}' \| jq -r '.ret'` | Free = 1 Mbit/s cap, p1 trial = 1 Gbit/s. This was the root cause of 45× variation across sessions |
+| RouterOS version | `--version` flag or `/system/resource/print` | Different versions may have different `/console/inspect` performance |
+| Network topology | Document: KVM bridged, KVM user-mode, QEMU user-mode, HVF bridged, HVF user-mode | QEMU user-mode implements its own TCP stack (slower). KVM/HVF bridged is closest to real hardware |
+| Architecture + accel | `x86+KVM`, `x86+HVF`, `arm64+TCG` | TCG (software emulation) is CPU-bound single-core — different bottleneck than KVM |
+| Host machine | CPU model, OS, RAM | Context for reproducibility |
+| API port mapping | e.g. `host:8728→VM:8728` or `host:9728→VM:8728` | Verify which CHR is actually being tested (port mismatch caused bad data in April 2026 session) |
+| Total arg count | Reported by enrichment stats | Varies by version/packages; normalize to calls/second |
+
+### Test 1: Enrichment transport comparison (sequential)
+
+**Purpose:** Compare REST vs native API for completion enrichment, sequential calls.
+
+```bash
+# Prerequisites: live CHR with known license level
+# Record all controlled variables first
+
+# REST sequential
+bun deep-inspect.ts --inspect-file ros-inspect-all.json \
+  --ros-version "$(bun deep-inspect.ts --version)" \
+  --output-dir /tmp/bench-rest --transport rest
+
+# Native sequential (modify ENRICHMENT_BATCH_SIZE=1 temporarily, or add --batch-size flag)
+bun deep-inspect.ts --inspect-file ros-inspect-all.json \
+  --ros-version "$(bun deep-inspect.ts --version)" \
+  --output-dir /tmp/bench-native-seq --transport native
+
+# Compare outputs
+diff <(jq -S . /tmp/bench-rest/deep-inspect.json) <(jq -S . /tmp/bench-native-seq/deep-inspect.json)
+```
+
+**Metric:** wall time, calls/second (argsTotal / enrichmentDurationMs * 1000)
+
+### Test 2: Enrichment batch size sweep (native only)
+
+**Purpose:** Determine if/how batch size affects throughput. Tests the multiplexing hypothesis.
+
+```bash
+# Run with batch sizes: 1, 10, 50, 100, 200
+# Either add --batch-size CLI flag or edit ENRICHMENT_BATCH_SIZE constant
+for BATCH in 1 10 50 100 200; do
+  # Record: batch size, wall time, calls/sec, argsFailed count
+  echo "Batch size: $BATCH"
+  bun deep-inspect.ts --inspect-file ros-inspect-all.json \
+    --ros-version VERSION --output-dir /tmp/bench-batch-$BATCH --transport native
+done
+```
+
+**What to look for:**
+- If all batch sizes produce ~same wall time: RouterOS processes commands sequentially
+- If throughput increases then plateaus: server has a concurrency limit
+- If failures increase with batch size: connection or buffer overflow
+
+### Test 3: Per-service latency profiling
+
+**Purpose:** Test hypothesis that latency varies by owning service/package, not path depth.
+RouterOS dispatches `/console/inspect` to the service that owns each path via internal IPC.
+Different services (routing, wireless, ip, iot, etc.) may reflect their schema at different speeds.
+
+```bash
+# Sample 100-200 args from each top-level path (service boundary)
+# Time each fetchCompletion call individually, group by top-level path
+bun -e "
+  // For each top-level: /ip, /routing, /interface, /system, /tool, /iot, etc.
+  // fetch completion for N args under that subtree
+  // report per-service: count, p50, p95, p99, mean latency
+"
+```
+
+**What to look for:**
+- If some services (e.g. `/routing/*`, `/interface/wireless/*`) have 5-10× higher per-call
+  latency than others (e.g. `/ip/*`), that explains why full-tree batching doesn't help —
+  slow services dominate wall time regardless of concurrency
+- The `/ip/*` microbenchmark (14× speedup) only tested fast services — not representative
+- Cross-reference with RouterOS log (`/log/print`) to see if inspect calls show up as
+  internal service dispatches
+
+### Test 4: Network overhead isolation (tcpdump)
+
+**Purpose:** Verify that batched writes actually go on the wire concurrently.
+
+```bash
+# Capture TCP traffic on the API port during a batched run
+sudo tcpdump -i lo0 -w /tmp/api-capture.pcap port 8728 &
+bun deep-inspect.ts --inspect-file ros-inspect-all.json \
+  --ros-version VERSION --output-dir /tmp/bench --transport native
+kill %1
+# Analyze: are 50 commands sent in a burst, or serialized?
+# tshark -r /tmp/api-capture.pcap -Y "tcp.len > 0" -T fields -e frame.time_relative -e tcp.len | head -100
+```
+
+### Test 5: CI benchmark (GitHub Actions KVM)
+
+**Purpose:** Establish CI-specific baselines under controlled conditions.
+
+Run as part of CI with timing output. The enrichment duration is already recorded in
+`_meta.enrichmentDurationMs` in `deep-inspect.json`. Compare across runs by:
+```bash
+jq '._meta | {enrichmentDurationMs, argsTotal, argsWithCompletion, argsFailed, apiTransport}' \
+  docs/VERSION/deep-inspect.json
+```
+
+### Reference: Baselines (April 2026, 7.23beta5, p1 trial license)
+
+| Test | Transport | Topology | Result |
+|------|-----------|----------|--------|
+| Full enrichment (35k args) | REST seq | x86 HVF user-mode | 61.6s (568 calls/s) |
+| Full enrichment (35k args) | REST seq | x86 HVF bridged | 84.5s (414 calls/s) |
+| Full enrichment (35k args) | Native seq | x86 HVF user-mode | 100.5s (348 calls/s) |
+| Full enrichment (35k args) | Native seq | x86 HVF bridged | 107s (327 calls/s) |
+| Full enrichment (35k args) | Native batch50 | x86 HVF user-mode | 101.8s (344 calls/s) |
+| Microbench 1000 `/ip/*` | Native mux50 | x86 HVF user-mode | 0.05s |
+| Microbench 1000 `/ip/*` | REST seq | x86 HVF user-mode | 0.86s |
+| Full crawl | Native | x86 KVM | 75s |
+| Full crawl | REST | x86 KVM | 1645s |
+| Crawl `/ip` only | Native | x86 HVF | 10.2s |
+| Crawl `/ip` only | REST | x86 HVF | 22.4s |
+
+**Key observations:**
+- REST enrichment is FASTER than native for full-tree — counterintuitive, unexplained
+- Native crawl is ~22× faster than REST crawl — expected (fewer HTTP round trips)
+- Microbenchmark multiplexing shows 14× but full-tree shows 0× — needs Test 2 and Test 3
+- All baselines measured with p1 trial license (1 Gbit/s). Free license (1 Mbit/s) results
+  are dramatically slower and not comparable — always verify license before benchmarking
+
+**Note on "REST is faster for enrichment":** This is surprising because REST internally calls
+into the native API (observable in RouterOS logs), adding JSON serialization overhead. The native
+API *should* be faster — but the measured numbers don't show it yet for full-tree enrichment.
+Possible explanations beyond the transport itself:
+- REST's HTTP/1.1 keep-alive pipeline may be more efficient than our TCP socket management
+- `fetch()` in Bun may have internal optimizations for HTTP that our raw TCP doesn't match
+- Per-service latency variance (hypothesis 2) may dominate — slow services take the same time
+  regardless of transport, and fast services are already sub-millisecond on both
+- RouterOS may prioritize or schedule HTTP and API connections differently
+Do NOT generalize from these numbers — sequential REST is well-known working and the native API
+opens the door to different crash paths and error handling edge cases. Proper investigation
+(Tests 1-4 above) is needed before changing the default transport

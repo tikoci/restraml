@@ -112,6 +112,21 @@ jobs:
     - name: Verify REST API is responding
       run: curl -sS --fail http://admin@localhost:9180/rest/ip/address | jq .
 
+    - name: Activate CHR trial license
+      # CHR "free" license caps networking at 1 Mbit/s, which throttles the ~34k
+      # /console/inspect API calls during enrichment. Trial (p1) allows 1 Gbit/s.
+      if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+      run: |
+        curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
+          -H 'Content-Type: application/json' \
+          -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+          && echo "License activated to p1 (trial)" \
+          || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
+        # Verify
+        curl -sS -X POST http://admin:@localhost:9180/rest/system/license/get \
+          -H 'Content-Type: application/json' \
+          -d '{"value-name":"level"}' | jq -r '.ret'
+
     - name: Setup Bun Runtime
       uses: oven-sh/setup-bun@v2
       with:

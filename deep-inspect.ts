@@ -283,24 +283,44 @@ export function completionsToObject(completions: InspectCompletionResponse[]): R
   return result;
 }
 
-/** Walk the inspect tree and fetch completions for all arg nodes */
+/** Collect all arg nodes with their paths from the inspect tree */
+function collectArgNodes(tree: InspectNode, path: string[] = []): Array<{ node: InspectNode; path: string[] }> {
+  const result: Array<{ node: InspectNode; path: string[] }> = [];
+  for (const [key, value] of Object.entries(tree)) {
+    if (key.startsWith("_") || typeof value !== "object" || value === null) continue;
+    const node = value as InspectNode;
+    const currentPath = [...path, key];
+    if (node._type === "arg") result.push({ node, path: currentPath });
+    result.push(...collectArgNodes(node, currentPath));
+  }
+  return result;
+}
+
+/** Default batch size for multiplexed enrichment.
+ *  Native API supports tag-multiplexed concurrent commands on one connection.
+ *  REST uses HTTP keep-alive but processes sequentially. Batching still helps
+ *  native API significantly (~5-14x vs sequential) while being harmless for REST. */
+const ENRICHMENT_BATCH_SIZE = 50;
+
+/** Walk the inspect tree and fetch completions for all arg nodes.
+ *  Uses batched concurrency: up to ENRICHMENT_BATCH_SIZE calls in flight at once,
+ *  leveraging native API tag multiplexing when available. */
 export async function enrichWithCompletions(
   tree: InspectNode,
   client: IRouterOSClient,
   path: string[] = [],
   stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
 ): Promise<typeof stats> {
-  for (const [key, value] of Object.entries(tree)) {
-    if (key.startsWith("_") || typeof value !== "object" || value === null) continue;
-    const node = value as InspectNode;
-    const currentPath = [...path, key];
+  const args = collectArgNodes(tree, path);
+  stats.argsTotal = args.length;
 
-    if (node._type === "arg") {
-      stats.argsTotal++;
+  for (let i = 0; i < args.length; i += ENRICHMENT_BATCH_SIZE) {
+    const batch = args.slice(i, i + ENRICHMENT_BATCH_SIZE);
+    await Promise.all(batch.map(async ({ node, path: argPath }) => {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), COMPLETION_TIMEOUT_MS);
-        const completions = await client.fetchCompletion(currentPath, controller.signal);
+        const completions = await client.fetchCompletion(argPath, controller.signal);
         clearTimeout(timeout);
 
         const shown = filterCompletions(completions);
@@ -311,10 +331,7 @@ export async function enrichWithCompletions(
       } catch {
         stats.argsFailed++;
       }
-    }
-
-    // Recurse into child nodes
-    await enrichWithCompletions(node, client, currentPath, stats);
+    }));
   }
   return stats;
 }
