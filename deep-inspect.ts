@@ -183,6 +183,21 @@ export class RouterOSClient implements IRouterOSClient {
   }
 }
 
+// ── Abort signal helper ───────────────────────────────────────────────────
+
+/** Race a promise against an AbortSignal. If signal is absent or never fires,
+ *  the original promise is returned unmodified (zero overhead). */
+function withAbortSignal<T>(signal: AbortSignal | undefined, promise: Promise<T>): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new Error("Aborted"));
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      signal.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
+    }),
+  ]);
+}
+
 // ── Native API Client ─────────────────────────────────────────────────────
 
 /** RouterOS native API (port 8728/8729) client implementing IRouterOSClient.
@@ -221,20 +236,18 @@ export class NativeRouterOSClient implements IRouterOSClient {
     return sentences.map((s) => s.data as unknown as InspectChildResponse);
   }
 
-  async fetchSyntax(path: string[], _signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
-    const sentences = await this.api.write(
-      "/console/inspect",
-      "=request=syntax",
-      `=path=${path.join(",")}`,
+  async fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
+    const sentences = await withAbortSignal(
+      signal,
+      this.api.write("/console/inspect", "=request=syntax", `=path=${path.join(",")}`),
     );
     return sentences.map((s) => s.data as unknown as InspectSyntaxResponse);
   }
 
-  async fetchCompletion(path: string[], _signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
-    const sentences = await this.api.write(
-      "/console/inspect",
-      "=request=completion",
-      `=path=${path.join(",")}`,
+  async fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
+    const sentences = await withAbortSignal(
+      signal,
+      this.api.write("/console/inspect", "=request=completion", `=path=${path.join(",")}`),
     );
     // Native API returns strings for all fields. completionsToObject() normalises:
     // show (string "true"/"false"), preference (string→number), text→desc fallback.

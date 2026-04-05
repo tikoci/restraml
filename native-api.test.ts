@@ -105,8 +105,10 @@ describe("NativeRouterOSClient (live)", () => {
     for (const name of ["ip", "system", "interface", "routing"]) {
       expect(nativeNames.has(name)).toBe(true);
     }
-    // Note: REST exposes 'special-login' which is not a CLI path and
-    // is absent from native API — that difference is expected.
+    // Note: special-login IS a real CLI path (visible in /console/inspect
+    // and RouterOS CLI). The native API and REST should return the same root
+    // children from /console/inspect. If a difference is observed, it is likely
+    // version-specific or a timing artifact, not a transport difference.
   });
 
   test("fetchChild at /ip/address/add returns same arg names as REST", async () => {

@@ -176,7 +176,7 @@ jobs:
 
     - name: Generate RAML schema from RouterOS REST API (with extra packages)
       run: |
-        bun install js-yaml
+        bun install
         bun rest2raml.js ${{ github.event.inputs.start_path }}
 
     - name: Validate RAML 1.0 using webapi-parser
