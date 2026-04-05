@@ -150,9 +150,17 @@ restraml/
 ├── rest2raml.js              # Main script: RouterOS REST API → RAML 1.0
 ├── validraml.cjs             # RAML 1.0 validator
 ├── appyamlvalidate.js        # /app YAML schema validator (Bun)
+├── deep-inspect.ts           # Deep API tree inspection (Bun)
+├── ros-api-protocol.ts       # Vendored RouterOS native API wire protocol
+├── enrich-openapi.ts         # Enriches OpenAPI schemas with descriptions
+├── validate-openapi.ts       # OpenAPI 3.0 schema validator
+├── *.test.ts                 # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu       # Local dev: RouterOS CHR in QEMU via Docker
 ├── scripts/
-│   └── entrypoint.sh         # QEMU launcher for local Docker use
+│   ├── entrypoint.sh         # QEMU launcher for local Docker use
+│   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local CHR
+│   ├── test-ros-api.sh       # Integration + stress tests (ros-api-protocol) against local CHR
+│   └── benchmark-qemu.sh     # REST vs native API benchmark suite against local CHR
 ├── docs/                     # GitHub Pages root (one subdirectory per version)
 │   ├── index.html            # Main website: version list, diff tool, downloads
 │   ├── openapi.html          # Interactive API Explorer (Scalar-based)
@@ -171,6 +179,56 @@ restraml/
     ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
     └── manual-from-secrets.yaml
 ```
+
+---
+
+## Testing
+
+The test suite covers the native API wire protocol, the deep-inspect tree walker, schema generation helpers, and the `/app` YAML schema validator.
+
+### Unit tests (no router required)
+
+```sh
+bun test
+```
+
+Runs all `*.test.ts` files. No router or QEMU needed. These run in CI on every push.
+
+### Integration + stress tests (local CHR required)
+
+Two scripts boot a RouterOS CHR in QEMU on your machine, run the integration tests, then stop the VM:
+
+| Script | `npm run` alias | What it tests |
+| --- | --- | --- |
+| `scripts/test-with-qemu.sh` | `test:qemu` | `deep-inspect.integration.test.ts` — full tree inspect walk |
+| `scripts/test-ros-api.sh` | `test:ros-api` | `ros-api-protocol.test.ts` — wire protocol + concurrent cancel stress test |
+| `scripts/benchmark-qemu.sh` | `test:benchmark` | REST vs native API timing benchmark |
+
+```sh
+bun run test:ros-api       # wire protocol integration + 50-concurrent cancel stress test
+bun run test:qemu          # deep-inspect integration tests
+bun run test:benchmark     # REST vs native API timing benchmark
+```
+
+The `test:ros-api` stress test specifically exercises the `/cancel` path that was the root cause of a 3-4× native API slowdown — it fires 50 concurrent `writeAbortable()` calls, aborts a portion mid-flight, and asserts the router queue drains in under 5 s. A ghost-command regression would cause the post-batch probe to time out at ~60 s.
+
+#### Prerequisites
+
+These scripts require [QEMU](https://www.qemu.org/) and a **[mikropkl](https://github.com/tikoci/mikropkl) CHR machine directory** at one of:
+
+```
+~/Lab/mikropkl/Machines/chr.x86_64.qemu.<version>.utm/
+~/GitHub/mikropkl/Machines/chr.x86_64.qemu.<version>.utm/
+```
+
+Or pass a machine path directly:
+
+```sh
+./scripts/test-ros-api.sh ~/path/to/chr.x86_64.qemu.7.22.1.utm
+```
+
+> [!NOTE]
+> **Local mikropkl machines are a short-term convenience.** The end goal is for all three integration script to run in CI — the same QEMU+CHR infrastructure used by the build workflows already supports this. Contributions to add CI jobs for `test:ros-api` and `test:qemu` are welcome. See [CLAUDE.md](CLAUDE.md) for the QEMU CHR boot pattern used in CI.
 
 ---
 

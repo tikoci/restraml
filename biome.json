@@ -124,6 +124,19 @@
                     }
                 }
             }
+        },
+        {
+            "includes": ["ros-api-protocol.test.ts"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noExplicitAny": "off"
+                    },
+                    "style": {
+                        "noNonNullAssertion": "off"
+                    }
+                }
+            }
         }
     ]
 }

@@ -28,10 +28,14 @@ restraml/
 ├── deep-inspect.ts       # Deep inspection of RouterOS API tree (Bun)
 ├── enrich-openapi.ts     # Enriches generated OpenAPI schemas (Bun)
 ├── validate-openapi.ts   # Validates OpenAPI 3.0 schemas (Bun)
+├── ros-api-protocol.ts   # Vendored RouterOS native API wire protocol (Bun)
+├── *.test.ts             # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu   # Alpine image that runs RouterOS CHR in QEMU (for local use)
 ├── scripts/
 │   ├── entrypoint.sh         # QEMU launcher used by Dockerfile.chr-qemu (user-mode networking)
-│   ├── test-with-qemu.sh     # Local QEMU-based integration test runner
+│   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local QEMU CHR
+│   ├── test-ros-api.sh       # Integration + stress tests (ros-api-protocol) against local CHR
+│   ├── benchmark-qemu.sh     # REST vs native API timing benchmark against local CHR
 │   ├── analyze_appports.js   # Analyze /app port mappings (Bun)
 │   ├── analyze_appyamls.py   # Analyze /app YAML patterns (Python)
 │   └── extract_appyamls.py   # Extract /app YAMLs from app.json (Python)
@@ -720,13 +724,30 @@ bun appyamlvalidate.js <version>
 ### "Run tests and lint"
 
 ```sh
-bun test                       # Unit tests (deep-inspect, enrich-openapi)
-bun run test:qemu              # Integration tests against local QEMU CHR
+bun test                       # Unit tests — no router needed; runs in CI
+bun run test:ros-api           # ros-api-protocol integration + stress tests (local CHR)
+bun run test:qemu              # deep-inspect integration tests (local CHR)
+bun run test:benchmark         # REST vs native API timing benchmark (local CHR)
 bun run lint                   # Biome lint + TypeScript type check
 bun run lint:fix               # Auto-fix Biome issues
 bun run typecheck              # TypeScript type check only
 bun run deep-inspect           # Deep API tree inspection
 ```
+
+**Local CHR test scripts** (`test:ros-api`, `test:qemu`, `test:benchmark`) boot a RouterOS CHR
+VM using [mikropkl](https://github.com/tikoci/mikropkl) machine directories searched in this order:
+`~/Lab/mikropkl/Machines/`, `~/GitHub/mikropkl/Machines/`, or `$MIKROPKL_DIR/Machines/`.
+You can also pass a machine path directly: `./scripts/test-ros-api.sh /path/to/machine.utm`.
+
+> **Short-term limitation**: Integration scripts currently require a local mikropkl directory.
+> The long-term goal is for `test:ros-api` and `test:qemu` to run in CI using the same
+> QEMU+CHR+KVM infrastructure that the build workflows already use (see "CHR Boot Pattern" above).
+> Contributions to add CI jobs are welcome.
+
+**`test:ros-api` stress test** (`scripts/test-ros-api.sh`) is the regression canary for the
+ghost-command bug where `writeAbortable()` without `/cancel` left 50 orphaned RouterOS commands
+blocking the inspect queue. The stress test fires 50 concurrent `writeAbortable()` calls, aborts
+half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regression = ~60 s timeout.
 
 ---
 

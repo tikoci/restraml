@@ -31,6 +31,38 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 - The apt package for QEMU is `qemu-system-x86` (not `qemu-system-x86_64`); also install
   `qemu-utils` for `qemu-img`.
 
+### Testing
+
+- `bun test` runs all `*.test.ts` files — **no router or QEMU needed**, runs in CI.
+  After modifying `.ts` files, run `bun test` to confirm all unit tests pass.
+- Integration + stress tests require a local [mikropkl](https://github.com/tikoci/mikropkl) CHR machine:
+  - `bun run test:ros-api` (`scripts/test-ros-api.sh`) — wire protocol unit + integration + 50-concurrent
+    cancel stress test against live RouterOS CHR. The post-batch probe is the regression canary for the
+    ghost-command bug (unissued `/cancel` → 60 s queue stall).
+  - `bun run test:qemu` (`scripts/test-with-qemu.sh`) — `deep-inspect` integration tests.
+  - `bun run test:benchmark` (`scripts/benchmark-qemu.sh`) — REST vs native API timing benchmark.
+- **Short-term limitation**: Integration scripts resolve mikropkl machines from
+  `~/Lab/mikropkl/Machines/` or `~/GitHub/mikropkl/Machines/` (or `MIKROPKL_DIR`).
+  This is a local convenience — the long-term goal is for `test:ros-api` and `test:qemu` to run
+  in CI using the same QEMU+CHR+KVM infrastructure already used by the build workflows.
+  **Do not rely on local machine paths in new code; contribute CI jobs instead.**
+
+### Testing
+
+- `bun test` runs all `*.test.ts` files — **no router or QEMU needed**, runs in CI.
+  After modifying `.ts` files, run `bun test` to confirm all unit tests pass.
+- Integration + stress tests require a local [mikropkl](https://github.com/tikoci/mikropkl) CHR machine:
+  - `bun run test:ros-api` (`scripts/test-ros-api.sh`) — wire protocol unit + integration + 50-concurrent
+    cancel stress test against live RouterOS CHR. The post-batch probe is the regression canary for the
+    ghost-command bug (unissued `/cancel` → 60 s queue stall).
+  - `bun run test:qemu` (`scripts/test-with-qemu.sh`) — `deep-inspect` integration tests.
+  - `bun run test:benchmark` (`scripts/benchmark-qemu.sh`) — REST vs native API timing benchmark.
+- **Short-term limitation**: Integration scripts resolve mikropkl machines from
+  `~/Lab/mikropkl/Machines/` or `~/GitHub/mikropkl/Machines/` (or `MIKROPKL_DIR`).
+  This is a local convenience — the long-term goal is for `test:ros-api` and `test:qemu` to run
+  in CI using the same QEMU+CHR+KVM infrastructure already used by the build workflows.
+  **Do not rely on local machine paths in new code; contribute CI jobs instead.**
+
 ### Linting
 
 - **Biome** (v2.x) is the linter for all `.js` and `docs/*.html` files. Run `bun run lint` after
@@ -159,12 +191,16 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `rest2raml.js` | Main schema generator (Bun runtime) |
 | `validraml.cjs` | RAML 1.0 validator (Node.js) |
 | `appyamlvalidate.js` | /app YAML schema validator and per-version schema generator (Bun) |
+| `ros-api-protocol.ts` | Vendored RouterOS native API wire protocol (Bun) |
+| `ros-api-protocol.test.ts` | Unit + integration + stress tests for `ros-api-protocol.ts` |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
 | `scripts/entrypoint.sh` | QEMU launcher for local Docker use |
+| `scripts/test-with-qemu.sh` | Integration tests (deep-inspect) against local QEMU CHR |
+| `scripts/test-ros-api.sh` | Integration + stress tests (ros-api-protocol) against local CHR |
+| `scripts/benchmark-qemu.sh` | REST vs native API timing benchmark against local CHR |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
 | `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
 | `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |
-| `docs/routeros-app-yaml-schema.dev.json` | /app YAML schema — dev/testing, do not rename |
 | `docs/routeros-app-yaml-store-schema.latest.json` | /app store schema — do not rename |
 | `.github/workflows/auto.yaml` | Daily cron: detect new RouterOS versions, trigger builds |
 | `.github/workflows/manual-using-docker-in-docker.yaml` | Build: base RouterOS schema |

@@ -12,6 +12,7 @@
     "validate:app-yaml": "echo 'Usage: bun appyamlvalidate.js <version>'",
     "test": "bun test",
     "test:qemu": "./scripts/test-with-qemu.sh",
+    "test:ros-api": "./scripts/test-ros-api.sh",
     "test:benchmark": "./scripts/benchmark-qemu.sh",
     "typecheck": "bunx tsc --noEmit",
     "lint": "bun run lint:bun && bun run lint:workflows",
