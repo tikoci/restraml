@@ -208,6 +208,42 @@ failed when only CDN was tried. **Do not change this order.**
 - `--version` flag: prints the RouterOS version and exits (used in CI to capture the actual version)
 - `INSPECTFILE` env var: skip live router query and load from a saved JSON file (useful for offline testing)
 
+### deep-inspect.ts — Enhanced Schema Generation (Enrichment)
+- Runs under Bun. Takes an existing `inspect.json` and enriches it with `request=completion`
+  data from the RouterOS REST API. Outputs `deep-inspect.json` and `openapi.json`.
+- Supports two transports: REST (`RouterOSClient`) and native API (`NativeRouterOSClient`)
+- **CI production uses `--transport rest` only** — do not change without reading the note below
+
+### Native API Wire Protocol (`ros-api-protocol.ts`)
+- Vendored from `tikoci/tiktui`. Zero external dependencies. Fully functional binary protocol.
+- Exports: `RosAPI`, `RosError`, `RosErrorCode`, `Sentence`, `CommandResult`
+- Supports tag-multiplexed concurrent commands on a single TCP connection
+
+### ⚠️ Native API Transport Policy — REST Only for Schema Generation
+
+**Decision (May 2026):** All schema generation (both crawl and completion enrichment) uses the
+REST API transport. The native API transport (`--transport native`) is NOT used in CI.
+
+**Why:** RouterOS `/console/inspect` with `request=completion` returns **non-deterministic results**
+over the native API binary protocol. The same command issued repeatedly on the same TCP connection
+randomly drops completion entries ~20-30% of the time. REST is 100% deterministic. This is a
+confirmed RouterOS bug, not a client-side issue.
+
+**Key facts:**
+- REST: 9,357 paths with completions, 55,730 total entries — deterministic across all runs
+- Native: 9,302 paths, 53,935 entries — randomly drops entries, always a strict subset of REST
+- Only `request=completion` is affected; `request=child` and `request=syntax` are reliable
+- The bug is per-call random, not cumulative or session-dependent
+- Native API is 22× faster for tree crawl and 2× faster per-call — but unusable for completions
+
+**What this means for agents:**
+- Do NOT change CI workflows to `--transport native` or `--transport auto` for enrichment
+- `ros-api-protocol.ts` and `NativeRouterOSClient` in `deep-inspect.ts` remain for potential future use
+  if MikroTik fixes the bug; `benchmark.test.ts` and `native-api.test.ts` were removed (research artifacts)
+- `--transport rest` is now the explicit default in `deep-inspect.ts`
+- If MikroTik fixes the bug, the hybrid approach (REST crawl + native enrichment) becomes viable
+- See `BACKLOG.md` Phase 2.9 and `docs/mikrotik-bug-native-api-inspect.md` for full investigation details
+
 ### Two Build Variants
 - **Base** (`manual-using-docker-in-docker.yaml`): base RouterOS only
 - **Extra** (`manual-using-extra-docker-in-docker.yaml`): all_packages including container, iot, zerotier, etc.
@@ -858,7 +894,14 @@ unilaterally; flag them in code comments and issue discussions.
 
 ## Things That Are Known-Broken or Incomplete
 
-(none currently)
+### Native API `/console/inspect` Completion Non-Determinism
+RouterOS 7.22.1 (and likely all 7.x) returns non-deterministic results for `request=completion`
+queries via the native API binary protocol. ~20-30% of calls randomly drop entries. REST is
+unaffected. See `BACKLOG.md` Phase 2.9 and `docs/mikrotik-bug-native-api-inspect.md`.
+**Workaround:** All CI uses `--transport rest` (now the default). `NativeRouterOSClient` and
+`ros-api-protocol.ts` remain in the codebase for potential use if MikroTik fixes the bug.
+Research test files (`benchmark.test.ts`, `native-api.test.ts`) and the experimental CI
+workflow (`test-transport-equivalence.yaml`) were removed as part of the REST-only decision.
 
 ---
 

@@ -84,14 +84,24 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 - `rest2raml.js` runs under **Bun** (not Node.js). Uses `Bun.argv` for CLI args.
 - `validraml.cjs` runs under **Node.js 18**.
 - `appyamlvalidate.js` runs under **Bun**. Validates /app YAML schemas and live /app entries.
+- `deep-inspect.ts` runs under **Bun**. Enriches inspect trees with completion data. Uses REST transport.
 - `URLBASE` and `BASICAUTH` env vars configure the RouterOS REST API connection.
+
+### ⚠️ Native API Transport — REST Only for Schema Generation
+All schema generation uses the REST API. The native API (`--transport native`) is NOT used in CI
+due to a RouterOS bug where `/console/inspect` with `request=completion` returns non-deterministic
+results via the native protocol (~20-30% of calls randomly drop entries). REST is 100% deterministic.
+**Do not change CI workflows to `--transport native`.** See `CLAUDE.md` and `BACKLOG.md` Phase 2.9
+for full details. `ros-api-protocol.ts` and `NativeRouterOSClient` remain for potential future use
+if MikroTik fixes the bug; `benchmark.test.ts` and `native-api.test.ts` were removed (research artifacts)
+and `test-transport-equivalence.yaml` was deleted (proven moot). `--transport rest` is the default.
 
 ### /app YAML Schema Files (`docs/`)
 RouterOS 7.22+ includes `/app` — a `docker-compose`-lite YAML format for custom container apps.
 The schema files in `docs/` validate this format:
 
 - **`routeros-app-yaml-schema.latest.json`** — stable public URL, linked externally. **Do not rename.**
-- **`routeros-app-yaml-schema.dev.json`** — dev/testing version. **Do not rename.**
+- **`routeros-app-yaml-schema.editor.json`** — relaxed variant for editor autocompletion (SchemaStore). **Do not rename.**
 - **`routeros-app-yaml-store-schema.latest.json`** — schema for `app-store-urls=` arrays. **Do not rename.**
 - **`{version}/routeros-app-yaml-schema.json`** — per-version schema (version-specific `$id`)
 - **`{version}/routeros-app-yaml-store-schema.json`** — per-version store schema

@@ -1,3 +1,6 @@
+# Native API investigation scripts (untracked research artifacts — see BACKLOG.md Phase 2.9)
+scripts/native-api-investigation/
+
 # Logs
 logs
 *.log

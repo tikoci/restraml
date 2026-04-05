@@ -14,7 +14,7 @@ was reviewed. Updated with post-review findings and known future wrinkles.
 |-------|------|--------|
 | Phase 1 | Fix Completion Bug + Metadata | ✅ Done (post-review fixes applied) |
 | Phase 2 | Native API Protocol for Performance | ✅ Done (committed 65199b9) |
-| Phase 2.9 | Native API CONNRESET Investigation | 🔄 In progress |
+| Phase 2.9 | Native API CONNRESET Investigation | ✅ Done — REST chosen for production |
 | Phase 3 | ARM64 Multi-Architecture Support | 🔲 Not started |
 
 ---
@@ -120,7 +120,7 @@ Both transports are now fast, reliable, and produce identical outputs.
   and ~7 on native per run. All failures respond in 1–2ms when retried sequentially.
   Fix: failed paths are queued and retried one-at-a-time with `COMPLETION_RETRY_TIMEOUT_MS=30s`
   before being reported as `argsFailed`. Result: `argsFailed=0` on every run, both transports.
-  The fix is in `enrichWithCompletions` in `deep-inspect.ts`. See `benchmark.test.ts` Test 7.
+  The fix is in `enrichWithCompletions` in `deep-inspect.ts`.
 
 ### Acceptance criteria (all met)
 - [x] `IRouterOSClient` interface fully covers all call sites
@@ -131,7 +131,7 @@ Both transports are now fast, reliable, and produce identical outputs.
 
 ---
 
-## Phase 2.9: Native API CONNRESET Investigation 🔄 In progress
+## Phase 2.9: Native API CONNRESET Investigation ✅ Done — REST chosen for production
 
 **Context:** First CI run of "Test: REST vs Native API Equivalence" (run 24002242406, April 2026)
 showed native API taking **3.5× longer than REST** (271s vs 77s) and producing 77 fewer
@@ -269,6 +269,62 @@ This fixes all three issues:
   CONNRESET batch and run them one at a time.
 - If confirmed as a RouterOS bug, file with MikroTik: version 7.22.1, the specific command path,
   reproduction steps via `/console/inspect` REST or API call.
+
+### Resolution: Native API Non-Determinism (May 2026)
+
+**Executive summary:** RouterOS `/console/inspect` with `request=completion` returns
+non-deterministic results over the native API binary protocol. The same command issued
+repeatedly on the same TCP connection randomly drops completion entries ~20-30% of the time.
+REST is 100% deterministic. **Decision: use REST for all schema-generation work going forward.**
+
+**How discovered:**
+Following the CONNRESET investigation, targeted testing on a local CHR (7.22.1 stable, macOS
+HVF) revealed that the 77-completion gap was NOT caused by CONNRESETs alone. A systematic
+investigation compared REST and native API results at the individual entry level:
+
+1. **Path-level comparison** (`scripts/find-diff-paths.js`): REST has completions for 9357 paths,
+   native for 9302. 55 paths entirely missing in native, 0 missing in REST.
+2. **Entry-level comparison** (`scripts/quantify-diff.js`): REST: 55730 total entries, native:
+   53935 — delta of 1795. **Native is always a strict subset of REST** — 0 entries unique to native.
+3. **Sequential testing** (`scripts/test-problem-paths-v2.ts`): Testing the 1279 differing paths
+   one-at-a-time, 911 (71.2%) match — proving it's NOT purely a concurrency issue.
+4. **Determinism test** (`scripts/test-rest-determinism.ts`): The definitive experiment.
+   Query the same path (`/ip/address/add`) 20× on each transport:
+   - **REST: 20/20 always returns 14 entries (100% deterministic)**
+   - **Native: 16/20 returns 14 entries, 4/20 returns 13 (random drops ~20-30%)**
+5. **Degradation monitoring** (`scripts/test-session-degradation.ts`): Over 500 queries on
+   one connection, drops are non-monotonic — they fluctuate randomly per-call, not accumulating.
+6. **Reconnection testing** (`scripts/test-reconnect-strategy.ts`): Reconnecting every N queries
+   does NOT fix it. Drops are random per individual call, not a session degradation.
+
+**Root cause (confirmed):** The RouterOS native API `/console/inspect` completion handler has
+internal non-determinism. REST creates a fresh API session per HTTP request, so each inspect
+call runs in isolation. The native API reuses a persistent session where the inspect engine's
+completion enumeration has a race condition or timing-dependent code path that sometimes skips
+entries. This is a RouterOS bug, not a protocol or client bug.
+
+**What remains in the codebase:**
+- `ros-api-protocol.ts` — vendored wire protocol, fully functional, well-tested. Valuable for
+  future crawl work (22× faster than REST for crawl) and any non-inspect-completion use cases.
+- `NativeRouterOSClient` in `deep-inspect.ts` — works correctly for `child` and `syntax` requests;
+  only `completion` is affected by the non-determinism bug.
+- CI workflows use `--transport rest` (now the default in `deep-inspect.ts`). `--transport native`
+  and `--transport auto` remain as options but are NOT used in CI.
+- `benchmark.test.ts` and `native-api.test.ts` were **removed** (research artifacts with no
+  production value now that REST is the settled choice).
+- `test-transport-equivalence.yaml` was **deleted** (experimental workflow, proven moot by the
+  non-determinism finding — native will always produce a strict subset of REST completions).
+- Investigation scripts preserved in `scripts/native-api-investigation/` (untracked) for reference.
+
+**What this means for Phase 3:**
+Phase 3 (ARM64 multi-architecture) uses `--skip-completion` for ARM64 crawl (completions
+fetched from X86 REST side). The native API bug does not affect tree crawling (`child` requests),
+only `completion` requests. However, for simplicity and reliability, **all enrichment
+(completion) work will use REST**. The native API code remains available if MikroTik fixes
+the non-determinism bug, or for crawl-only use cases where its 22× speed advantage matters.
+
+**MikroTik bug report:** See `docs/mikrotik-bug-native-api-inspect.md` for the full write-up
+with reproduction steps, suitable for filing with MikroTik support.
 
 ---
 
@@ -411,19 +467,23 @@ Identifying which extra-package provides which command is hard:
 - Accurate approach: install packages one at a time, diff tree after each install — complex, many CHR reboots
 - Track demand before implementing
 
-### Native API for full crawl
-`crawlInspectTree` currently uses REST (`rest2raml.js`) then enriches via native API (`deep-inspect.ts`).
+### Native API for full crawl — ⏸️ TABLED (native API non-determinism bug)
+`crawlInspectTree` currently uses REST (`rest2raml.js`) then enriches via `deep-inspect.ts`.
 With Phase 2 shipped, `crawlInspectTree` in `deep-inspect.ts` already accepts `IRouterOSClient`
-and works with either transport. The next step is to validate that `--live --transport native`
-produces identical trees to the REST crawl, then retire the REST-only `rest2raml.js` path.
-- **Measured speedup: ~22x** — 75s full crawl via native API vs ~1645s via REST (X86 KVM)
-- One compelling approach: pipe the native API crawl AND enrichment together so `deep-inspect.json`
-  is produced entirely from a single native API session. Then diff the resulting inspect tree
-  against the REST-based `inspect.json` to verify identical results — confidence check
-  before retiring the REST crawl path.
-- If native crawl + native enrichment can replace both phases, the full CI job time drops from
-  ~2400s (crawl+enrich REST) to ~90s (crawl+enrich native) on X86 — potentially below the
-  GitHub Actions job minimum and well within free-tier limits.
+and works with either transport.
+
+**Status (May 2026):** The native API `request=completion` non-determinism bug (see Phase 2.9
+resolution) means native API cannot be used for reliable completion enrichment. REST is 100%
+deterministic and is the only transport used in CI.
+
+**Native API advantages (still valid for non-completion work):**
+- **22× faster full crawl** — 75s via native vs ~1645s via REST (X86 KVM)
+- **2× faster per-call latency** — 0.5-0.8ms native vs 1.0-1.3ms REST
+- All `child` and `syntax` requests appear reliable; only `completion` is affected
+
+**Reopening criteria:** If MikroTik fixes the `/console/inspect` completion non-determinism
+(see `docs/mikrotik-bug-native-api-inspect.md`), the hybrid REST-crawl + native-enrichment
+approach becomes viable again, with potential full-pipeline native mode after that.
 
 ### Multiplexed batch enrichment — ✅ RESOLVED (Phase 2.8)
 `enrichWithCompletions` uses batched concurrency (ENRICHMENT_BATCH_SIZE=50, `Promise.all`).
@@ -444,8 +504,9 @@ Current full-tree performance (7.20.8 p1, X86 KVM, batch=50 + retry):
 - REST: ~61s, 0 argsFailed
 - Native: ~44s, 0 argsFailed
 
-**Correctness verified by `benchmark.test.ts` Test 8** — REST and native produce byte-identical
-completion data on the full tree. REST is deterministic across two independent runs.
+**Correctness verified by controlled benchmark (7.20.8 p1 baseline, see Benchmark section)** —
+REST is deterministic across two independent runs. Native produces a strict subset of REST
+due to the non-determinism bug (see Phase 2.9 resolution).
 
 ### Deep-inspect backfill for stable versions
 Generate `deep-inspect.json` (and enriched `openapi.json`) for all current release channels,
@@ -474,22 +535,17 @@ native-API-vs-REST difference. Low priority — the test no longer asserts on it
 
 ---
 
-## Benchmark Test Suite Design — ✅ IMPLEMENTED
+## Benchmark Test Suite Design — ✅ IMPLEMENTED (archived May 2026)
 
-Implemented in `benchmark.test.ts`. Run with:
-```bash
-# Start a QEMU CHR with both REST and native API ports forwarded:
-QEMU_NETDEV="user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9728-:8728" \
-  ~/GitHub/mikropkl/Machines/chr.x86_64.qemu.7.23beta5.utm/qemu.sh --background
+> `benchmark.test.ts` was **removed** (May 2026) as a research artifact — it required a live
+> CHR with both REST and native API ports, and served no production purpose once REST was chosen
+> as the only transport. The results below are preserved as historical reference for Phase 3.
+>
+> The `scripts/benchmark-qemu.sh` orchestration script is also a historical artifact but is
+> kept in `scripts/` for reference. The `_meta.enrichmentDurationMs` field in `deep-inspect.json`
+> provides ongoing timing data in CI.
 
-# Run benchmarks:
-URLBASE=http://localhost:9180/rest BASICAUTH=admin: API_PORT=9728 bun test benchmark.test.ts
-
-# Or use the orchestration script:
-./scripts/benchmark-qemu.sh
-```
-
-Tests are guarded by `URLBASE`/`BASICAUTH` env vars and skip gracefully without a live CHR.
+~~Implemented in `benchmark.test.ts`~~. Historical baseline data:
 
 ### Controlled variables
 
@@ -659,7 +715,7 @@ jq '._meta | {enrichmentDurationMs, argsTotal, argsWithCompletion, argsFailed, a
 **Authoritative baselines (7.20.8 long-term stable, p1, x86 HVF user-mode, batch=50 + retry):**
 
 > All figures below use the `enrichWithCompletions` retry fix (Phase 2.8) — `argsFailed=0`
-> is the hard requirement, enforced by Test 7 and Test 8 in `benchmark.test.ts`.
+> is the hard requirement, verified by the benchmark runs that produced these baselines.
 
 | Test | Transport | Result | Notes |
 |------|-----------|--------|-------|
@@ -719,22 +775,19 @@ jq '._meta | {enrichmentDurationMs, argsTotal, argsWithCompletion, argsFailed, a
 - **License verification is critical** — free license (1 Mbit/s) vs p1 (1 Gbit/s) causes
   dramatic throughput differences. The benchmark now asserts p1 in beforeAll.
 
-**Recommendation for production use (corrected):**
-- **Use native API for enrichment** — nearly equal throughput to REST (401 vs 420 calls/s)
-  but **18× fewer failures and 24 more completions**. The quality advantage outweighs the
-  marginal speed difference. For best results, reduce batch size to 5-10 to avoid the
-  hanger problem with specific paths while retaining most throughput.
-- **Use REST for full-tree crawl** — native crawl hangs on full tree walks due to connection
-  reliability issues. REST's per-request connection model makes it more robust for long operations.
-  Native crawl works for small subtrees (2.2× faster on /ip/address).
-- **Hybrid approach** (`--transport auto`) — REST crawl + native enrichment — is the optimal
-  default for `deep-inspect.ts`. This is the reverse of the prior (incorrect) recommendation.
-- **Immediate improvements needed**:
-  1. Add auto-reconnect to `NativeRouterOSClient` / `RosAPI` — the single biggest reliability issue
-  2. Skip known hanger paths in enrichment (ip/address/add/broadcast, ip/address/comment/comment)
-     or add per-path retry with transport fallback
-  3. Consider batch size auto-tuning: start at 50, reduce to 1 if timeouts detected
-- **The prior "REST is faster" conclusion was wrong** — it was an artifact of:
-  (a) testing on a beta version (7.23beta5) which may have different behavior,
-  (b) focusing on the /ip subtree which is worst-case for native batching,
-  (c) conflating "fewer visible failures" (REST times out faster) with "faster throughput"
+**Recommendation for production use (UPDATED May 2026 — REST only):**
+
+> ⚠️ The recommendation below was written before the native API `/console/inspect` completion
+> non-determinism bug was discovered (see Phase 2.9 resolution above). The original recommendation
+> to use native API for enrichment is **superseded by the decision to use REST for all schema work**.
+
+- **Use REST for all enrichment (completion) work** — REST is 100% deterministic. Native API
+  randomly drops ~20-30% of completion entries per call. The native API code remains in the
+  codebase for potential future use if MikroTik fixes the bug.
+- **Use REST for full-tree crawl** — native crawl hangs on full tree walks. REST's per-request
+  connection model is more robust.
+- **Native API advantages still valid for non-completion work**: 22× faster crawl on small subtrees,
+  2× lower per-call latency. Could be useful for tree-walking operations where completions
+  aren't needed (e.g. ARM64 `--skip-completion` crawl in Phase 3).
+- **CI workflows set to `--transport rest`** since April 2026 safety fix. Do not change without
+  first confirming the native API non-determinism bug is fixed in the target RouterOS version.

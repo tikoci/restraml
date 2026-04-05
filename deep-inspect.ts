@@ -205,10 +205,17 @@ export class RouterOSClient implements IRouterOSClient {
 
 // ── Native API Client ─────────────────────────────────────────────────────
 
-/** RouterOS native API (port 8728/8729) client implementing IRouterOSClient.
- *  Uses `/console/inspect` via the wire protocol for each operation.
- *  All values from the native API are strings — normalization happens downstream
- *  in completionsToObject() exactly as it does for the REST client.
+/**
+ * RouterOS native API (port 8728/8729) client implementing IRouterOSClient.
+ * Uses `/console/inspect` via the wire protocol for each operation.
+ * All values from the native API are strings — normalization happens downstream
+ * in completionsToObject() exactly as it does for the REST client.
+ *
+ * ⚠️  NOT USED IN CI — RouterOS native API `/console/inspect` with request=completion
+ * returns non-deterministic results: ~20-30% of entries are randomly dropped per call.
+ * REST is 100% deterministic. Use `--transport rest` (the default) for all production work.
+ * This code is retained for potential future use if MikroTik fixes the bug.
+ * See BACKLOG.md Phase 2.9 and docs/mikrotik-bug-native-api-inspect.md.
  */
 export class NativeRouterOSClient implements IRouterOSClient {
   private api: RosAPI;
@@ -1018,7 +1025,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       "test-crash-paths": { type: "boolean", default: false },
       version: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
-      transport: { type: "string", default: "auto" },
+      transport: { type: "string", default: "rest" },
       "api-host": { type: "string" },
       "api-port": { type: "string", default: "8728" },
     },
@@ -1026,7 +1033,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     allowPositionals: true,
   });
 
-  const transportRaw = values.transport ?? "auto";
+  const transportRaw = values.transport ?? "rest";
   if (transportRaw !== "auto" && transportRaw !== "rest" && transportRaw !== "native") {
     throw new Error(`--transport must be auto, rest, or native; got "${transportRaw}"`);
   }
@@ -1067,7 +1074,7 @@ Options:
   --skip-openapi          Skip OpenAPI 3.0 generation
   --skip-completion       Skip completion data fetching
   --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
-  --transport <mode>      Transport: auto (default), rest, or native
+  --transport <mode>      Transport: rest (default), auto, or native
   --api-host <host>       Native API host (default: derived from URLBASE)
   --api-port <port>       Native API port (default: 8728)
   --version               Print RouterOS version and exit
@@ -1078,22 +1085,22 @@ Environment:
   BASICAUTH   Credentials as user:pass (e.g. admin:)
 
 Transport selection (--transport):
-  auto   Try native API (port 8728) first; fall back to REST if not reachable (default)
-  rest   Use REST API only (port 80 via URLBASE)
-  native Use native API only (port 8728); fails if not reachable
+  rest   Use REST API only — deterministic, production-safe (default)
+  auto   Try native API (port 8728) first; fall back to REST if not reachable
+  native Use native API only (port 8728); NOTE: non-deterministic for completions (RouterOS bug)
 
 Examples:
   # Offline enrichment (no completion data, just structure + OpenAPI)
   # Note: Bun auto-loads .env — add --skip-completion if URLBASE is set in .env
   bun deep-inspect.ts --inspect-file docs/7.22/inspect.json --output-dir /tmp --skip-completion
 
-  # Live enrichment with completions (auto-selects native API if port 8728 is open)
+  # Live enrichment with completions via REST (default transport — deterministic)
   URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
     bun deep-inspect.ts --inspect-file docs/7.22/inspect.json
 
-  # Full live crawl via native API (fastest)
+  # Full live crawl and enrichment (REST transport)
   URLBASE=http://localhost:9180/rest BASICAUTH=admin: \\
-    bun deep-inspect.ts --live --transport native --output-dir docs/7.22
+    bun deep-inspect.ts --live --output-dir docs/7.22
 `.trim());
 }
 

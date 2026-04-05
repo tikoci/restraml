@@ -16,8 +16,10 @@ the `/docs/` directory in this repository.
 ## Key Files
 
 - **`rest2raml.js`** — Main schema generator (runs under Bun, not Node.js)
+- **`deep-inspect.ts`** — Enriches inspect.json with completion data; generates deep-inspect.json and openapi.json (Bun)
 - **`validraml.cjs`** — Validates RAML 1.0 using webapi-parser
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
+- **`ros-api-protocol.ts`** — Vendored RouterOS native API wire protocol (kept for future use; NOT used in CI)
 - **`Dockerfile.chr-qemu`** — Alpine image that runs RouterOS CHR in QEMU
 - **`docs/`** — Published schema files, one subdirectory per RouterOS version
 - **`docs/restraml-shared.js`** — Shared JS utilities for all docs/*.html pages (version parsing, theme switcher, share modal, GitHub API)
@@ -36,6 +38,9 @@ the `/docs/` directory in this repository.
 - `auto.yaml` runs daily and checks MikroTik's `NEWESTa7.{stable,testing,development,long-term}` channels
 - **`routeros-app-yaml-schema.latest.json`** and **`routeros-app-yaml-store-schema.latest.json`** are
   publicly known URLs linked externally — **never rename or move these files**
+- **CI always uses `--transport rest`** for all schema generation — RouterOS native API has a non-determinism
+  bug that randomly drops completion entries. Do not change transport to `native` or `auto` in CI workflows.
+  See `CLAUDE.md` → "Native API Transport Policy" and `BACKLOG.md` Phase 2.9.
 
 ## /app YAML Schema System (7.22+)
 
