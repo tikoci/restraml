@@ -9,6 +9,7 @@
         "includes": [
             "*.js",
             "*.cjs",
+            "*.mjs",
             "*.ts",
             "docs/*.js",
             "docs/*.html",

@@ -18,6 +18,8 @@ jobs:
     env:
       URLBASE: http://localhost:9180/rest 
       BASICAUTH: "admin:" 
+      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
+      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
 
     steps:
     - name: Checkout repository
@@ -115,7 +117,7 @@ jobs:
     - name: Activate CHR trial license
       # CHR "free" license caps networking at 1 Mbit/s, which throttles the ~34k
       # /console/inspect API calls during enrichment. Trial (p1) allows 1 Gbit/s.
-      if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+      if: env.MIKROTIK_ACCOUNT != ''
       run: |
         curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
           -H 'Content-Type: application/json' \
