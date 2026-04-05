@@ -262,7 +262,7 @@ beforeAll(async () => {
     // CRITICAL: License must be p1 (1 Gbit/s). Free license throttles to 1 Mbit/s.
     if (controlledVars.licenseLevel === "free") {
       console.error("🛑  CHR license is 'free' (1 Mbit/s throttle!)");
-      console.error("    License with: curl -u admin: ${URLBASE}/system/license/renew \\");
+      console.error(`    License with: curl -u admin: ${URLBASE}/system/license/renew \\`);
       console.error('      -d \'{"account":"...","password":"...","level":"p1"}\'');
       throw new Error("CHR must be licensed as p1 — free license throttles to 1 Mbit/s, invalidating benchmarks");
     }
@@ -427,13 +427,14 @@ describe("Test 0: Environment validation", () => {
 
   test("crash path probe (native)", async () => {
     if (skipNative()) return;
+    if (!URLBASE || !BASICAUTH) return;
     console.log("  Probing CRASH_PATHS via native API...");
 
     // Use a fresh native connection for crash path testing
-    const url = new URL(URLBASE!);
-    const colonIdx = BASICAUTH!.indexOf(":");
-    const user = BASICAUTH!.substring(0, colonIdx);
-    const password = BASICAUTH!.substring(colonIdx + 1);
+    const url = new URL(URLBASE);
+    const colonIdx = BASICAUTH.indexOf(":");
+    const user = BASICAUTH.substring(0, colonIdx);
+    const password = BASICAUTH.substring(colonIdx + 1);
 
     const probeClient = new NativeRouterOSClient(url.hostname, API_PORT, user, password);
     await probeClient.connect();

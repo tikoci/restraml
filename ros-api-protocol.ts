@@ -179,11 +179,6 @@ class RosError extends Error {
 
 // ── Constants ──
 
-/** Grace period (ms) after /cancel is sent before forcibly rejecting the command.
- *  Prevents infinite hang when the router ignores /cancel (e.g. command handler
- *  is deadlocked on a specific /console/inspect path). */
-const CANCEL_GRACE_MS = 5_000;
-
 // ── Main client ──
 
 class RosAPI {
@@ -370,32 +365,42 @@ class RosAPI {
     });
 
     let cancelSent = false;
-    let graceTimer: ReturnType<typeof setTimeout> | undefined;
 
     const onAbort = (): void => {
       // Only send cancel once, and only if the command is still pending.
       if (cancelSent || !this.pending.has(tag)) return;
       cancelSent = true;
 
-      // Start grace timer — if the router doesn't acknowledge /cancel within
-      // CANCEL_GRACE_MS, forcibly reject the command to prevent infinite hang.
-      // This covers the case where the router's command handler is deadlocked
-      // (e.g. on specific /console/inspect paths) and never processes /cancel.
-      graceTimer = setTimeout(() => {
-        const cmd = this.pending.get(tag);
-        if (cmd) {
-          this.pending.delete(tag);
-          cmd.reject(new RosError(
-            "Timed out waiting for /cancel acknowledgement — router may be unresponsive",
-            RosErrorCode.ETIMEDOUT,
-          ));
-        }
-      }, CANCEL_GRACE_MS);
+      // Immediately reject the caller's promise — do NOT wait for the router
+      // to acknowledge /cancel. This gives REST-like abort semantics: abort is
+      // instant, the caller can retry immediately. The router's eventual
+      // response (if any) is silently discarded by _routeSentence since we
+      // replace the pending entry with a zombie handler below.
+      const cmd = this.pending.get(tag);
+      if (cmd) {
+        // Replace with zombie handler that silently absorbs the router's
+        // eventual response (e.g. !trap category=2 from /cancel ack, or
+        // !done if the command completes after we gave up). Without this,
+        // the router's response for the dead tag would log "orphan sentence".
+        this.pending.set(tag, {
+          resolve: () => { this.pending.delete(tag); },
+          reject: () => { this.pending.delete(tag); },
+          replies: [],
+        });
 
+        cmd.reject(new RosError(
+          "Command aborted",
+          RosErrorCode.ETIMEDOUT,
+        ));
+      }
+
+      // Send /cancel as a fire-and-forget courtesy to the router. Even though
+      // we already rejected the caller's promise, /cancel tells the router to
+      // stop processing the command and free server-side resources. The cancel
+      // tag handler silently consumes the router's !done for the /cancel itself.
       if (this.connected && this.socket) {
         try {
           const cancelTag = `cc${++this.nextTag}`;
-          // Register a no-op handler so the /cancel response is silently consumed.
           this.pending.set(cancelTag, {
             resolve: () => { this.pending.delete(cancelTag); },
             reject: () => { this.pending.delete(cancelTag); },
@@ -403,31 +408,17 @@ class RosAPI {
           });
           this.socket.write(encodeSentence(["/cancel", `=tag=${tag}`, `.tag=${cancelTag}`]));
         } catch {
-          // Socket gone — _onClose will reject commandPromise via CONNRESET
+          // Socket gone — _onClose will clean up remaining pending entries
         }
-      } else {
-        // Not connected — can't send /cancel; force-reject immediately.
-        const cmd = this.pending.get(tag);
-        if (cmd) {
-          this.pending.delete(tag);
-          cmd.reject(new RosError(
-            "Cannot send /cancel — connection lost",
-            RosErrorCode.CONNRESET,
-          ));
-        }
-        clearTimeout(graceTimer);
-        graceTimer = undefined;
       }
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
     try {
-      // commandPromise resolves with [] when /cancel succeeds (!trap cat=2 → resolve in _routeSentence)
       const result = await commandPromise;
       return result.re;
     } finally {
       signal?.removeEventListener("abort", onAbort);
-      if (graceTimer) clearTimeout(graceTimer);
     }
   }
 
@@ -640,7 +631,6 @@ class RosAPI {
 }
 
 export {
-  CANCEL_GRACE_MS,
   RosAPI,
   RosError,
   RosErrorCode,

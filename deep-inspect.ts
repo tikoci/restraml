@@ -379,6 +379,7 @@ export async function enrichWithCompletions(
 
   for (let i = 0; i < args.length; i += ENRICHMENT_BATCH_SIZE) {
     const batch = args.slice(i, i + ENRICHMENT_BATCH_SIZE);
+    let batchHadConnReset = false;
     await Promise.all(batch.map(async ({ node, path: argPath }) => {
       try {
         const controller = new AbortController();
@@ -391,7 +392,18 @@ export async function enrichWithCompletions(
           node._completion = completionsToObject(shown);
           stats.argsWithCompletion++;
         }
-      } catch {
+      } catch (err) {
+        // Track whether this batch had a CONNRESET — log batch composition once.
+        if (!batchHadConnReset && (err as RosError)?.code === RosErrorCode.CONNRESET) {
+          batchHadConnReset = true;
+          const batchNum = Math.floor(i / ENRICHMENT_BATCH_SIZE) + 1;
+          const batchPaths = batch.map(b => b.path.join("/"));
+          console.warn(
+            `[enrichment] CONNRESET during batch #${batchNum} (args ${i}–${i + batch.length - 1}). ` +
+            `All ${batch.length} paths in this batch will be retried sequentially.\n` +
+            `  Batch paths: ${batchPaths.join(", ")}`,
+          );
+        }
         // Queue for sequential retry — do NOT count as failure yet.
         retryQueue.push({ node, path: argPath });
       }

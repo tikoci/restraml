@@ -216,6 +216,60 @@ the entire enrichment forever.
      trigger CONNRESET consistently? Is it specific to `/console/inspect` or any command?
 5. If it's a Bun socket bug: reproduce with a minimal script and file against Bun.
 
+**Second CI run analysis (run 24004412387, April 2026):**
+
+The cancel-grace fix prevented the infinite hang but introduced a **4× performance regression**:
+- REST: 81s, 9357 completions, 261 retried, 190 blank-on-retry, 0 failed
+- Native: 326s (4×!), 9312 completions, 81 retried, 62 blank-on-retry, 0 failed
+- 45 fewer completions on native → deep-inspect.json DIFFERS → build FAILED
+
+Root causes identified:
+1. **CANCEL_GRACE_MS blocks the caller**: Each batch with a hanger path costs `COMPLETION_TIMEOUT_MS
+   + CANCEL_GRACE_MS` (10s) because `writeAbortable` awaits the grace period before rejecting. REST
+   aborts are instant (HTTP fetch abort). This single issue explains the 4× slowdown.
+2. **Silent completion loss**: When `/cancel` is acknowledged (!trap cat=2), `commandPromise`
+   resolves with `[]`. `enrichWithCompletions` sees empty completions (not an error), so the path
+   is NEVER retried — completions are silently lost. This contributes to the 45 missing.
+3. **52 CONNRESETs in a single 25ms window**: All at timestamp 15:28:04.110–15:28:04.133 — one TCP
+   drop killing the entire in-flight batch. First path: `system/reset-configuration/force-v6-to-v7-configuration-upgrade`.
+   All CONNRESETs in `system/reset-configuration/*` and `system/resource/*` (alphabetically adjacent
+   = same batch). Theory: a specific `/console/inspect` command in this batch crashes the RouterOS
+   API service process, which restarts but the TCP connection is lost.
+
+**Immediate-reject fix (done, April 2026):**
+
+Replaced the grace-timer-blocking `writeAbortable` with an immediate-reject design:
+- On abort: send `/cancel` as fire-and-forget, **immediately** reject the caller's promise with
+  `RosError(ETIMEDOUT)`, replace the pending map entry with a "zombie handler" that silently
+  absorbs the router's eventual response.
+- No more grace timer blocking — abort is instant, just like REST's `fetch().abort()`.
+- The zombie handler ensures the router's `/cancel` acknowledgement (!trap cat=2 or !done)
+  doesn't log as "orphan sentence" — it's silently consumed and the tag is cleaned from pending.
+- `_onClose` cleans up zombie handlers along with all other pending entries on connection drop.
+- Removed `CANCEL_GRACE_MS` constant entirely — no longer needed.
+
+This fixes all three issues:
+1. **Performance**: Abort is instant → batch with hanger paths costs 5s (same as REST), not 10s.
+2. **Silent loss**: Abort always triggers catch → path always goes to retryQueue → retried sequentially.
+3. **Diagnostics**: Added CONNRESET batch logging to `enrichWithCompletions` — when a CONNRESET hits
+   a batch, ALL paths in that batch are logged (not just the first to fail), making it possible to
+   identify the crash-triggering command.
+
+5 unit tests in `ros-api-protocol.test.ts` (`§7b writeAbortable — immediate-reject on abort`):
+- Rejects immediately with ETIMEDOUT (< 200ms, not 5s)
+- Sends /cancel as fire-and-forget (verifies 2 socket writes)
+- Rejects with ETIMEDOUT when not connected (can't send /cancel)
+- Zombie handler absorbs router response after abort
+- _onClose cleans up zombie handlers
+
+**Remaining investigation (CONNRESET root cause):**
+- Need to test `system/reset-configuration/*` paths individually against a local CHR to identify
+  which specific command crashes the API process.
+- `testCrashPaths()` in deep-inspect.ts can be used for this — feed it the paths from the
+  CONNRESET batch and run them one at a time.
+- If confirmed as a RouterOS bug, file with MikroTik: version 7.22.1, the specific command path,
+  reproduction steps via `/console/inspect` REST or API call.
+
 ---
 
 ## Phase 3: ARM64 Multi-Architecture Support 🔲 Not started
