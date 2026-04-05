@@ -503,7 +503,7 @@ describe("deep-inspect.json output structure", () => {
       crashPathsTested: [],
       crashPathsSafe: [],
       crashPathsCrashed: [],
-      completionStats: { argsTotal: 100, argsWithCompletion: 50, argsFailed: 2 },
+      completionStats: { argsTotal: 100, argsWithCompletion: 50, argsFailed: 2, argsTimedOut: 0, argsBlankOnRetry: 0 },
     };
 
     const output: DeepInspectOutput = { _meta: meta, ...sampleInspect };

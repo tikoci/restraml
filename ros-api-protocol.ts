@@ -337,6 +337,63 @@ class RosAPI {
   }
 
   /**
+   * Like write(), but sends /cancel to the router when `signal` is aborted.
+   *
+   * This is the correct way to abort a native API in-flight command — it tells
+   * the router to stop processing, preventing "ghost" commands that hold router
+   * resources and compete for serialized handlers like /console/inspect.
+   *
+   * On cancellation the router sends !trap category=2 ("interrupted"), which
+   * _routeSentence resolves as an empty result (not an error). The caller gets
+   * an empty Sentence[] and can treat that as "retry needed".
+   *
+   * If signal is undefined, behaves identically to write().
+   */
+  async writeAbortable(signal: AbortSignal | undefined, command: string, ...params: string[]): Promise<Sentence[]> {
+    // Fast path: already aborted before we even start
+    if (signal?.aborted) return [];
+    if (!this.connected) await this.connect();
+
+    const tag = `t${++this.nextTag}`;
+    const words = [command, ...params, `.tag=${tag}`];
+
+    const commandPromise = new Promise<CommandResult>((resolve, reject) => {
+      this.pending.set(tag, { resolve, reject, replies: [] });
+      this.socket.write(encodeSentence(words));
+    });
+
+    let cancelSent = false;
+    const onAbort = (): void => {
+      // Only send cancel once, and only if the command is still pending.
+      if (cancelSent || !this.pending.has(tag)) return;
+      cancelSent = true;
+      if (this.connected && this.socket) {
+        try {
+          const cancelTag = `cc${++this.nextTag}`;
+          // Register a no-op handler so the /cancel response is silently consumed.
+          this.pending.set(cancelTag, {
+            resolve: () => { this.pending.delete(cancelTag); },
+            reject: () => { this.pending.delete(cancelTag); },
+            replies: [],
+          });
+          this.socket.write(encodeSentence(["/cancel", `=tag=${tag}`, `.tag=${cancelTag}`]));
+        } catch {
+          // Socket gone — _onClose will reject commandPromise via CONNRESET
+        }
+      }
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      // commandPromise resolves with [] when /cancel succeeds (!trap cat=2 → resolve in _routeSentence)
+      const result = await commandPromise;
+      return result.re;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+
+  /**
    * Send a streaming command. Returns a handle with:
    * - on(callback): receive each !re sentence as it arrives
    * - cancel(): send /cancel to stop the stream
@@ -487,8 +544,9 @@ class RosAPI {
       case "!trap": {
         const msg = sentence.data.message || "Unknown trap";
         const cat = parseInt(sentence.data.category || "0", 10);
-        if (cmd.streaming && cat === 2) {
-          // "interrupted" — normal stream cancellation, treat as done
+        if (cat === 2) {
+          // "interrupted" — result of /cancel (for any command type) or stream cancel.
+          // Treat as clean done with whatever replies accumulated so far.
           this.pending.delete(sentence.tag);
           cmd.resolve({ re: cmd.replies, done: sentence.data });
         } else {

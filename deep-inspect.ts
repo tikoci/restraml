@@ -43,6 +43,14 @@ export interface DeepInspectMeta {
     argsTotal: number;
     argsWithCompletion: number;
     argsFailed: number;
+    /** Paths that timed out in the concurrent batch pass and were queued for sequential
+     *  retry. A high value relative to argsTotal means the concurrent batch is
+     *  overwhelming the router — with the native API, the router serializes
+     *  /console/inspect internally, so ghost in-flight commands stall the queue. */
+    argsTimedOut: number;
+    /** Paths in the retry queue that returned an empty completion array (not an error).
+     *  These are "silent misses" that should never differ from the REST transport. */
+    argsBlankOnRetry: number;
   };
   /** Present only when native transport was used. Tracks TCP connection resets
    *  observed during enrichment — each reset rejects all in-flight commands on the
@@ -195,21 +203,6 @@ export class RouterOSClient implements IRouterOSClient {
   }
 }
 
-// ── Abort signal helper ───────────────────────────────────────────────────
-
-/** Race a promise against an AbortSignal. If signal is absent or never fires,
- *  the original promise is returned unmodified (zero overhead). */
-function withAbortSignal<T>(signal: AbortSignal | undefined, promise: Promise<T>): Promise<T> {
-  if (!signal) return promise;
-  if (signal.aborted) return Promise.reject(new Error("Aborted"));
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      signal.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
-    }),
-  ]);
-}
-
 // ── Native API Client ─────────────────────────────────────────────────────
 
 /** RouterOS native API (port 8728/8729) client implementing IRouterOSClient.
@@ -285,9 +278,11 @@ export class NativeRouterOSClient implements IRouterOSClient {
 
   async fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]> {
     try {
-      const sentences = await withAbortSignal(
+      // writeAbortable sends /cancel to the router when signal fires,
+      // preventing ghost in-flight commands from stalling the router.
+      const sentences = await this.api.writeAbortable(
         signal,
-        this.api.write("/console/inspect", "=request=syntax", `=path=${path.join(",")}`),
+        "/console/inspect", "=request=syntax", `=path=${path.join(",")}`
       );
       return sentences.map((s) => s.data as unknown as InspectSyntaxResponse);
     } catch (err) {
@@ -298,9 +293,11 @@ export class NativeRouterOSClient implements IRouterOSClient {
 
   async fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]> {
     try {
-      const sentences = await withAbortSignal(
+      // writeAbortable sends /cancel to the router when signal fires,
+      // preventing ghost in-flight commands from stalling the router.
+      const sentences = await this.api.writeAbortable(
         signal,
-        this.api.write("/console/inspect", "=request=completion", `=path=${path.join(",")}`),
+        "/console/inspect", "=request=completion", `=path=${path.join(",")}`
       );
       // Native API returns strings for all fields. completionsToObject() normalises:
       // show (string "true"/"false"), preference (string→number), text→desc fallback.
@@ -369,7 +366,7 @@ export async function enrichWithCompletions(
   tree: InspectNode,
   client: IRouterOSClient,
   path: string[] = [],
-  stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
+  stats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0, argsTimedOut: 0, argsBlankOnRetry: 0 },
   onFailure?: (path: string[], error: Error) => void,
 ): Promise<typeof stats> {
   const args = collectArgNodes(tree, path);
@@ -401,6 +398,12 @@ export async function enrichWithCompletions(
     }));
   }
 
+  stats.argsTimedOut = retryQueue.length;
+  if (retryQueue.length > 0) {
+    const pct = ((retryQueue.length / args.length) * 100).toFixed(1);
+    console.log(`Retry queue: ${retryQueue.length}/${args.length} paths (${pct}%) timed out in batch pass — retrying sequentially`);
+  }
+
   // Second pass: sequential retry for any path that failed under concurrent load.
   // Test data shows these paths respond in 1–2ms when called one at a time.
   for (const { node, path: argPath } of retryQueue) {
@@ -414,6 +417,10 @@ export async function enrichWithCompletions(
       if (shown.length > 0) {
         node._completion = completionsToObject(shown);
         stats.argsWithCompletion++;
+      } else {
+        // Retry succeeded but returned no completions. This is a "silent miss" —
+        // the batch-pass ghost commands may have consumed the completion data.
+        stats.argsBlankOnRetry++;
       }
     } catch (err) {
       // Still failing after sequential retry — genuinely unresponsive path.
@@ -1198,7 +1205,7 @@ async function main() {
   }
 
   // Enrich with completion data
-  let completionStats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 };
+  let completionStats = { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0, argsTimedOut: 0, argsBlankOnRetry: 0 };
   let enrichmentDurationMs: number | undefined;
   if (!opts.skipCompletion && client) {
     console.log("Enriching with completion data...");
@@ -1208,6 +1215,8 @@ async function main() {
     console.log(
       `Completions: ${completionStats.argsWithCompletion}/${completionStats.argsTotal} args enriched` +
       (completionStats.argsFailed > 0 ? `, ${completionStats.argsFailed} failed` : "") +
+      (completionStats.argsTimedOut > 0 ? `, ${completionStats.argsTimedOut} retried` : "") +
+      (completionStats.argsBlankOnRetry > 0 ? `, ${completionStats.argsBlankOnRetry} blank-on-retry` : "") +
       ` (${(enrichmentDurationMs / 1000).toFixed(1)}s)`,
     );
   } else if (!opts.skipCompletion && !client) {

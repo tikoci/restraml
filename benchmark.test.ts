@@ -1221,7 +1221,7 @@ describe("Test 7: Enrichment retry — 0 failures required", () => {
       restTree,
       restClient,
       [],
-      { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
+      { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0, argsTimedOut: 0, argsBlankOnRetry: 0 },
       (p, err) => restFails.push({ path: p, error: err.message }),
     );
     const restMs = performance.now() - restStart;
@@ -1238,7 +1238,7 @@ describe("Test 7: Enrichment retry — 0 failures required", () => {
       nativeTree,
       nativeClient,
       [],
-      { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0 },
+      { argsTotal: 0, argsWithCompletion: 0, argsFailed: 0, argsTimedOut: 0, argsBlankOnRetry: 0 },
       (p, err) => nativeFails.push({ path: p, error: err.message }),
     );
     const nativeMs = performance.now() - nativeStart;
