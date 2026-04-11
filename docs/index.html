@@ -213,7 +213,8 @@
                 </i><b><u>+extra</u></b> <i>links include both base <code>routeros.npk</code> and all
                     <code>extra-packages.zip</code> available for X86.</i><br>
                 <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small><br>
-                <small>🔍 <strong>OpenAPI 3</strong> schemas power the <a href="openapi.html">API Explorer</a> — an interactive browser for the RouterOS REST API with enriched descriptions.</small>
+                <small>🔍 <strong>OpenAPI 3</strong> schemas power the <a href="openapi.html">API Explorer</a> — an interactive browser for the RouterOS REST API with enriched descriptions.</small><br>
+                <small>📋 <strong><code>/app</code> YAML</strong> columns (7.22+) provide per-version JSON Schema files for validating RouterOS <code>/app</code> container YAML — <i>/app</i> for single-app definitions, <i>store</i> for <code>app-store-urls=</code> arrays. See the callout below for version-independent <i>latest</i> links.</small>
             </article>
             <table>
                 <thead>
@@ -222,6 +223,7 @@
                         <td>REST Schema</td>
                         <td><small><code style="overflow-wrap: break-word">/console/inspect</code></small></td>
                         <td>OpenAPI 3</td>
+                        <td><small><code>/app</code> YAML</small></td>
                         <td>SNMP MIB</td>
                     </tr>
                 </thead>
@@ -241,6 +243,7 @@
                             <td class="cell-raml"></td>
                             <td class="cell-json"></td>
                             <td class="cell-openapi"></td>
+                            <td class="cell-appyaml"></td>
                             <td class="cell-mib"><small><mark>SNMP</mark> <a href="#">mib</a></small></td>
                         </tr>
                     </template>
@@ -251,9 +254,28 @@
                         <th scope="col"></th>
                         <th scope="col"></th>
                         <th scope="col"></th>
+                        <th scope="col"></th>
+                        <th scope="col"></th>
                     </tr>
                 </tfoot>
             </table>
+        </section>
+        <!-- /app YAML latest schema links callout -->
+        <section id="section-appyaml-latest">
+            <article>
+                <header><strong><code>/app</code> YAML Schemas &mdash; Always-Latest URLs</strong></header>
+                <small>These root-level schema files are updated to the latest stable RouterOS release and are suitable for use in editors, CI pipelines, and SchemaStore. They are version-independent; for per-version schemas use the table above.</small>
+                <br><br>
+                <small>
+                    <strong>Strict</strong> (for CI validation &mdash; use with <code>ajv</code>, <code>appyamlvalidate.js</code>):<br>
+                    &bull;&ensp;<a href="routeros-app-yaml-schema.latest.json"><code>routeros-app-yaml-schema.latest.json</code></a> &mdash; single <code>/app</code> YAML definition<br>
+                    &bull;&ensp;<a href="routeros-app-yaml-store-schema.latest.json"><code>routeros-app-yaml-store-schema.latest.json</code></a> &mdash; <code>app-store-urls=</code> array format<br>
+                    <br>
+                    <strong>Editor</strong> (relaxed for VSCode / SchemaStore autocompletion):<br>
+                    &bull;&ensp;<a href="routeros-app-yaml-schema.editor.json"><code>routeros-app-yaml-schema.editor.json</code></a> &mdash; single <code>/app</code> YAML (no strict regex)<br>
+                    &bull;&ensp;<a href="routeros-app-yaml-store-schema.editor.json"><code>routeros-app-yaml-store-schema.editor.json</code></a> &mdash; store format (relaxed)<br>
+                </small>
+            </article>
         </section>
         <!-- Direct to GitHub Issues for Support or More Help -->
         <section>
@@ -388,6 +410,30 @@
                 exploreLink.textContent = 'explore \u2197'
                 exploreLink.style.cssText = 'display:block; font-size:0.75em; margin-top:0.15em'
                 openapiCell.appendChild(exploreLink)
+            }
+
+            // /app YAML schema links (7.22+)
+            const hasAppYaml = compareVersions(file.name, '7.22') <= 0
+            const appYamlCell = verrow.querySelector('.cell-appyaml')
+            if (hasAppYaml) {
+                const wrap = document.createElement('small')
+                const label = document.createElement('span')
+                label.innerHTML = '<mark>YAML</mark>'
+                const links = document.createElement('div')
+                const appLink = document.createElement('a')
+                appLink.href = `${file.name}/routeros-app-yaml-schema.json`
+                appLink.textContent = '/app'
+                const storeLink = document.createElement('a')
+                storeLink.href = `${file.name}/routeros-app-yaml-store-schema.json`
+                storeLink.textContent = 'store'
+                links.appendChild(appLink)
+                links.append(' ')
+                const appStoreLinkWrap = document.createElement('small') // even smaller
+                appStoreLinkWrap.appendChild(storeLink)
+                links.appendChild(appStoreLinkWrap)
+                wrap.appendChild(label)
+                wrap.appendChild(links)
+                appYamlCell.appendChild(wrap)
             }
 
             // SNMP MIB link
