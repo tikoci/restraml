@@ -197,6 +197,8 @@ view does meaningfully more than x86. Ready to proceed to 3.5.
   (325s vs 76s on the local run — TCG emulation tax).
 - Runs crawl + enrich, publishes `docs/{version}/deep-inspect.arm64.json`
   (and `docs/{version}/extra/deep-inspect.arm64.json`).
+- **`@tikoci/quickchr` is currently a `file:../quickchr` local dependency.**
+  For CI, it must be published to npm or vendored. Resolve before this step.
 - **Runs `scripts/diff-deep-inspect.ts` against the x86 and arm64 outputs and
   publishes the text report as a build artifact** (step summary + uploaded
   file). Initially informational — no hard gate until we have a baseline
@@ -245,8 +247,36 @@ Identifying which extra package provides which command is hard. No RouterOS
 API exposes a package→command mapping. The accurate approach: install packages
 one at a time, crawl after each install, diff. Many reboots, inherently slow.
 
-`quickchr --add-package` is the obvious lever once it has enough independent
-test coverage for conflict cases. Track demand before investing.
+`@tikoci/quickchr` is the intended lever — its `installAllPackages` and
+per-package install operations can automate the boot/install/crawl/diff cycle.
+Once quickchr has enough independent test coverage for conflict cases (some
+packages conflict: `wifi-qcom` vs `wifi-qcom-be`, etc.), this becomes
+tractable. Track demand before investing.
+
+---
+
+## Future: Web tool alignment + deep-inspect consumption
+
+Not a numbered phase yet — collecting scope. These items emerge once a "final"
+`deep-inspect.json` exists (post-Phase 4 merge or arm64-as-default decision):
+
+- **Web tools migration**: `docs/lookup.html`, `diff.html`, `index.html`
+  currently fetch `inspect.json`. Migrating to deep-inspect adds completion
+  data but the files are significantly larger (~10–50 MB with completions).
+  Options: a "light" variant without `_completion`, on-demand field loading,
+  or keeping inspect.json as the web-tool source and deep-inspect as the
+  "full" download.
+- **Schema downloads**: `docs/index.html` should surface deep-inspect files
+  alongside existing schema.raml / openapi.json downloads.
+- **CI rebuild of older versions**: Once the pipeline stabilizes, backfill
+  deep-inspect for already-published versions (7.20+, at least).
+- **deep-inspect format documentation**: A lightweight schema or doc describing
+  the structure — `_meta` fields, `_type` enum, `_completion` shape, `_source`
+  (Phase 4). Useful for external consumers and for the web tools.
+- **Deeper /console/inspect mining**: Investigate whether `/console/inspect`
+  exposes information beyond `child`, `syntax`, and `completion` requests.
+  `request=help`? Undocumented request types? This is speculative but the
+  goal is `deep-inspect.json` as the richest possible form of the inspect data.
 
 ---
 

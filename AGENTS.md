@@ -201,6 +201,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `rest2raml.js` | Main schema generator (Bun runtime) |
 | `validraml.cjs` | RAML 1.0 validator (Node.js) |
 | `appyamlvalidate.js` | /app YAML schema validator and per-version schema generator (Bun) |
+| `deep-inspect.ts` | Crawls live CHR + enriches with completion data → deep-inspect.json / openapi.json (Bun) |
 | `ros-api-protocol.ts` | Vendored RouterOS native API wire protocol (Bun) |
 | `ros-api-protocol.test.ts` | Unit + integration + stress tests for `ros-api-protocol.ts` |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
@@ -208,6 +209,8 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `scripts/test-with-qemu.sh` | Integration tests (deep-inspect) against local QEMU CHR |
 | `scripts/test-ros-api.sh` | Integration + stress tests (ros-api-protocol) against local CHR |
 | `scripts/benchmark-qemu.sh` | REST vs native API timing benchmark against local CHR |
+| `scripts/deep-inspect-multi-arch.ts` | Per-arch deep-inspect orchestrator (quickchr, x86 + arm64) |
+| `scripts/diff-deep-inspect.ts` | Diff two deep-inspect.<arch>.json files (enum drift + path delta) |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
 | `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
 | `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |

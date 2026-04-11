@@ -16,7 +16,7 @@ the `/docs/` directory in this repository.
 ## Key Files
 
 - **`rest2raml.js`** — Main schema generator (runs under Bun, not Node.js)
-- **`deep-inspect.ts`** — Enriches inspect.json with completion data; generates deep-inspect.json and openapi.json (Bun)
+- **`deep-inspect.ts`** — Crawls a live RouterOS CHR and enriches with completion data; generates deep-inspect.json and openapi.json (Bun)
 - **`validraml.cjs`** — Validates RAML 1.0 using webapi-parser
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
 - **`ros-api-protocol.ts`** — Vendored RouterOS native API wire protocol (kept for future use; NOT used in CI)
