@@ -7,6 +7,8 @@
     "schema": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js [path...]'",
     "schema:version": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js --version'",
     "deep-inspect": "bun deep-inspect.ts",
+    "deep-inspect:multi-arch": "bun scripts/deep-inspect-multi-arch.ts",
+    "deep-inspect:diff": "bun scripts/diff-deep-inspect.ts",
     "validate:raml": "node validraml.cjs",
     "validate:openapi": "bun validate-openapi.ts",
     "validate:app-yaml": "echo 'Usage: bun appyamlvalidate.js <version>'",
@@ -21,6 +23,7 @@
     "lint:workflows": "bun validate-workflows.mjs"
   },
   "dependencies": {
+    "@tikoci/quickchr": "file:../quickchr",
     "js-yaml": "^4.1.1"
   },
   "devDependencies": {

@@ -13,7 +13,8 @@
             "*.ts",
             "docs/*.js",
             "docs/*.html",
-            "scripts/*.js"
+            "scripts/*.js",
+            "scripts/*.ts"
         ]
     },
     "formatter": {

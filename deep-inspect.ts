@@ -1002,6 +1002,8 @@ interface CliOptions {
   rosVersion?: string;
   live: boolean;
   outputDir: string;
+  outputSuffix?: string;
+  arch?: "x86" | "arm64";
   skipOpenapi: boolean;
   skipCompletion: boolean;
   testCrashPaths: boolean;
@@ -1020,6 +1022,8 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       "ros-version": { type: "string" },
       live: { type: "boolean", default: false },
       "output-dir": { type: "string", default: "." },
+      "output-suffix": { type: "string" },
+      arch: { type: "string" },
       "skip-openapi": { type: "boolean", default: false },
       "skip-completion": { type: "boolean", default: false },
       "test-crash-paths": { type: "boolean", default: false },
@@ -1038,6 +1042,11 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     throw new Error(`--transport must be auto, rest, or native; got "${transportRaw}"`);
   }
 
+  const archRaw = values.arch;
+  if (archRaw !== undefined && archRaw !== "x86" && archRaw !== "arm64") {
+    throw new Error(`--arch must be x86 or arm64; got "${archRaw}"`);
+  }
+
   const [, , ...pathArgs] = positionals;
 
   return {
@@ -1046,6 +1055,8 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       rosVersion: values["ros-version"],
       live: values.live ?? false,
       outputDir: values["output-dir"] ?? ".",
+      outputSuffix: values["output-suffix"],
+      arch: archRaw,
       skipOpenapi: values["skip-openapi"] ?? false,
       skipCompletion: values["skip-completion"] ?? false,
       testCrashPaths: values["test-crash-paths"] ?? false,
@@ -1067,10 +1078,12 @@ Usage:
   bun deep-inspect.ts [options] [path...]
 
 Options:
-  --inspect-file <path>   Input inspect.json file (offline enrichment)
+  --inspect-file <path>   Input inspect.json file (offline enrichment, dev only — see BACKLOG.md principle 2)
   --ros-version <ver>     Override RouterOS version (e.g. 7.23beta4)
   --live                  Query live router (URLBASE/BASICAUTH env vars)
+  --arch <x86|arm64>      Record architecture in _meta.architecture (set by orchestrator)
   --output-dir <dir>      Output directory (default: .)
+  --output-suffix <str>   Filename suffix, e.g. "arm64" → deep-inspect.arm64.json
   --skip-openapi          Skip OpenAPI 3.0 generation
   --skip-completion       Skip completion data fetching
   --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
@@ -1249,6 +1262,7 @@ async function main() {
   const meta: DeepInspectMeta = {
     version,
     generatedAt: new Date().toISOString(),
+    architecture: opts.arch,
     apiTransport: (!opts.skipCompletion && client !== null) ? activeTransport : undefined,
     enrichmentDurationMs,
     crashPathsTested: crashPathResults.map((r) => r.path),
@@ -1272,16 +1286,17 @@ async function main() {
     }
   }
 
-  // Write deep-inspect.json
+  // Write deep-inspect.json (with optional arch suffix, e.g. deep-inspect.arm64.json)
+  const suffix = opts.outputSuffix ? `.${opts.outputSuffix}` : "";
   const deepInspect: DeepInspectOutput = { _meta: meta, ...inspectTree };
-  const deepInspectPath = `${opts.outputDir}/deep-inspect.json`;
+  const deepInspectPath = `${opts.outputDir}/deep-inspect${suffix}.json`;
   await Bun.write(deepInspectPath, JSON.stringify(deepInspect));
   console.log(`Written: ${deepInspectPath}`);
 
-  // Write openapi.json
+  // Write openapi.json (with same suffix)
   if (!opts.skipOpenapi) {
     const openapi = generateOpenAPI(inspectTree, version);
-    const openapiPath = `${opts.outputDir}/openapi.json`;
+    const openapiPath = `${opts.outputDir}/openapi${suffix}.json`;
     await Bun.write(openapiPath, JSON.stringify(openapi, null, 2));
     console.log(`Written: ${openapiPath}`);
   }

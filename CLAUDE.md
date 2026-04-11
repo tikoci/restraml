@@ -32,13 +32,15 @@ restraml/
 ├── *.test.ts             # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu   # Alpine image that runs RouterOS CHR in QEMU (for local use)
 ├── scripts/
-│   ├── entrypoint.sh         # QEMU launcher used by Dockerfile.chr-qemu (user-mode networking)
-│   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local QEMU CHR
-│   ├── test-ros-api.sh       # Integration + stress tests (ros-api-protocol) against local CHR
-│   ├── benchmark-qemu.sh     # REST vs native API timing benchmark against local CHR
-│   ├── analyze_appports.js   # Analyze /app port mappings (Bun)
-│   ├── analyze_appyamls.py   # Analyze /app YAML patterns (Python)
-│   └── extract_appyamls.py   # Extract /app YAMLs from app.json (Python)
+│   ├── entrypoint.sh               # QEMU launcher used by Dockerfile.chr-qemu (user-mode networking)
+│   ├── test-with-qemu.sh           # Integration tests (deep-inspect) against local QEMU CHR
+│   ├── test-ros-api.sh             # Integration + stress tests (ros-api-protocol) against local CHR
+│   ├── benchmark-qemu.sh           # REST vs native API timing benchmark against local CHR
+│   ├── deep-inspect-multi-arch.ts  # Per-arch deep-inspect orchestrator (quickchr library, x86 + arm64)
+│   ├── diff-deep-inspect.ts        # Diff two deep-inspect.<arch>.json files (enum drift + path delta)
+│   ├── analyze_appports.js         # Analyze /app port mappings (Bun)
+│   ├── analyze_appyamls.py         # Analyze /app YAML patterns (Python)
+│   └── extract_appyamls.py         # Extract /app YAMLs from app.json (Python)
 ├── .env                  # Local dev env vars (URLBASE, BASICAUTH) — not committed secrets
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
 │   ├── index.html        # Main SPA: version list, diff tool, download links
@@ -767,8 +769,25 @@ bun run test:benchmark         # REST vs native API timing benchmark (local CHR)
 bun run lint                   # Biome lint + TypeScript type check
 bun run lint:fix               # Auto-fix Biome issues
 bun run typecheck              # TypeScript type check only
-bun run deep-inspect           # Deep API tree inspection
+bun run deep-inspect           # Deep API tree inspection (single CHR via env vars)
+bun run deep-inspect:multi-arch  # Per-arch enrichment via quickchr (x86 + arm64)
+bun run deep-inspect:diff      # Diff two deep-inspect.<arch>.json files
 ```
+
+**Per-arch enrichment** (`deep-inspect:multi-arch`) boots a fresh CHR per arch
+via the `quickchr` library (`installAllPackages: true`), applies a p1 trial
+license if MikroTik web credentials are available (env vars for CI,
+Bun.secrets for local via `quickchr login`), runs `deep-inspect.ts --live`
+as a subprocess, and writes `deep-inspect.<arch>.json` / `openapi.<arch>.json`
+side-by-side. Exits nonzero per BACKLOG principle 3 if any arch has crash
+paths or failed args — anomalies are the point, not something to tolerate.
+See `BACKLOG.md` Phase 3 for the decision context and the first-run findings.
+
+**Diff tool** (`deep-inspect:diff`) reports structural delta (paths only in
+one arch), completion enum drift (same arg, different `_completion` keysets —
+this is the bucket that surfaces real schema gaps), and a `_meta` side-by-side.
+Does not merge, does not decide who is right; always exits 0. The text report
+is the intended CI artifact once Phase 3.5 lands.
 
 **Local CHR test scripts** (`test:ros-api`, `test:qemu`, `test:benchmark`) boot a RouterOS CHR
 VM using [mikropkl](https://github.com/tikoci/mikropkl) machine directories searched in this order:
