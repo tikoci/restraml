@@ -1,793 +1,265 @@
-# BACKLOG.md — deep-inspect.json Enrichment Roadmap
+# BACKLOG.md — deep-inspect Roadmap
 
-This file tracks the multi-phase plan to enrich `deep-inspect.json` with completion data,
-a native API transport, and ARM64 multi-architecture merge support.
-
-**Origin:** Imported from local plan `tingly-yawning-wreath.md` after Phase 1 shipped and
-was reviewed. Updated with post-review findings and known future wrinkles.
+Tracks how `deep-inspect.*.json` is produced and how the schema pipeline evolves.
+For historical forensics on shipped phases (native API investigation, benchmark
+sweeps, Phase 1/2 rollout), see git log and `docs/mikrotik-bug-native-api-inspect.md`.
+This file is meant to stay short and actionable.
 
 ---
 
-## Status Summary
+## Guiding principles
+
+These predate any specific phase and apply to every future change.
+
+### 1. `inspect.json` is load-bearing and frozen
+
+`docs/{version}/inspect.json` is consumed by many tikoci projects (rosetta,
+lsp-routeros-ts, the HTML tools in `docs/`, etc.) and potentially external
+consumers. Do not change its shape, do not rename it, do not stop publishing it.
+Any change to `inspect.json` is a standalone change with its own justification —
+never a side effect of deep-inspect work.
+
+It exists because direct `/console/inspect` → RAML was hard to debug. The
+JSON intermediate form turned out to be valuable on its own as a lingua franca
+between RouterOS CLI / REST / native API (which share the same path/cmd/attr
+model, just different encodings). That value is still intact and worth
+preserving.
+
+### 2. `deep-inspect.*.json` is independent — it runs its own crawl
+
+The deep-inspect pipeline must perform its own `/console/inspect` crawl against
+a live CHR. It must **not** take `inspect.json` as input in production. Reason:
+crash paths, error paths, and empty-response paths need to be identified at the
+time of the current build, against the current RouterOS version. A tree
+inherited from `inspect.json` launders those signals away — we'd see "the same"
+paths that were fine on a different earlier build.
+
+The existing `--inspect-file` flag stays as a developer convenience for offline
+work (e.g. iterating on merge logic without booting a CHR). It is not a
+production code path.
+
+### 3. Crashes and missing paths are signals, not exceptions
+
+We are building a schema, but the crawl is often the first thing that walks
+every corner of a new RouterOS build. `/console/inspect` likely reads internal
+TLV structures from many different subsystems, and a crash on a read-only
+operation is a hint that something else in that subsystem may have a more
+serious defect. The correct reaction is: **stop, investigate, report to
+MikroTik**, then resume building.
+
+Specifically:
+
+- **No hardcoded `CRASH_PATHS` skip list growth.** Do not add a path to a skip
+  list to "unblock the build". Each new crash must be confirmed reproducible,
+  filed upstream, and only then suppressed — with a comment linking the report.
+  The existing skip list in `rest2raml.js` is grandfathered; new entries need
+  explicit justification.
+- **99% is not "done".** A run that loses 14 of 30,000 paths is not an
+  acceptable steady state. Track the count per build; any non-zero count is a
+  thing to look at, not a thing to tolerate. Recent X86 builds have reached
+  zero crash paths — that is the bar.
+- **The build failing is not the emergency; the RouterOS bug it surfaced is.**
+  The right sequence is: investigate, decide whether it's our client bug or a
+  RouterOS bug, file accordingly, then unblock the build. Do not invert that.
+- **Rule out our side first.** Before attributing a crash to RouterOS, eliminate
+  client-side causes: REST URL encoding, JSON body shape, retry timing, our
+  completion filter. Only when the client is clean does the path get attributed
+  upstream.
+
+### 4. Per-arch files before any merge
+
+The pipeline produces `deep-inspect.x86.json` and `deep-inspect.arm64.json` as
+independent, self-consistent outputs. Merging them into a single
+`deep-inspect.json` is deferred. This preserves the ability to diff the two
+trees against each other as a cross-validation signal, and keeps each arch
+debuggable in isolation. A merged file hides disagreements that are useful to
+see.
+
+In the long run ARM64 is plausibly the better "default" tree — most RouterOS
+paths are arch-agnostic, and ARM64 ships with more packages (zerotier, blink,
+wifi-qcom variants, etc.). But that's a downstream decision for whenever merge
+happens, not Phase 3.
+
+---
+
+## Status
 
 | Phase | Name | Status |
 |-------|------|--------|
-| Phase 1 | Fix Completion Bug + Metadata | ✅ Done (post-review fixes applied) |
-| Phase 2 | Native API Protocol for Performance | ✅ Done (committed 65199b9) |
-| Phase 2.9 | Native API CONNRESET Investigation | ✅ Done — REST chosen for production |
-| Phase 3 | ARM64 Multi-Architecture Support | 🔲 Not started |
+| Phase 1 | Completion bug fix + metadata | ✅ Shipped |
+| Phase 2 | Native API transport | ✅ Shipped, unused in CI |
+| Phase 2.9 | Native API non-determinism finding | ✅ Resolved |
+| Phase 3 | ARM64 per-arch enrichment | 🟡 3.1–3.4 shipped locally; 3.5 (CI) pending |
+| Phase 4 | Multi-arch merge + `_source` | 🔲 Deferred |
+| Phase 5 | Per-package provenance (`_package`) | 🔲 Deferred |
+
+**Phase 2 / 2.9 one-line summary:** Native API transport was shipped and is
+measurably faster per-call, but `/console/inspect request=completion` returns
+non-deterministic results over the native API (~20–30% random entry drops).
+Confirmed RouterOS bug, see `docs/mikrotik-bug-native-api-inspect.md`. All
+schema work uses REST; `--transport rest` is the default. Native API code
+(`ros-api-protocol.ts`, `NativeRouterOSClient`) remains in the tree for
+potential future use if MikroTik fixes the bug. Reopening this decision
+requires new evidence and a well-tested reference — not a casual retry.
 
 ---
 
-## Context
+## Phase 3: ARM64 per-arch enrichment
 
-`deep-inspect.json` is a rich "source of truth" for RouterOS commands per version, consumed by
-the rosetta project and others. It is generated by `deep-inspect.ts` (Bun runtime), which enriches
-a raw `inspect.json` from `/console/inspect` with per-argument completion data.
+**Goal:** Produce `deep-inspect.arm64.json` as a peer to `deep-inspect.x86.json`,
+using the same code path, on the same RouterOS version, with its own fresh
+`/console/inspect` crawl. No merging. No fallback. No "enrich ARM64-only paths
+from X86" shortcut. Per principle 2, neither file is derived from `inspect.json`
+— both run their own crawl.
 
-**Original problems addressed:**
-- `argsWithCompletion: 0` across all published versions (completion filter bug)
-- X86 CHR misses ~108 nodes that only exist on ARM64 (zerotier, ethernet/switch)
-- ARM64 CHR misses ~354 nodes that only exist on X86 (caps-man, legacy wireless)
-- Enrichment over REST takes ~760s on X86 and ~1105s on ARM64 (native API would be ~17s/276s)
+### Prerequisites that already exist
 
----
-
-## Phase 1: Fix Completion Bug + Metadata ✅ Done
-
-### What shipped
-- **1.1** Fixed `filterCompletions()` — added `show === "true"` (string from REST API).
-  Previously only matched boolean `true` or string `"yes"`, never string `"true"`.
-- **1.2** Unit tests for `show === "true"`, mixed-value filtering.
-- **1.3** Optional `_meta` fields: `architecture?`, `apiTransport?`, `enrichmentDurationMs?`, `mergeStats?`
-- **1.4** Enrichment timing recorded in `main()`.
-
-### Post-review fixes applied (alongside Phase 1 code)
-
-**`apiTransport` semantics (was: medium bug):**
-`apiTransport` was hardcoded to `"rest"` even when `--skip-completion` was passed or no client
-was available. Fixed: `apiTransport` is now only set when completion enrichment was actually
-performed via REST. It remains `undefined` otherwise, so downstream consumers can distinguish
-"REST transport used" from "no enrichment done".
-
-**Completion payload normalization (was: medium bug):**
-The RouterOS REST API returns:
-- `preference` as a **string** (e.g. `"80"`), not a number
-- the description in a field named **`text`**, not `desc`
-
-`InspectCompletionResponse` now declares `preference?: number | string` and adds `text?: string`.
-`completionsToObject()` normalizes at the boundary:
-- `preference`: `typeof === "string"` → `Number(...)` coercion
-- description: uses `c.desc ?? c.text` fallback, so descriptions appear regardless of field name
-
-Five new unit tests cover these normalization cases.
-
-**Help text / `.env` auto-load (was: low):**
-The "offline enrichment" example in `printUsage()` now includes `--skip-completion` and a note
-that Bun auto-loads `.env`, so users with `URLBASE` set don't accidentally run live enrichment
-when they intend offline-only.
-
-### Metadata contract (for Phase 2 / Phase 3 implementors)
-Define these semantics before adding new transports or merge modes:
-
-| Field | Allowed values | Semantics |
-|-------|---------------|-----------|
-| `apiTransport` | `"rest"` \| `"native"` \| `undefined` | Only set when completions were fetched. `undefined` = no enrichment. |
-| `architecture` | `"x86"` \| `"arm64"` \| `"merged"` \| `undefined` | Only set when known. |
-| `mergeStats` | `{ x86OnlyNodes, arm64OnlyNodes, sharedNodes }` | Only set in `--merge` mode. |
-
----
-
-## Phase 2: Native API Protocol for Performance ✅ Done
-
-**Shipped in 65199b9. Corrected baseline verified on 7.20.8 p1 X86 KVM, April 2026.**
-
-### Performance baseline (7.20.8 p1, X86 KVM, batch=50 with retry)
-| Transport | Per-call (seq) | Full enrichment (27173 args) | argsFailed |
-|-----------|--------------|-----------------------------|------------|
-| REST (batch=50 + retry) | ~1.5ms/call | ~61s | 0 ✓ |
-| Native (batch=50 + retry) | ~0.5ms/call | ~44s | 0 ✓ |
-
-**Note:** Earlier figures (~760s REST, ~17s native) were measured before the batch=50 retry fix
-and used a pre-licensed CHR (free license = 1 Mbit/s throttle). The corrected figures above use
-batch=50 concurrent calls with the sequential retry pass for failed paths (see Phase 2.8).
-Both transports are now fast, reliable, and produce identical outputs.
+- `deep-inspect.ts` with `--live` crawl and REST enrichment (Phase 1+2).
+- `quickchr` library (`~/GitHub/quickchr`) with
+  `QuickCHR.start({arch: "arm64"}).rest(...)` — boots ARM64 CHR under QEMU TCG
+  on X86 hosts.
+- `all_packages-arm64-{ver}.zip` on `download.mikrotik.com` and
+  `cdn.mikrotik.com`, confirmed for 7.22+.
+- Empirically verified package conflict resolution: install all ARM64 packages,
+  reboot once, `wifi-qcom-be` wins the wireless conflict, `switch-marvell`
+  installs and registers its inspect subtree even though the hardware is absent.
 
 ### Tasks
 
-### What shipped (65199b9)
+#### 3.1 — Make `deep-inspect.ts` output arch-aware ✅
 
-- **2.0** Completion response normalization at client boundary — `completionsToObject()` handles
-  both REST and native API field differences (preference string→number, text→desc fallback).
-  Normalization is transport-agnostic: both clients return raw data, downstream normalizes.
-- **2.1** Vendored `ros-api-protocol.ts` (555 lines, zero external deps) from tikoci/tiktui.
-  Exports: `RosAPI`, `RosError`, `RosErrorCode`, `Sentence`, `CommandResult`.
-  Biome override: `noExplicitAny: off` for the protocol's socket handler typing.
-- **2.2** `IRouterOSClient` interface extracted. All call sites (`enrichWithCompletions`,
-  `crawlInspectTree`, `testCrashPaths`, `main()`) accept `IRouterOSClient`.
-- **2.3** `NativeRouterOSClient` wraps `RosAPI`. `connect()` + `close()` lifecycle.
-  Uses `/console/inspect` via wire protocol. All values returned as strings (matches REST behavior).
-- **2.4** CLI flags: `--transport` (auto|rest|native), `--api-host`, `--api-port`.
-  Auto mode: tries native port 8728, falls back to REST with diagnostic message.
-- **2.5** CI QEMU port forwarding updated: both build workflows now forward port 8728.
-  CI `deep-inspect.ts` auto-detects native API, enrichment runs ~45× faster on X86 KVM.
-- **2.6** `native-api.test.ts`: structural typing tests (unit), live parity tests (integration),
-  performance baseline (no hard assertion — varies by network topology).
-- **2.7** Verified: `bun test` passes (94 tests), `bun run lint` clean, integration tests pass.
-- **2.8** `enrichWithCompletions` sequential retry pass — shipped April 2026.
-  Under concurrent batch=50 load, the RouterOS HTTP daemon serializes requests to certain
-  subsystems (`/system` 93.6%, `/certificate` 6.4%), causing ~219 paths to timeout on REST
-  and ~7 on native per run. All failures respond in 1–2ms when retried sequentially.
-  Fix: failed paths are queued and retried one-at-a-time with `COMPLETION_RETRY_TIMEOUT_MS=30s`
-  before being reported as `argsFailed`. Result: `argsFailed=0` on every run, both transports.
-  The fix is in `enrichWithCompletions` in `deep-inspect.ts`.
+Shipped. `--arch {x86|arm64}` sets `_meta.architecture` explicitly;
+`--output-suffix <s>` produces `deep-inspect.<s>.json` / `openapi.<s>.json`.
+Crawl and enrichment code paths unchanged — same REST, same retry logic.
 
-### Acceptance criteria (all met)
-- [x] `IRouterOSClient` interface fully covers all call sites
-- [x] Both client implementations satisfy the interface (structural typing test)
-- [x] `auto` mode: unit test simulates port-closed scenario and confirms REST fallback
-- [x] `apiTransport` in `_meta` reflects actual transport used (not hardcoded)
-- [x] `bun run lint` produces zero errors
+#### 3.2 — Local orchestrator `scripts/deep-inspect-multi-arch.ts` ✅
 
----
+Shipped. Uses the `QuickCHR` library (`@tikoci/quickchr`) rather than
+hand-rolling SCP + reboot: `installAllPackages: true` handles the extra
+package install, reboot, and post-reboot wait. Empirically reproduces the
+conflict resolution we previously verified by hand (wifi-qcom-be wins,
+switch-marvell registers its subtree, etc.). Licensing via
+`getStoredCredentials()` from quickchr's barrel — reads
+`MIKROTIK_WEB_ACCOUNT`/`MIKROTIK_WEB_PASSWORD` (CI) or Bun.secrets (local).
 
-## Phase 2.9: Native API CONNRESET Investigation ✅ Done — REST chosen for production
+Per principle 3, exits nonzero on `crashPathsCrashed > 0` or `argsFailed > 0`
+after retries, with the full path list.
 
-**Context:** First CI run of "Test: REST vs Native API Equivalence" (run 24002242406, April 2026)
-showed native API taking **3.5× longer than REST** (271s vs 77s) and producing 77 fewer
-completions, with 1 argsFailed. REST was definitively better on both metrics — the opposite of
-the expected outcome (native API should be marginally faster, not 3× slower).
+#### 3.3 — Overlap diff tool `scripts/diff-deep-inspect.ts` ✅
 
-**What the data shows:**
-- `argsWithCompletion`: REST=9357, Native=9280 (77 missing on native)
-- `argsFailed`: REST=0, Native=1
-- Missing completions are scattered across subsystems (certificate, console, interface, etc.)
-- Every difference is native *missing* a `_completion` that REST has — no reverse case
+Shipped. Produces a text or JSON report:
 
-**Root cause hypothesis:** The `RosAPI` TCP connection is being dropped under concurrent load
-(50 commands in-flight via tag multiplexing). When `_onClose()` fires, all 50 in-flight
-commands are rejected with `CONNRESET` at once. They pile into the sequential retry queue.
-`RosAPI.write()` auto-reconnects (calls `connect()` when `!this.connected`), but some
-completions come back empty after reconnect — silently, without `throw` — so `_completion`
-is never set for those paths. This explains both the slowdown (huge retryQueue) and the
-77 missing completions (reconnect-after-drop returns empty results for some paths).
+- `_meta` side-by-side (versions, transports, completion stats).
+- Paths only in A / only in B, grouped by top-level segment.
+- Completion enum drift — args on both arches with different `_completion`
+  keysets, sorted by total delta size. This is the bucket that surfaces
+  genuine schema gaps.
+- Type mismatches (same path, different `_type`) — flagged separately as
+  structural surprises worth investigating.
 
-**What was NOT the cause (ruled out):**
-- `withAbortSignal` orphaned promises: when abort fires, the `_send()` promise remains in
-  `this.pending` but the router responds to it eventually and it's cleaned up via
-  `_routeSentence()`. No leak, no protocol corruption.
-- Batch size: 50 was verified to work well for REST. The issue is specific to the
-  single shared TCP connection of the native API under concurrent load.
+**Does not merge, does not decide who is right.** Exit code is 0 regardless
+of diff size — a difference is not a failure. Gating on this report is a CI
+concern (3.5), not the tool's concern.
 
-**Safety fix (done, April 2026):**
-- Build workflows (`manual-using-docker-in-docker.yaml`, `manual-using-extra-docker-in-docker.yaml`)
-  changed from `--transport auto` to `--transport rest`. Ensures production schema builds use
-  the proven REST path while native API investigation continues.
+#### 3.4 — First real run + investigation ✅
 
-**Observability fix (done, April 2026):**
-- `NativeRouterOSClient` now catches `CONNRESET` errors in `fetchChild/fetchSyntax/fetchCompletion`
-  and logs them to stderr with the path that triggered the drop and an incrementing counter.
-- `getReconnectStats()` method returns `{ count, firstPaths }` for the session.
-- `DeepInspectMeta` has a new optional field `nativeApiReconnects: { count, firstPaths }` —
-  only set when native transport is used AND at least one CONNRESET was observed.
-- `main()` logs a prominent warning summarising total CONNRESET count after enrichment.
-- Re-running "Test: REST vs Native API Equivalence" will now show CONNRESET count in
-  the step log and in `_meta` output, confirming whether the hypothesis is correct.
+Run: `bun scripts/deep-inspect-multi-arch.ts --channel stable --output-dir /tmp/multi-arch`
+against 7.22.1 (x86 + arm64, all extra packages). Both arches: 0 crash paths,
+0 failed args, ~0.7% batch-timeout retries with 175/176 blank-on-retry.
 
-**Cancel-grace timeout fix (done, April 2026):**
+Diff outcome — numbers pass the sniff test:
 
-Root cause of the 40+ minute CI hang (run 24003439705): `writeAbortable()` sends `/cancel` when
-the AbortSignal fires (e.g. from a 5s `COMPLETION_TIMEOUT_MS`), but had **no forced rejection**
-if the router never acknowledges the `/cancel`. Hanger paths (e.g. `ip/address/add/broadcast`,
-`ip/address/comment/comment`) block the router's command handler, preventing it from processing
-the `/cancel` — so `commandPromise` hangs forever. With batch=50, one hung command blocks the
-entire `Promise.all`, and since every batch contains some hanger paths, the enrichment hangs
-indefinitely.
+- **+1433 paths only in arm64, 37 paths only in x86** (shared 46,483).
+- The ~1.4K arm64-only set is concentrated in `/zerotier` (427),
+  `/interface/ethernet/switch/**` (switch-marvell), wifi/routing extras —
+  exactly the extra-package surface we expected ARM64 to have.
+- The 37 x86-only paths (`/system/console/screen/*`,
+  `/system/health/set/state-after-reboot`, `/interface/ethernet/*/cable-settings`)
+  are the legacy-CHR tail. CHR began as the x86-only form of RouterOS before
+  MikroTik shipped hardware; ARM64 is the reverse — it started on hardware
+  and was later packaged as stock aarch64 Linux. That asymmetry matching our
+  expectations is a positive signal that the pipeline is seeing real
+  RouterOS, not a bug.
+- Completion enum drift: 1,137 args. One legitimate schema gap — `/ip/cloud/get/value-name`
+  exposes `back-to-home-vpn` and 9 `vpn-*` fields only on arm64. The rest are
+  noise categories (VM hardware sensors/PCI IDs, filesystem `skins/`,
+  package-name enum) that a future filter can suppress.
+- Zero type mismatches. Nothing to investigate upstream.
 
-Fix: Added `CANCEL_GRACE_MS = 5_000` to `writeAbortable()`. After the abort signal fires and
-`/cancel` is sent, a grace timer starts. If the router doesn't acknowledge within 5s, the
-command is force-rejected with `RosError(ETIMEDOUT)`. Also handles the disconnected state
-(socket gone before abort) by immediately rejecting with `CONNRESET`. The grace timer is
-cleaned up in `finally` if the command resolves normally before the timer fires.
+**Takeaway:** the per-arch pipeline is producing usable output and the arm64
+view does meaningfully more than x86. Ready to proceed to 3.5.
 
-Total worst-case per-command timeout is now bounded: `COMPLETION_TIMEOUT_MS + CANCEL_GRACE_MS`
-(10s for enrichment, 35s for retry). Without this fix, a single unresponsive command could hang
-the entire enrichment forever.
+#### 3.5 — CI integration (pending)
 
-4 unit tests added to `ros-api-protocol.test.ts` (`§7b writeAbortable — cancel-grace timeout`):
-- Force-rejects with ETIMEDOUT after grace period when router ignores /cancel
-- Does NOT force-reject if router acknowledges /cancel normally (!trap category=2)
-- Force-rejects immediately with CONNRESET when not connected and signal is aborted
-- Grace timer is cleaned up when command resolves before grace period expires
+- New job that boots ARM64 CHR via QEMU TCG on an X86 runner. Boot time is
+  empirically ~5 min for install + post-reboot ready; measure on the real
+  runner before committing to a timeout. Enrichment is ~4× slower than x86
+  (325s vs 76s on the local run — TCG emulation tax).
+- Runs crawl + enrich, publishes `docs/{version}/deep-inspect.arm64.json`
+  (and `docs/{version}/extra/deep-inspect.arm64.json`).
+- **Runs `scripts/diff-deep-inspect.ts` against the x86 and arm64 outputs and
+  publishes the text report as a build artifact** (step summary + uploaded
+  file). Initially informational — no hard gate until we have a baseline
+  across multiple versions. The report is the point: it's the human-readable
+  record of what each build surfaced.
+- `auto.yaml` extended to check for missing `deep-inspect.arm64.json`
+  alongside existing artifacts.
 
-**Next steps:**
-1. Re-run "Test: REST vs Native API Equivalence" workflow to confirm the fix prevents hangs.
-   Native enrichment should now fail gracefully (ETIMEDOUT on hanger paths → retryQueue)
-   instead of hanging forever. Expect total native enrichment time to increase by
-   ~(hanger_path_count × 10s) but complete instead of timing out.
-2. Re-run to confirm CONNRESET events appear in the log and count matches the ~77 missing
-   completions (observability fix from earlier).
-3. Investigate whether CONNRESET can be prevented:
-   - Reduce batch concurrency for native (e.g. ENRICHMENT_BATCH_SIZE=10 for native vs 50)?
-   - Is this a RouterOS bug (TCP RST under API load)? Or a Bun `Bun.connect` socket bug?
-4. If CONNRESET continues at reduced concurrency, file a bug report to MikroTik with:
-   - RouterOS version, concurrency level, CONNRESET count, affected paths sample
-   - Compare behaviour: does the same number of concurrent `/console/inspect` commands
-     trigger CONNRESET consistently? Is it specific to `/console/inspect` or any command?
-5. If it's a Bun socket bug: reproduce with a minimal script and file against Bun.
+### Explicitly not in Phase 3
 
-**Second CI run analysis (run 24004412387, April 2026):**
-
-The cancel-grace fix prevented the infinite hang but introduced a **4× performance regression**:
-- REST: 81s, 9357 completions, 261 retried, 190 blank-on-retry, 0 failed
-- Native: 326s (4×!), 9312 completions, 81 retried, 62 blank-on-retry, 0 failed
-- 45 fewer completions on native → deep-inspect.json DIFFERS → build FAILED
-
-Root causes identified:
-1. **CANCEL_GRACE_MS blocks the caller**: Each batch with a hanger path costs `COMPLETION_TIMEOUT_MS
-   + CANCEL_GRACE_MS` (10s) because `writeAbortable` awaits the grace period before rejecting. REST
-   aborts are instant (HTTP fetch abort). This single issue explains the 4× slowdown.
-2. **Silent completion loss**: When `/cancel` is acknowledged (!trap cat=2), `commandPromise`
-   resolves with `[]`. `enrichWithCompletions` sees empty completions (not an error), so the path
-   is NEVER retried — completions are silently lost. This contributes to the 45 missing.
-3. **52 CONNRESETs in a single 25ms window**: All at timestamp 15:28:04.110–15:28:04.133 — one TCP
-   drop killing the entire in-flight batch. First path: `system/reset-configuration/force-v6-to-v7-configuration-upgrade`.
-   All CONNRESETs in `system/reset-configuration/*` and `system/resource/*` (alphabetically adjacent
-   = same batch). Theory: a specific `/console/inspect` command in this batch crashes the RouterOS
-   API service process, which restarts but the TCP connection is lost.
-
-**Immediate-reject fix (done, April 2026):**
-
-Replaced the grace-timer-blocking `writeAbortable` with an immediate-reject design:
-- On abort: send `/cancel` as fire-and-forget, **immediately** reject the caller's promise with
-  `RosError(ETIMEDOUT)`, replace the pending map entry with a "zombie handler" that silently
-  absorbs the router's eventual response.
-- No more grace timer blocking — abort is instant, just like REST's `fetch().abort()`.
-- The zombie handler ensures the router's `/cancel` acknowledgement (!trap cat=2 or !done)
-  doesn't log as "orphan sentence" — it's silently consumed and the tag is cleaned from pending.
-- `_onClose` cleans up zombie handlers along with all other pending entries on connection drop.
-- Removed `CANCEL_GRACE_MS` constant entirely — no longer needed.
-
-This fixes all three issues:
-1. **Performance**: Abort is instant → batch with hanger paths costs 5s (same as REST), not 10s.
-2. **Silent loss**: Abort always triggers catch → path always goes to retryQueue → retried sequentially.
-3. **Diagnostics**: Added CONNRESET batch logging to `enrichWithCompletions` — when a CONNRESET hits
-   a batch, ALL paths in that batch are logged (not just the first to fail), making it possible to
-   identify the crash-triggering command.
-
-5 unit tests in `ros-api-protocol.test.ts` (`§7b writeAbortable — immediate-reject on abort`):
-- Rejects immediately with ETIMEDOUT (< 200ms, not 5s)
-- Sends /cancel as fire-and-forget (verifies 2 socket writes)
-- Rejects with ETIMEDOUT when not connected (can't send /cancel)
-- Zombie handler absorbs router response after abort
-- _onClose cleans up zombie handlers
-
-**Remaining investigation (CONNRESET root cause):**
-- Need to test `system/reset-configuration/*` paths individually against a local CHR to identify
-  which specific command crashes the API process.
-- `testCrashPaths()` in deep-inspect.ts can be used for this — feed it the paths from the
-  CONNRESET batch and run them one at a time.
-- If confirmed as a RouterOS bug, file with MikroTik: version 7.22.1, the specific command path,
-  reproduction steps via `/console/inspect` REST or API call.
-
-### Resolution: Native API Non-Determinism (May 2026)
-
-**Executive summary:** RouterOS `/console/inspect` with `request=completion` returns
-non-deterministic results over the native API binary protocol. The same command issued
-repeatedly on the same TCP connection randomly drops completion entries ~20-30% of the time.
-REST is 100% deterministic. **Decision: use REST for all schema-generation work going forward.**
-
-**How discovered:**
-Following the CONNRESET investigation, targeted testing on a local CHR (7.22.1 stable, macOS
-HVF) revealed that the 77-completion gap was NOT caused by CONNRESETs alone. A systematic
-investigation compared REST and native API results at the individual entry level:
-
-1. **Path-level comparison** (`scripts/find-diff-paths.js`): REST has completions for 9357 paths,
-   native for 9302. 55 paths entirely missing in native, 0 missing in REST.
-2. **Entry-level comparison** (`scripts/quantify-diff.js`): REST: 55730 total entries, native:
-   53935 — delta of 1795. **Native is always a strict subset of REST** — 0 entries unique to native.
-3. **Sequential testing** (`scripts/test-problem-paths-v2.ts`): Testing the 1279 differing paths
-   one-at-a-time, 911 (71.2%) match — proving it's NOT purely a concurrency issue.
-4. **Determinism test** (`scripts/test-rest-determinism.ts`): The definitive experiment.
-   Query the same path (`/ip/address/add`) 20× on each transport:
-   - **REST: 20/20 always returns 14 entries (100% deterministic)**
-   - **Native: 16/20 returns 14 entries, 4/20 returns 13 (random drops ~20-30%)**
-5. **Degradation monitoring** (`scripts/test-session-degradation.ts`): Over 500 queries on
-   one connection, drops are non-monotonic — they fluctuate randomly per-call, not accumulating.
-6. **Reconnection testing** (`scripts/test-reconnect-strategy.ts`): Reconnecting every N queries
-   does NOT fix it. Drops are random per individual call, not a session degradation.
-
-**Root cause (confirmed):** The RouterOS native API `/console/inspect` completion handler has
-internal non-determinism. REST creates a fresh API session per HTTP request, so each inspect
-call runs in isolation. The native API reuses a persistent session where the inspect engine's
-completion enumeration has a race condition or timing-dependent code path that sometimes skips
-entries. This is a RouterOS bug, not a protocol or client bug.
-
-**What remains in the codebase:**
-- `ros-api-protocol.ts` — vendored wire protocol, fully functional, well-tested. Valuable for
-  future crawl work (22× faster than REST for crawl) and any non-inspect-completion use cases.
-- `NativeRouterOSClient` in `deep-inspect.ts` — works correctly for `child` and `syntax` requests;
-  only `completion` is affected by the non-determinism bug.
-- CI workflows use `--transport rest` (now the default in `deep-inspect.ts`). `--transport native`
-  and `--transport auto` remain as options but are NOT used in CI.
-- `benchmark.test.ts` and `native-api.test.ts` were **removed** (research artifacts with no
-  production value now that REST is the settled choice).
-- `test-transport-equivalence.yaml` was **deleted** (experimental workflow, proven moot by the
-  non-determinism finding — native will always produce a strict subset of REST completions).
-- Investigation scripts preserved in `scripts/native-api-investigation/` (untracked) for reference.
-
-**What this means for Phase 3:**
-Phase 3 (ARM64 multi-architecture) uses `--skip-completion` for ARM64 crawl (completions
-fetched from X86 REST side). The native API bug does not affect tree crawling (`child` requests),
-only `completion` requests. However, for simplicity and reliability, **all enrichment
-(completion) work will use REST**. The native API code remains available if MikroTik fixes
-the non-determinism bug, or for crawl-only use cases where its 22× speed advantage matters.
-
-**MikroTik bug report:** See `docs/mikrotik-bug-native-api-inspect.md` for the full write-up
-with reproduction steps, suitable for filing with MikroTik support.
+- **No merge.** No `mergeInspectTrees()`, no `_source` annotation, no merged
+  `deep-inspect.json`. Phase 4.
+- **No `_package` annotation.** Phase 5.
+- **No change to `inspect.json`** at any step. Phase 3 adds files, it does not
+  modify existing ones.
+- **No hybrid enrichment.** Each arch crawls and enriches on its own CHR.
+- **No use of `inspect.json` as a deep-inspect input in CI.** Per principle 2.
 
 ---
 
-## Phase 3: ARM64 Multi-Architecture Support 🔲 Not started
+## Phase 4: Multi-arch merge (deferred)
 
-**Requires Phase 1 (done). Phase 2 (done) recommended before broad rollout.**
+Deferred until Phase 3 ships and the overlap diff is understood in practice.
 
-### Architecture difference summary (7.23beta5, both with all extra packages)
-| Category | X86-only | ARM64-only | Shared |
-|----------|----------|------------|--------|
-| Root paths | `caps-man` | `zerotier`, `blink` | 85 paths |
-| Subtree nodes | 354 | 108 | ~40,000 |
-| Packages | 12 | 18 | |
+Likely shape:
 
-**Known surprises:**
-- `/interface/wifi` is IDENTICAL on both architectures (wifi-qcom doesn't add inspect paths)
-- `/iot/bluetooth` is IDENTICAL (iot-bt-extra doesn't add visible paths)
-- `switch-marvell` (DISABLED on ARM64 CHR) DOES add `/interface/ethernet/switch` paths (52 nodes)
-- ARM64 CHR available in `.img.zip` and `.vdi.zip` formats; boots in ~20s under TCG on x86_64 host
+- `mergeInspectTrees()` combining the two per-arch files into
+  `deep-inspect.json`.
+- Sparse `_source: "x86" | "arm64"` annotation, only on arch-unique nodes
+  (absent = present in both).
+- `--merge` CLI mode taking both arch files and writing the merged output.
+- `_meta.mergeStats` fields.
+- Conflict policy for shared-node `_completion` disagreements — TBD, depends
+  on what Phase 3.4 actually surfaces.
 
-### ARM64 Research Findings (Resolved, April 2026 — 7.23beta5)
-
-**Reboot timing:**
-- Live VM (KVM): ~53–56 seconds per reboot consistently
-- QEMU TCG ARM64 on x86_64 CI: GitHub Actions X86 runners have no KVM. Running X86 host →
-  ARM64 guest via TCG is the same scenario as on an Intel Mac (where boot takes ~20–60s). A
-  conservative 10-minute timeout was noted earlier, but that figure may have come from a
-  conflated experiment. Actual CI boot time should be measured on first run and the loop tuned.
-  Using an ARM64 GitHub runner would give ARM64→ARM64 TCG (faster than X86→ARM64 TCG) but adds
-  runner selection complexity; the simpler choice is X86 runner + `accel=tcg` (same as local dev).
-- **For crawl-only runs** (`--skip-completion`) the wall time is short regardless of TCG speed;
-  the bottleneck is boot, not crawl. Measure on first CI run.
-
-**Package conflict resolution (empirically verified):**
-- All ARM64 packages scheduled for enable simultaneously → wifi-qcom-be **WINS**; wifi-qcom
-  and wireless are DISABLED by RouterOS conflict resolution on reboot
-- `wifi-qcom` and `wifi-qcom-be` CAN coexist if wifi-qcom is explicitly re-enabled after the
-  first reboot — they are NOT mutually exclusive with each other
-- `wireless` always loses to any Qualcomm wifi driver (wifi-qcom-be or wifi-qcom)
-- `switch-marvell`: always shows `disabled: true` on QEMU ARM64 (RouterOS hardware detection
-  finds no Marvell switch chip). However the **install tree is registered at install time**, so
-  `/interface/ethernet/switch` paths (52 nodes) ARE visible in the inspect tree regardless
-- **CI strategy:** SCP all_packages zip → reboot into installed state → **ONE reboot only**.
-  This is more deterministic than `POST /system/package/enable` (fewer steps, no per-package
-  API calls). After reboot all packages are active subject to conflict resolution above.
-  - Install ALL packages from the zip unconditionally. RouterOS handles the conflict.
-  - Exception: exclude `wireless` explicitly if needed to ensure wifi-qcom-be wins. Currently
-    the conflict resolution already disables wireless automatically when wifi-qcom-be is
-    present; explicit exclusion is a safety net for future RouterOS versions.
-  - Note: the `wifi-qcom` vs `wifi-qcom-be` split may evolve over time — the hAPbe3 (the
-    only hardware using wifi-qcom-be) has barely shipped. Their behaviour may converge or
-    diverge in future releases; revisit this if new conflicts appear.
-
-**Architecture topology (empirically verified, 7.23beta5):**
-
-| Path | Source | X86 | ARM64 |
-|------|--------|-----|-------|
-| `/interface/wifi` (40 keys) | Base routeros | ✓ identical | ✓ identical |
-| `/blink` | Base routeros ARM64 | — | ✓ |
-| `/caps-man`, `/interface/wireless` | `wireless` package | ✓ (wireless stays enabled on X86) | — (wireless disabled by wifi-qcom-be conflict) |
-| `/zerotier` | `zerotier` package | — | ✓ |
-| `/interface/ethernet/switch` | `switch-marvell` (installed+disabled, hw absent) | — | ✓ (52 nodes) |
-
-**Key insight:** `caps-man` is NOT fundamentally X86-only at the RouterOS level — it comes from
-the `wireless` package, which is available on both architectures. It is absent from ARM64 CI
-crawls because `wireless` is always disabled there by the wifi-qcom-be conflict. In the merged
-schema, `caps-man` will carry `_source: "x86"`. This is architecturally correct: ARM64 RouterOS
-devices with Qualcomm wifi hardware do not use caps-man anyway.
-
-**`all_packages` zip availability:** Confirmed available for ARM64 (at least 7.22+) from
-both `download.mikrotik.com` (stable) and `cdn.mikrotik.com` (beta/RC). The same
-primary+fallback wget pattern from the X86 extra-packages workflow applies unchanged.
-
-### Tasks
-
-**3.1 Implement `mergeInspectTrees()`**
-- Signature: `mergeInspectTrees(trees: Array<{ tree: InspectNode; source: string }>): InspectNode`
-- Deep merge logic:
-  - Nodes in both trees: merge recursively, no `_source` annotation (implicit "both")
-  - Nodes in only one tree: include with `_source: "x86"` or `_source: "arm64"`
-  - `_completion` keys: union from both trees (first tree's values win on key conflict)
-- Returns merged tree + stats (`x86OnlyNodes`, `arm64OnlyNodes`, `sharedNodes`)
-
-**3.2 Sparse `_source` annotation**
-- Add `_source?: string` to `InspectNode` interface
-- Only set on arch-unique nodes (~462 out of ~40k) — avoids bloating JSON
-- Absence means "present in both architectures"
-
-**3.3 Unit tests for tree merging** *(lock conflict policy in tests first)*
-- Test cases: identical trees, x86-only paths, arm64-only paths, completion union
-- Real-world scenarios: zerotier/caps-man, switch-marvell paths
-- Merge determinism: same output regardless of input order for shared nodes
-- `_completion` key collision policy: first-tree-wins rule must be deterministic
-- `desc` conflict on shared arg nodes: document which value wins
-
-**3.4 Add `--merge` CLI mode**
-- Options: `--merge`, `--x86-file <path>`, `--arm64-file <path>`
-- In merge mode: load both trees, merge, set `_meta.architecture = "merged"`, write output
-- Generates merged `deep-inspect.json` and `openapi.json`
-
-**3.5 ARM64 CI job in extra-packages workflow**
-- File: `manual-using-extra-docker-in-docker.yaml`
-- Add parallel `arm64-crawl` job:
-  - Runner: `ubuntu-latest` (X86) — same QEMU TCG approach as local Intel Mac dev
-  - `apt` packages: `qemu-system-arm qemu-efi-aarch64 qemu-utils`
-  - Firmware: `/usr/share/qemu-efi-aarch64/QEMU_EFI.fd`
-  - Boot: `qemu-system-aarch64 -M virt -cpu cortex-a72 -m 256 -bios QEMU_EFI.fd -accel tcg`
-  - Wait loop: start with 30×10s (same as X86); tune after first CI run — do not assume 10 min
-  - Extra packages: `all_packages-arm64-{ver}.zip` — availability confirmed for 7.22+
-  - Package install: SCP zip → RouterOS installs all packages on reboot → **one reboot only**
-    - All packages installed; wireless conflict handled automatically (wifi-qcom-be wins)
-    - After reboot: wifi-qcom-be enabled; wireless disabled (conflict); switch-marvell disabled
-      (no Marvell hw) — expected/correct state, no remediation needed
-  - Crawl: `bun deep-inspect.ts --live --skip-completion` (completions fetched from X86 side)
-  - Upload `deep-inspect.json` as artifact
-- Add `merge-and-publish` job depending on both X86 and ARM64 crawl jobs
-
-**3.6 ARM64 experiment test file (`arm64-inspect.test.ts`)**
-- Live integration tests against ARM64 CHR when `ARM64_URLBASE` is set
-- Verify ARM64-unique paths: `/zerotier`, `/interface/ethernet/switch`, `/blink`
-- Verify absent from ARM64 (wireless disabled): `/caps-man`, `/interface/wireless`
-- Confirm `/interface/wifi` has exactly 40 keys, identical to X86 base (it's in base routeros)
-- Verify switch-marvell disabled but paths still visible (inspect tree registered at install time)
-- Timing benchmarks kept as guarded integration baselines for regression detection
-
-**3.7 Verification**
-- `bun test` — unit tests including merge tests pass
-- Local test: merge two JSON files from X86 and ARM64 CHRs
-- CI dry run: ARM64 QEMU boots and crawl completes within 10-minute timeout
-- Check merged output: `_meta.mergeStats` shows expected node counts (~354 x86-only, ~108 arm64-only)
+Reason for deferral: nothing currently consumes a merged file, merge policy
+depends on real diff data we don't have yet, and a merged file hides the
+cross-arch disagreements that are useful to see. Ship the per-arch files
+first.
 
 ---
 
-## Backlog Items (deferred, not in any phase)
+## Phase 5: Per-package provenance (deferred)
 
-### `_package` annotation
-Identifying which extra-package provides which command is hard:
-- No RouterOS API exposes a package→command mapping
-- Heuristics work for obvious cases (e.g. `/iot` → `iot`, `/zerotier` → `zerotier`)
-- Accurate approach: install packages one at a time, diff tree after each install — complex, many CHR reboots
-- Track demand before implementing
+Identifying which extra package provides which command is hard. No RouterOS
+API exposes a package→command mapping. The accurate approach: install packages
+one at a time, crawl after each install, diff. Many reboots, inherently slow.
 
-### Native API for full crawl — ⏸️ TABLED (native API non-determinism bug)
-`crawlInspectTree` currently uses REST (`rest2raml.js`) then enriches via `deep-inspect.ts`.
-With Phase 2 shipped, `crawlInspectTree` in `deep-inspect.ts` already accepts `IRouterOSClient`
-and works with either transport.
+`quickchr --add-package` is the obvious lever once it has enough independent
+test coverage for conflict cases. Track demand before investing.
 
-**Status (May 2026):** The native API `request=completion` non-determinism bug (see Phase 2.9
-resolution) means native API cannot be used for reliable completion enrichment. REST is 100%
-deterministic and is the only transport used in CI.
+---
 
-**Native API advantages (still valid for non-completion work):**
-- **22× faster full crawl** — 75s via native vs ~1645s via REST (X86 KVM)
-- **2× faster per-call latency** — 0.5-0.8ms native vs 1.0-1.3ms REST
-- All `child` and `syntax` requests appear reliable; only `completion` is affected
-
-**Reopening criteria:** If MikroTik fixes the `/console/inspect` completion non-determinism
-(see `docs/mikrotik-bug-native-api-inspect.md`), the hybrid REST-crawl + native-enrichment
-approach becomes viable again, with potential full-pipeline native mode after that.
-
-### Multiplexed batch enrichment — ✅ RESOLVED (Phase 2.8)
-`enrichWithCompletions` uses batched concurrency (ENRICHMENT_BATCH_SIZE=50, `Promise.all`).
-The native API protocol supports tag-multiplexed concurrent commands on a single TCP connection.
-
-**Root cause (April 2026, resolved in Phase 2.8):**
-
-Under concurrent batch=50 load, the RouterOS HTTP daemon serializes requests into specific
-subsystems (`/system`, `/certificate`), queuing them past the 5s `COMPLETION_TIMEOUT_MS`.
-Native API has ~7 random-jitter timeouts per run via a different mechanism.
-**In both cases, the affected paths respond in 1–2ms when retried sequentially.**
-
-Fix: `enrichWithCompletions` now runs a sequential retry pass after the concurrent batch phase.
-Any path that times out under concurrency is retried one-at-a-time with a 30s timeout.
-Result: `argsFailed=0` on every run, both transports, 0 missed paths.
-
-Current full-tree performance (7.20.8 p1, X86 KVM, batch=50 + retry):
-- REST: ~61s, 0 argsFailed
-- Native: ~44s, 0 argsFailed
-
-**Correctness verified by controlled benchmark (7.20.8 p1 baseline, see Benchmark section)** —
-REST is deterministic across two independent runs. Native produces a strict subset of REST
-due to the non-determinism bug (see Phase 2.9 resolution).
+## Other open items
 
 ### Deep-inspect backfill for stable versions
-Generate `deep-inspect.json` (and enriched `openapi.json`) for all current release channels,
-working back to at least 7.20.8 (current long-term). This ensures the HTML tools have rich
-schema data for all actively-used RouterOS versions.
 
-**Approach:**
-- Use the development branch (currently 7.23betaN) for the first CI test of the Phase 2 native
-  transport in production. This version already has `deep-inspect.json` — safe to replace if broken.
-- After verifying CI works end-to-end on development, backfill: stable, testing, long-term.
-- Existing `inspect.json` files are already published for these versions; `deep-inspect.ts
-  --inspect-file` can enrich them without a live router (structure only, no completions). For full
-  completions, a live CHR is needed per version.
-- **Priority order:** development (CI validation) → stable → long-term → testing
-- Nothing currently consumes `deep-inspect.json` in the HTML tools, so a few hours of broken
-  state during backfill is acceptable. However, `openapi.json` IS used by `openapi.html` —
-  regenerating it should produce equivalent or better output, but verify against the existing
-  version first.
+Once Phase 3 is clean, regenerate `deep-inspect.x86.json` and
+`deep-inspect.arm64.json` for all current release channels, back to at least
+the current long-term. Priority order: development → stable → long-term →
+testing.
 
-### `special-login` transport difference investigation
-During Phase 2 testing, `special-login` appeared absent from native API root children results.
-However, it IS a legitimate CLI path (has add/print/set/get etc.), IS visible in
-`/console/inspect` output on all tested versions, and IS in every published `inspect.json`.
-Worth investigating whether this is a version-specific or timing artifact vs a real
-native-API-vs-REST difference. Low priority — the test no longer asserts on it.
-
----
-
-## Benchmark Test Suite Design — ✅ IMPLEMENTED (archived May 2026)
-
-> `benchmark.test.ts` was **removed** (May 2026) as a research artifact — it required a live
-> CHR with both REST and native API ports, and served no production purpose once REST was chosen
-> as the only transport. The results below are preserved as historical reference for Phase 3.
->
-> The `scripts/benchmark-qemu.sh` orchestration script is also a historical artifact but is
-> kept in `scripts/` for reference. The `_meta.enrichmentDurationMs` field in `deep-inspect.json`
-> provides ongoing timing data in CI.
-
-~~Implemented in `benchmark.test.ts`~~. Historical baseline data:
-
-### Controlled variables
-
-Every benchmark run MUST record these in the results:
-
-| Variable | How to check | Why it matters |
-|----------|-------------|----------------|
-| CHR license level | `curl -sS -X POST http://admin:@HOST:PORT/rest/system/license/get -H 'Content-Type: application/json' -d '{"value-name":"level"}' \| jq -r '.ret'` | Free = 1 Mbit/s cap, p1 trial = 1 Gbit/s. This was the root cause of 45× variation across sessions |
-| RouterOS version | `--version` flag or `/system/resource/print` | Different versions may have different `/console/inspect` performance |
-| Network topology | Document: KVM bridged, KVM user-mode, QEMU user-mode, HVF bridged, HVF user-mode | QEMU user-mode implements its own TCP stack (slower). KVM/HVF bridged is closest to real hardware |
-| Architecture + accel | `x86+KVM`, `x86+HVF`, `arm64+TCG` | TCG (software emulation) is CPU-bound single-core — different bottleneck than KVM |
-| Host machine | CPU model, OS, RAM | Context for reproducibility |
-| API port mapping | e.g. `host:8728→VM:8728` or `host:9728→VM:8728` | Verify which CHR is actually being tested (port mismatch caused bad data in April 2026 session) |
-| Total arg count | Reported by enrichment stats | Varies by version/packages; normalize to calls/second |
-
-### Test 1: Enrichment transport comparison (sequential)
-
-**Purpose:** Compare REST vs native API for completion enrichment, sequential calls.
-
-```bash
-# Prerequisites: live CHR with known license level
-# Record all controlled variables first
-
-# REST sequential
-bun deep-inspect.ts --inspect-file ros-inspect-all.json \
-  --ros-version "$(bun deep-inspect.ts --version)" \
-  --output-dir /tmp/bench-rest --transport rest
-
-# Native sequential (modify ENRICHMENT_BATCH_SIZE=1 temporarily, or add --batch-size flag)
-bun deep-inspect.ts --inspect-file ros-inspect-all.json \
-  --ros-version "$(bun deep-inspect.ts --version)" \
-  --output-dir /tmp/bench-native-seq --transport native
-
-# Compare outputs
-diff <(jq -S . /tmp/bench-rest/deep-inspect.json) <(jq -S . /tmp/bench-native-seq/deep-inspect.json)
-```
-
-**Metric:** wall time, calls/second (argsTotal / enrichmentDurationMs * 1000)
-
-### Test 2: Enrichment batch size sweep (native only)
-
-**Purpose:** Determine if/how batch size affects throughput. Tests the multiplexing hypothesis.
-
-```bash
-# Run with batch sizes: 1, 10, 50, 100, 200
-# Either add --batch-size CLI flag or edit ENRICHMENT_BATCH_SIZE constant
-for BATCH in 1 10 50 100 200; do
-  # Record: batch size, wall time, calls/sec, argsFailed count
-  echo "Batch size: $BATCH"
-  bun deep-inspect.ts --inspect-file ros-inspect-all.json \
-    --ros-version VERSION --output-dir /tmp/bench-batch-$BATCH --transport native
-done
-```
-
-**What to look for:**
-- If all batch sizes produce ~same wall time: RouterOS processes commands sequentially
-- If throughput increases then plateaus: server has a concurrency limit
-- If failures increase with batch size: connection or buffer overflow
-
-### Test 3: Per-service latency profiling
-
-**Purpose:** Test hypothesis that latency varies by owning service/package, not path depth.
-RouterOS dispatches `/console/inspect` to the service that owns each path via internal IPC.
-Different services (routing, wireless, ip, iot, etc.) may reflect their schema at different speeds.
-
-```bash
-# Sample 100-200 args from each top-level path (service boundary)
-# Time each fetchCompletion call individually, group by top-level path
-bun -e "
-  // For each top-level: /ip, /routing, /interface, /system, /tool, /iot, etc.
-  // fetch completion for N args under that subtree
-  // report per-service: count, p50, p95, p99, mean latency
-"
-```
-
-**What to look for:**
-- If some services (e.g. `/routing/*`, `/interface/wireless/*`) have 5-10× higher per-call
-  latency than others (e.g. `/ip/*`), that explains why full-tree batching doesn't help —
-  slow services dominate wall time regardless of concurrency
-- The `/ip/*` microbenchmark (14× speedup) only tested fast services — not representative
-- Cross-reference with RouterOS log (`/log/print`) to see if inspect calls show up as
-  internal service dispatches
-
-### Test 4: Network overhead isolation (tcpdump)
-
-**Purpose:** Verify that batched writes actually go on the wire concurrently.
-
-```bash
-# Capture TCP traffic on the API port during a batched run
-sudo tcpdump -i lo0 -w /tmp/api-capture.pcap port 8728 &
-bun deep-inspect.ts --inspect-file ros-inspect-all.json \
-  --ros-version VERSION --output-dir /tmp/bench --transport native
-kill %1
-# Analyze: are 50 commands sent in a burst, or serialized?
-# tshark -r /tmp/api-capture.pcap -Y "tcp.len > 0" -T fields -e frame.time_relative -e tcp.len | head -100
-```
-
-### Test 5: CI benchmark (GitHub Actions KVM)
-
-**Purpose:** Establish CI-specific baselines under controlled conditions.
-
-Run as part of CI with timing output. The enrichment duration is already recorded in
-`_meta.enrichmentDurationMs` in `deep-inspect.json`. Compare across runs by:
-```bash
-jq '._meta | {enrichmentDurationMs, argsTotal, argsWithCompletion, argsFailed, apiTransport}' \
-  docs/VERSION/deep-inspect.json
-```
-
-### Reference: Baselines
-
-**Ad-hoc baselines (April 2026, 7.23beta5, p1 trial license):**
-
-| Test | Transport | Topology | Result |
-|------|-----------|----------|--------|
-| Full enrichment (35k args) | REST seq | x86 HVF user-mode | 61.6s (568 calls/s) |
-| Full enrichment (35k args) | REST seq | x86 HVF bridged | 84.5s (414 calls/s) |
-| Full enrichment (35k args) | Native seq | x86 HVF user-mode | 100.5s (348 calls/s) |
-| Full enrichment (35k args) | Native seq | x86 HVF bridged | 107s (327 calls/s) |
-| Full enrichment (35k args) | Native batch50 | x86 HVF user-mode | 101.8s (344 calls/s) |
-| Microbench 1000 `/ip/*` | Native mux50 | x86 HVF user-mode | 0.05s |
-| Microbench 1000 `/ip/*` | REST seq | x86 HVF user-mode | 0.86s |
-| Full crawl | Native | x86 KVM | 75s |
-| Full crawl | REST | x86 KVM | 1645s |
-| Crawl `/ip` only | Native | x86 HVF | 10.2s |
-| Crawl `/ip` only | REST | x86 HVF | 22.4s |
-
-**Controlled baselines (April 2026, 7.20.8 long-term stable, p1 trial license):**
-
-| Test | Transport | Topology | Result |
-|------|-----------|----------|--------|
-| Per-call latency (5 services) | Native seq | x86 HVF user-mode | 0.5-0.8ms mean |
-| Per-call latency (5 services) | REST seq | x86 HVF user-mode | 1.0-1.3ms mean |
-| 100 calls sequential | Native batch=1 | x86 HVF user-mode | 63ms (1,593 calls/s) |
-| 100 calls sequential | REST batch=1 | x86 HVF user-mode | 97ms (1,031 calls/s) |
-| Full enrichment (27k args) | REST batch=50+retry | x86 HVF user-mode | 61s, **0 failed** (was 222 pre-fix) |
-| Full enrichment (27k args) | Native batch=50+retry | x86 HVF user-mode | 44s, **0 failed** (was 12 pre-fix) |
-| Full crawl (33,649 nodes) | REST seq | x86 HVF user-mode | 72.5s (464 calls/s) |
-| Full crawl (33,649 nodes) | Native seq | x86 HVF user-mode | **timed out (>300s)** |
-| Crawl /ip/address (89 nodes) | REST seq | x86 HVF user-mode | 142ms |
-| Crawl /ip/address (89 nodes) | Native seq | x86 HVF user-mode | 65ms (2.2× faster) |
-
-**~~April 2026 benchmark.test.ts results (7.23beta5, p1 trial, x86 HVF user-mode)~~ — SUPERSEDED:**
-
-> ⚠️ The 7.23beta5 results below were collected on a beta version with unverified methodology.
-> The "REST is faster" conclusion drawn from these results was **wrong**. The /ip subtree is a
-> worst-case for native batching due to specific hanger paths — it does not generalize to the
-> full tree. See the corrected 7.20.8 results below.
-
-| Test | Transport | Batch | Result | Notes |
-|------|-----------|-------|--------|-------|
-| /ip enrichment (6424 args) | REST | 50 | 12.1s (530 calls/s) | |
-| /ip enrichment (6424 args) | Native | 50 | 72.3s (89 calls/s) | REST 6× faster (**misleading — /ip worst-case**) |
-| Full enrichment (27k args, 7.22.1 tree) | REST | 50 | 61.0s (446 calls/s) | 193 failed |
-| Full enrichment (27k args, 7.22.1 tree) | Native | 50 | 72.6s (374 calls/s) | 13 failed |
-| Batch sweep 100 calls | Native | 1 | 49ms (2022 calls/s) | 0 timeouts |
-| Batch sweep 100 calls | Native | 10 | 10.1s (10 calls/s) | 2 timeouts (5s each) |
-| Batch sweep 100 calls | Native | 50 | 5.0s (20 calls/s) | 1 timeout (5s) |
-| Batch sweep 100 calls | REST | 1 | 106ms (947 calls/s) | |
-| Per-call latency (5 services) | Native | 1 | 0.6-0.8ms mean | p95: 1.0-1.9ms |
-| Per-call latency (5 services) | REST | 1 | 1.0-1.5ms mean | p95: 1.5-2.6ms |
-| Crawl /ip/address (94 nodes) | REST | — | 154ms | |
-| Crawl /ip/address (94 nodes) | Native | — | 68ms | Native 2.3× faster |
-| Schema equivalence (crawl) | Both | — | ✅ identical | 94/94 nodes |
-| Schema equivalence (OpenAPI) | Both | — | ✅ identical | 6/6 paths |
-| Completion equivalence | Both | — | ⚠️ minor diff | 1 extra key in native |
-
-**Authoritative baselines (7.20.8 long-term stable, p1, x86 HVF user-mode, batch=50 + retry):**
-
-> All figures below use the `enrichWithCompletions` retry fix (Phase 2.8) — `argsFailed=0`
-> is the hard requirement, verified by the benchmark runs that produced these baselines.
-
-| Test | Transport | Result | Notes |
-|------|-----------|--------|-------|
-| Full enrichment (27173 args, 7.22.1 tree) | REST batch=50+retry | 61s, argsFailed=**0** | 8718 completions |
-| Full enrichment (27173 args, 7.22.1 tree) | Native batch=50+retry | 44s, argsFailed=**0** | 8697 completions |
-| REST determinism (run twice, compare) | REST | ✅ **identical** | Test 8 assertion |
-| Cross-transport equivalence (full tree) | REST vs Native | ✅ **identical** | Test 8 assertion |
-| Per-call latency (5 services) | Native seq | 0.5–0.8ms mean | p95: 1.0–1.7ms |
-| Per-call latency (5 services) | REST seq | 1.0–1.3ms mean | p95: 1.5–2.5ms |
-| Crawl /ip/address (89 nodes) | REST | 142ms | |
-| Crawl /ip/address (89 nodes) | Native | 65ms | 2.2× faster |
-| Full crawl (33,649 nodes) | REST | 72.5s | ✅ reliable |
-| Full crawl (33,649 nodes) | Native | **timed out (>300s)** | ⚠️ hung on full tree — use REST crawl |
-
-**Pre-retry-fix results (April 2026, 7.20.8, SUPERSEDED by retry fix):**
-
-> Kept for reference only. The failure counts below are the defect the retry pass fixes.
-
-| Test | Transport | Result | Notes |
-|------|-----------|--------|-------|
-| Full enrichment (27k args) | REST batch=50 | 64.7s, **222 failed** | before Phase 2.8 |
-| Full enrichment (27k args) | Native batch=50 | 67.7s, **12 failed** | before Phase 2.8 |
-
-**Key observations (corrected, 7.20.8 stable):**
-
-- **Native is ~2× faster per individual call** — consistently 0.5-0.8ms vs 1.0-1.3ms across
-  all 5 service groups (/ip, /system, /interface, /routing, /tool). This is the fundamental
-  truth: no HTTP overhead, no JSON encoding, binary protocol is faster.
-- **Native sequential (batch=1) is 1.5× faster** — 1,593 calls/s vs 1,031 calls/s. Zero
-  timeouts for native at batch=1. This is the cleanest comparison.
-- **Full-tree enrichment: nearly equivalent throughput** — REST 420 calls/s vs native 401 calls/s
-  (only 1.05× difference). But native has **18× fewer failures** (12 vs 222) and recovers
-  **24 more completions** (8,691 vs 8,667). Native enrichment produces more complete data.
-- **The /ip subtree is a worst-case for native batching** — it misleadingly shows REST 4.3×
-  faster (371 vs 86 calls/s), but this does NOT generalize to the full tree where they're
-  nearly equal. The /ip subtree contains the specific hanger paths (ip/address/add/broadcast,
-  ip/address/comment/comment) that dominate native batch latency.
-- **REST batch=50 is CATASTROPHICALLY slow** — 1.6 calls/s (62s for 100 calls!), far worse
-  than native batch=50 at 33 calls/s. The REST API server appears to deadlock or serialize
-  under high concurrent HTTP request load. The prior session's "REST handles concurrency better"
-  conclusion was wrong — REST hides latency by failing calls faster (HTTP timeouts), not by
-  being actually faster.
-- **Native full-tree crawl hangs** — timed out after 300s. The single TCP connection likely
-  breaks during a long walk (possibly from a hanger path or RouterOS-side socket timeout) and
-  without auto-reconnect, the crawl waits forever. Bun's event loop did not fire the setTimeout
-  for the race condition — possible Bun bug or blocked I/O.
-- **REST full-tree crawl is reliable** — 72.5s for 33,649 nodes (464 calls/s). Works because
-  HTTP creates fresh connections per request batch.
-- **Crash paths**: Only `do` crashes both transports on 7.20.8. REST deadlocks for ~63s on
-  `do`; native gets a clean "Connection closed" and recovers instantly.
-- **Specific hanger paths**: `ip/address/add/broadcast` and `ip/address/comment/comment` time
-  out on native (3s each) but succeed instantly via REST — these are transport-specific issues,
-  not path-specific crashes. They appear to be native API protocol-level problems with specific
-  `/console/inspect` completion queries.
-- **No router crashes** — post-test log analysis found zero crash indicators; only a SYN flood
-  warning from REST batch=50 hammering port 80.
-- **License verification is critical** — free license (1 Mbit/s) vs p1 (1 Gbit/s) causes
-  dramatic throughput differences. The benchmark now asserts p1 in beforeAll.
-
-**Recommendation for production use (UPDATED May 2026 — REST only):**
-
-> ⚠️ The recommendation below was written before the native API `/console/inspect` completion
-> non-determinism bug was discovered (see Phase 2.9 resolution above). The original recommendation
-> to use native API for enrichment is **superseded by the decision to use REST for all schema work**.
-
-- **Use REST for all enrichment (completion) work** — REST is 100% deterministic. Native API
-  randomly drops ~20-30% of completion entries per call. The native API code remains in the
-  codebase for potential future use if MikroTik fixes the bug.
-- **Use REST for full-tree crawl** — native crawl hangs on full tree walks. REST's per-request
-  connection model is more robust.
-- **Native API advantages still valid for non-completion work**: 22× faster crawl on small subtrees,
-  2× lower per-call latency. Could be useful for tree-walking operations where completions
-  aren't needed (e.g. ARM64 `--skip-completion` crawl in Phase 3).
-- **CI workflows set to `--transport rest`** since April 2026 safety fix. Do not change without
-  first confirming the native API non-determinism bug is fixed in the target RouterOS version.
+Nothing in the HTML tools consumes `deep-inspect.*.json` yet, so a few hours
+of broken state during backfill is acceptable. `openapi.json` IS consumed by
+`openapi.html` and must continue to regenerate correctly — verify against the
+existing version first.
