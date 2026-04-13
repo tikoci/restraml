@@ -193,8 +193,14 @@ jobs:
           fi
 
   # ── arm64 deep-inspect (native arm64 runner; KVM if available, else TCG) ──
+  # Under TCG, a full crawl (~47K paths) takes hours — the router responds too slowly
+  # under software emulation for depth-first recursive discovery. Instead, the arm64 job
+  # downloads the x86 inspect tree (same command structure) and only runs completion
+  # enrichment against the arm64 router. The diff tool then surfaces arch-specific
+  # completion differences (the real value of multi-arch comparison).
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
+    needs: [deep-inspect-x86]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
     env:
@@ -471,11 +477,22 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Run deep-inspect (arm64, live crawl + enrichment)
+      - name: Download x86 inspect tree
+        # The command tree is arch-independent — only completions differ.
+        # Use the fully-crawled x86 tree as the base instead of re-crawling
+        # under TCG (which only manages ~2% of paths before timeout).
+        uses: actions/download-artifact@v4
+        with:
+          name: deep-inspect-x86
+
+      - name: Run deep-inspect (arm64, enrichment only using x86 tree)
         run: |
-          bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
-            --output-dir . --skip-openapi --test-crash-paths --transport rest \
-            --request-timeout 30000
+          echo "Using x86 inspect tree as base for arm64 enrichment..."
+          ls -lh deep-inspect.x86.json
+          bun deep-inspect.ts --inspect-file deep-inspect.x86.json \
+            --ros-version "${{ inputs.rosver }}" \
+            --arch arm64 --output-suffix arm64 \
+            --output-dir . --skip-openapi --test-crash-paths --transport rest
 
       - name: Upload deep-inspect.arm64.json
         uses: actions/upload-artifact@v4
