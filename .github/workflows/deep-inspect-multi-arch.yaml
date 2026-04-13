@@ -398,28 +398,51 @@ jobs:
           fi
 
       - name: Reboot CHR to activate extra packages
-        # RouterOS processes .npk files during reboot — reboot to install uploaded packages.
+        # QEMU user-mode NAT (SLIRP) does NOT survive guest reboots under aarch64 TCG
+        # emulation — TCP connects succeed at the host but packets never reach the rebooted
+        # guest. Workaround: kill QEMU entirely and cold-boot from the same disk image.
+        # RouterOS discovers .npk files on disk and installs them during cold boot.
         run: |
-          echo "Triggering REST API reboot to activate packages..."
-          curl -sS -m 10 -X POST http://admin:@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' || true
+          echo "Killing QEMU to cold-boot with packages (SLIRP doesn't survive guest reboot under TCG)..."
+          if [ -f /tmp/qemu.pid ]; then
+            kill "$(cat /tmp/qemu.pid)" 2>/dev/null || true
+            # Wait for QEMU process to fully exit
+            for i in $(seq 1 10); do
+              if ! kill -0 "$(cat /tmp/qemu.pid)" 2>/dev/null; then
+                echo "QEMU stopped after $i attempt(s)."
+                break
+              fi
+              sleep 1
+            done
+          fi
 
-          # Wait for REST API to go down (confirms CHR is rebooting)
-          echo "Waiting for REST API to go down..."
-          for i in $(seq 1 20); do
-            if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API went down after $i attempt(s)."
-              break
-            fi
-            sleep 2
-          done
+          # Derive QEMU launch command from the same vars used in "Start arm64 CHR in QEMU"
+          AAVMF_CODE=$(readlink -f /usr/share/AAVMF/AAVMF_CODE.fd)
 
-          # Wait for REST API to come back with packages installed
-          # TCG installs 17 packages + boots — can take 6-8 minutes under software emulation
-          echo "Waiting for CHR to restart with extra packages (up to 600s)..."
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            CPU_ARGS=( -cpu host -enable-kvm )
+          else
+            CPU_ARGS=( -cpu cortex-a72 -accel tcg )
+          fi
+
+          echo "Re-launching arm64 CHR with accel=${ARM_ACCEL} (cold boot with packages)..."
+          nohup qemu-system-aarch64 \
+            -M virt "${CPU_ARGS[@]}" -m 256 -nographic \
+            -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
+            -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
+            -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
+            -device virtio-blk-pci,drive=drive0 \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            &>/tmp/qemu.log &
+          echo $! > /tmp/qemu.pid
+          echo "QEMU restarted with PID: $(cat /tmp/qemu.pid)"
+
+          # Wait for REST API — package installation + boot under TCG can take 6-10 minutes
+          echo "Waiting for CHR to boot with extra packages (up to 600s)..."
           consecutive=0
           for i in $(seq 1 120); do
-            if curl -sS -m 10 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+            if curl -sS -m 5 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
               | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
               >/dev/null 2>&1; then
               consecutive=$((consecutive + 1))
@@ -437,7 +460,7 @@ jobs:
           done
 
           if [ "$consecutive" -lt 2 ]; then
-            echo "::error::CHR did not come back after reboot within 600s."
+            echo "::error::CHR did not come back after cold-boot within 600s."
             tail -80 /tmp/qemu.log || true
             exit 1
           fi
