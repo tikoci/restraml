@@ -415,10 +415,11 @@ jobs:
           done
 
           # Wait for REST API to come back with packages installed
-          echo "Waiting for CHR to restart with extra packages (up to 240s)..."
+          # TCG installs 17 packages + boots — can take 6-8 minutes under software emulation
+          echo "Waiting for CHR to restart with extra packages (up to 600s)..."
           consecutive=0
-          for i in $(seq 1 48); do
-            if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+          for i in $(seq 1 120); do
+            if curl -sS -m 10 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
               | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
               >/dev/null 2>&1; then
               consecutive=$((consecutive + 1))
@@ -429,14 +430,14 @@ jobs:
             else
               consecutive=0
             fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Attempt $i/48: not ready yet (~$((i * 5))s elapsed)..."
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Attempt $i/120: not ready yet (~$((i * 5))s elapsed)..."
             fi
             sleep 5
           done
 
           if [ "$consecutive" -lt 2 ]; then
-            echo "::error::CHR did not come back after reboot within 240s."
+            echo "::error::CHR did not come back after reboot within 600s."
             tail -80 /tmp/qemu.log || true
             exit 1
           fi
