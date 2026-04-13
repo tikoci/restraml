@@ -230,13 +230,11 @@ jobs:
           if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
           then
             echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=18" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=36" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
             echo "Using KVM acceleration"
           else
             echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=18" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=36" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
             echo "::notice::KVM unavailable on this runner; falling back to TCG"
           fi
 
@@ -251,6 +249,47 @@ jobs:
           mv chr-*-arm64.img chr-arm64.img
           rm -f chr-arm64.img.zip
           ls -lh chr-arm64.img
+
+      - name: Download arm64 extra packages
+        run: |
+          VER="${{ inputs.rosver }}"
+          mkdir extra && cd extra
+          wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
+            || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
+          unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
+          echo "Packages to inject:"
+          ls -lh extra/*.npk | head -30
+          echo "Total: $(ls extra/*.npk | wc -l) packages"
+
+      - name: Inject extra packages into disk image
+        # Pre-inject .npk files directly into the CHR disk image's ext4 root partition
+        # (partition 2). RouterOS processes packages found on the filesystem at boot time.
+        # This bypasses SCP entirely — RouterOS SSH under TCG emulation is catastrophically
+        # slow (13+ min for file transfer vs ~52s for a full boot). One boot does everything.
+        run: |
+          echo "=== Disk image partition layout ==="
+          fdisk -l chr-arm64.img
+
+          # Attach disk image as loop device with partition scanning
+          LOOPDEV=$(sudo losetup --partscan --find --show chr-arm64.img)
+          echo "Loop device: ${LOOPDEV}"
+          ls -la ${LOOPDEV}p* 2>/dev/null || { echo "::error::No partitions found"; sudo losetup -d "${LOOPDEV}"; exit 1; }
+
+          # Mount the ext4 root partition (partition 2)
+          sudo mkdir -p /mnt/chr-root
+          sudo mount "${LOOPDEV}p2" /mnt/chr-root
+          echo "=== Filesystem before injection ==="
+          sudo ls -la /mnt/chr-root/
+
+          # Copy all .npk packages to root
+          sudo cp extra/*.npk /mnt/chr-root/
+          echo "=== Injected packages ==="
+          sudo ls -lh /mnt/chr-root/*.npk
+
+          # Clean unmount and detach
+          sudo umount /mnt/chr-root
+          sudo losetup -d "${LOOPDEV}"
+          echo "Packages injected into disk image successfully"
 
       - name: Start arm64 CHR in QEMU
         # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
@@ -317,12 +356,22 @@ jobs:
             return 1
           }
 
-          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, up to 120s)..."
+          MAX_WAIT=$((ARM_BOOT_ATTEMPTS * 5))
+          echo "Waiting for arm64 RouterOS REST API with extra packages (accel=${ARM_ACCEL}, up to ${MAX_WAIT}s)..."
           if wait_for_rest_ready "${ARM_BOOT_ATTEMPTS}"; then
             exit 0
           fi
-          echo "::error::arm64 CHR did not become REST-ready in time with accel=${ARM_ACCEL}. QEMU log:"
-          cat /tmp/qemu.log
+          echo "::error::arm64 CHR did not become REST-ready in ${MAX_WAIT}s with accel=${ARM_ACCEL}."
+          echo "--- QEMU process ---"
+          if [ -f /tmp/qemu.pid ]; then
+            ps -p "$(cat /tmp/qemu.pid)" -o pid,stat,%cpu,%mem,etime,args || echo "QEMU process not running!"
+          fi
+          echo "--- Listeners ---"
+          ss -tln 2>/dev/null | grep -E '(:9180|:9122)' || echo "No listeners on 9180/9122"
+          echo "--- QEMU log (last 80 lines) ---"
+          tail -80 /tmp/qemu.log || true
+          echo "--- Final REST probe ---"
+          curl -sS -m 5 -i http://admin:@localhost:9180/rest/system/resource 2>&1 | head -30 || true
           exit 1
 
       - name: Activate CHR trial license
@@ -334,88 +383,10 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      - name: Download and install arm64 extra packages
-        run: |
-          VER="${{ inputs.rosver }}"
-          mkdir extra && cd extra
-          wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
-            || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
-          unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
-          scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
-
-      - name: Reboot CHR and wait for extra packages
-        run: |
-          wait_for_rest_down() {
-            for i in $(seq 1 15); do
-              if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
-                echo "REST API went down after $i attempt(s) with accel=${ARM_ACCEL}."
-                return 0
-              fi
-              sleep 2
-            done
-            echo "::warning::REST API never visibly went down after reboot request with accel=${ARM_ACCEL}; continuing with readiness wait."
-          }
-
-          wait_for_rest_ready() {
-            local attempts="$1"
-            local consecutive=0
-            local status
-            local preview
-
-            for i in $(seq 1 "$attempts"); do
-              status=$(curl -sS -m 3 -o /tmp/rest-resource.body -w "%{http_code}" http://admin:@localhost:9180/rest/system/resource 2>/dev/null || echo "000")
-              if [ "$status" = "200" ] && python3 -c 'import json, sys; body = json.load(open("/tmp/rest-resource.body", "r", encoding="utf-8")); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' >/dev/null 2>&1; then
-                consecutive=$((consecutive + 1))
-                if [ "$consecutive" -ge 2 ]; then
-                  echo "REST API is ready after $i attempt(s) with accel=${ARM_ACCEL}."
-                  return 0
-                fi
-              else
-                consecutive=0
-              fi
-
-              if [ $((i % 3)) -eq 0 ]; then
-                preview=$(head -c 140 /tmp/rest-resource.body 2>/dev/null | tr '\n' ' ' | tr '\r' ' ' || true)
-                [ -z "$preview" ] && preview="(empty)"
-                echo "Attempt $i/${attempts}: status=${status}, consecutive=${consecutive}, preview=${preview}"
-              fi
-              sleep 5
-            done
-            return 1
-          }
-
-          reboot_method="none"
-          if curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' > /dev/null 2>&1; then
-            reboot_method="rest"
-          elif ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1; then
-            reboot_method="ssh"
-          else
-            reboot_method="best-effort"
-          fi
-          echo "Reboot request path: ${reboot_method}"
-
-          wait_for_rest_down
-          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, up to 180s)..."
-          if wait_for_rest_ready "${ARM_REBOOT_ATTEMPTS}"; then
-            exit 0
-          fi
-          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within 180s with accel=${ARM_ACCEL}."
-          echo "--- Diagnostic: /dev/kvm and qemu process ---"
-          ls -la /dev/kvm || true
-          if [ -f /tmp/qemu.pid ]; then
-            QPID=$(cat /tmp/qemu.pid)
-            echo "QEMU pid: ${QPID}"
-            ps -p "${QPID}" -o pid,stat,%cpu,%mem,etime,args || true
-          fi
-          echo "--- Diagnostic: listeners on 9180/9122 ---"
-          ss -tln 2>/dev/null | rg '(:9180|:9122)' || true
-          echo "--- Diagnostic: qemu log tail ---"
-          tail -120 /tmp/qemu.log || true
-          echo "--- Diagnostic: final REST probes ---"
-          curl -sS -m 5 -i http://localhost:9180/ | head -30 || true
-          curl -sS -m 5 -i http://admin:@localhost:9180/rest/system/resource | head -40 || true
-          exit 1
+      # NOTE: SCP + reboot steps were replaced by pre-boot disk injection (see
+      # "Inject extra packages into disk image" before QEMU start). RouterOS SSH
+      # under TCG emulation is catastrophically slow — 13+ minutes for SCP vs ~52s
+      # for a full boot. Packages are now on disk before the first boot.
 
       - name: List installed packages
         run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
