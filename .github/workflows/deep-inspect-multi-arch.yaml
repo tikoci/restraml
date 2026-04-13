@@ -140,11 +140,11 @@ jobs:
             echo "QEMU process terminated."
           fi
 
-  # ── arm64 deep-inspect (TCG cross-arch emulation, slow) ──────────────────
+  # ── arm64 deep-inspect (KVM on native arm64 runner, fast) ──────────────────
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -154,7 +154,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install QEMU for aarch64 emulation
+      - name: Install QEMU for aarch64
         # qemu-system-arm provides qemu-system-aarch64
         # qemu-efi-aarch64 provides AAVMF UEFI firmware (required for arm64 CHR boot)
         run: |
@@ -165,6 +165,13 @@ jobs:
           echo "QEMU aarch64 binary:"
           which qemu-system-aarch64
           qemu-system-aarch64 --version
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
 
       - name: Download CHR arm64 image
         run: |
@@ -178,7 +185,7 @@ jobs:
           rm -f chr-arm64.img.zip
           ls -lh chr-arm64.img
 
-      - name: Start arm64 CHR in QEMU (TCG cross-arch emulation)
+      - name: Start arm64 CHR in QEMU (KVM native)
         # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
         # On the 'virt' machine, if=virtio resolves to virtio-blk-device (MMIO) which
         # RouterOS does NOT support — the kernel stalls silently.
@@ -197,37 +204,32 @@ jobs:
           truncate -s "$CODE_SIZE" /tmp/aavmf-vars.fd
           echo "UEFI code: $(du -h "$AAVMF_CODE" | cut -f1), vars: $(du -h /tmp/aavmf-vars.fd | cut -f1)"
 
-          # Boot arm64 CHR under TCG — no KVM for cross-arch (x86 host → arm64 guest)
+          # Boot arm64 CHR with KVM — native arm64 runner, full hardware acceleration
           nohup qemu-system-aarch64 \
-            -M virt -cpu cortex-a72 -m 256 -accel tcg \
+            -M virt -cpu host -m 256 -enable-kvm -nographic \
             -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
             -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
             -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
             -device virtio-blk-pci,drive=drive0 \
             -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
             -device virtio-net-pci,netdev=net0 \
-            -nographic \
             &>/tmp/qemu.log &
           echo $! > /tmp/qemu.pid
           echo "QEMU aarch64 started with PID: $(cat /tmp/qemu.pid)"
 
-      - name: Wait for REST API (extended timeout for TCG emulation)
-        # arm64 under TCG on x86 host is significantly slower than native.
-        # Allow up to 10 minutes for initial boot.
+      - name: Wait for REST API
         run: |
-          echo "Waiting for arm64 RouterOS REST API (up to 10 min, TCG is slow)..."
-          for i in {1..60}; do
+          echo "Waiting for arm64 RouterOS REST API (up to 5 min)..."
+          for i in {1..30}; do
             if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is up after $i attempt(s) (~$((i * 10))s)."
+              echo "REST API is up after $i attempt(s)."
               exit 0
             fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Attempt $i/60: not ready yet (~$((i * 10))s elapsed)..."
-            fi
+            echo "Attempt $i/30: not ready, retrying in 10s..."
             sleep 10
           done
-          echo "::error::arm64 CHR did not start within 10 minutes. QEMU log (last 50 lines):"
-          tail -50 /tmp/qemu.log
+          echo "::error::arm64 CHR did not start within 5 minutes. QEMU log:"
+          cat /tmp/qemu.log
           exit 1
 
       - name: Activate CHR trial license
@@ -248,21 +250,19 @@ jobs:
           unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
           scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
 
-      - name: Reboot CHR and wait for extra packages (extended timeout)
+      - name: Reboot CHR and wait for extra packages
         run: |
           curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
             -H 'Content-Type: application/json' || \
             ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
-          sleep 30
-          echo "Waiting for arm64 CHR to restart with extra packages (up to 10 min)..."
-          for i in {1..60}; do
+          sleep 15
+          echo "Waiting for arm64 CHR to restart with extra packages (up to 5 min)..."
+          for i in {1..30}; do
             if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is back up after $i attempt(s) (~$((i * 10))s)."
+              echo "REST API is back up after $i attempt(s)."
               exit 0
             fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Attempt $i/60: not ready yet (~$((i * 10))s elapsed)..."
-            fi
+            echo "Attempt $i/30: not ready, retrying in 10s..."
             sleep 10
           done
           echo "::error::arm64 CHR did not restart after extra-packages reboot."
