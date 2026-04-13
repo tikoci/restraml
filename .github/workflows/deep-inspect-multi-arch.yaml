@@ -261,36 +261,6 @@ jobs:
           ls -lh extra/*.npk | head -30
           echo "Total: $(ls extra/*.npk | wc -l) packages"
 
-      - name: Inject extra packages into disk image
-        # Pre-inject .npk files directly into the CHR disk image's ext4 root partition
-        # (partition 2). RouterOS processes packages found on the filesystem at boot time.
-        # This bypasses SCP entirely — RouterOS SSH under TCG emulation is catastrophically
-        # slow (13+ min for file transfer vs ~52s for a full boot). One boot does everything.
-        run: |
-          echo "=== Disk image partition layout ==="
-          fdisk -l chr-arm64.img
-
-          # Attach disk image as loop device with partition scanning
-          LOOPDEV=$(sudo losetup --partscan --find --show chr-arm64.img)
-          echo "Loop device: ${LOOPDEV}"
-          ls -la ${LOOPDEV}p* 2>/dev/null || { echo "::error::No partitions found"; sudo losetup -d "${LOOPDEV}"; exit 1; }
-
-          # Mount the ext4 root partition (partition 2)
-          sudo mkdir -p /mnt/chr-root
-          sudo mount "${LOOPDEV}p2" /mnt/chr-root
-          echo "=== Filesystem before injection ==="
-          sudo ls -la /mnt/chr-root/
-
-          # Copy all .npk packages to root
-          sudo cp extra/*.npk /mnt/chr-root/
-          echo "=== Injected packages ==="
-          sudo ls -lh /mnt/chr-root/*.npk
-
-          # Clean unmount and detach
-          sudo umount /mnt/chr-root
-          sudo losetup -d "${LOOPDEV}"
-          echo "Packages injected into disk image successfully"
-
       - name: Start arm64 CHR in QEMU
         # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
         # On the 'virt' machine, if=virtio resolves to virtio-blk-device (MMIO) which
@@ -383,12 +353,29 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      - name: Reboot CHR to activate extra packages
-        # Packages were pre-injected into the disk image before QEMU started.
-        # RouterOS processes .npk files during reboot (not initial fresh boot).
-        # REST reboot is instant — avoids SCP entirely (which hangs under TCG).
+      - name: Upload extra packages via HTTP
+        # Upload .npk files via HTTP PUT (WebFig upload endpoint) instead of SCP.
+        # RouterOS SSH under TCG emulation is catastrophically slow (13+ min hang).
+        # HTTP PUT has minimal overhead — no SSH handshake, no encryption.
         run: |
-          echo "Triggering REST API reboot to activate pre-injected packages..."
+          echo "Uploading extra packages via HTTP PUT..."
+          TOTAL=$(ls extra/*.npk | wc -l)
+          COUNT=0
+          for npk in extra/*.npk; do
+            COUNT=$((COUNT + 1))
+            NAME=$(basename "$npk")
+            SIZE=$(du -h "$npk" | cut -f1)
+            echo "  [$COUNT/$TOTAL] Uploading $NAME ($SIZE)..."
+            curl -sS -m 120 -u admin: -T "$npk" "http://localhost:9180/$NAME"
+          done
+          echo "Upload complete. Verifying files on RouterOS..."
+          curl -sS --fail http://admin:@localhost:9180/rest/file \
+            | jq '[.[] | select(.name | endswith(".npk")) | {name, size}]'
+
+      - name: Reboot CHR to activate extra packages
+        # RouterOS processes .npk files during reboot — reboot to install uploaded packages.
+        run: |
+          echo "Triggering REST API reboot to activate packages..."
           curl -sS -m 10 -X POST http://admin:@localhost:9180/rest/system/reboot \
             -H 'Content-Type: application/json' || true
 
