@@ -1,0 +1,63 @@
+{
+  "a": {
+    "label": "x86",
+    "path": "deep-inspect.x86.json",
+    "meta": {
+      "version": "7.22.1",
+      "generatedAt": "2026-04-13T15:31:13.557Z",
+      "architecture": "x86",
+      "apiTransport": "rest",
+      "enrichmentDurationMs": 310620,
+      "crashPathsTested": [],
+      "crashPathsSafe": [],
+      "crashPathsCrashed": [],
+      "completionStats": {
+        "argsTotal": 34548,
+        "argsWithCompletion": 11525,
+        "argsFailed": 0,
+        "argsTimedOut": 18,
+        "argsBlankOnRetry": 9
+      }
+    }
+  },
+  "b": {
+    "label": "x86",
+    "path": "deep-inspect.arm64.json",
+    "meta": {
+      "version": "7.22.1",
+      "generatedAt": "2026-04-13T15:31:13.557Z",
+      "architecture": "x86",
+      "apiTransport": "rest",
+      "enrichmentDurationMs": 310620,
+      "crashPathsTested": [],
+      "crashPathsSafe": [],
+      "crashPathsCrashed": [],
+      "completionStats": {
+        "argsTotal": 34548,
+        "argsWithCompletion": 11525,
+        "argsFailed": 0,
+        "argsTimedOut": 18,
+        "argsBlankOnRetry": 9
+      }
+    }
+  },
+  "counts": {
+    "pathsA": 46633,
+    "pathsB": 46633,
+    "pathsBoth": 46633,
+    "pathsOnlyA": 0,
+    "pathsOnlyB": 0,
+    "argsA": 34548,
+    "argsB": 34548,
+    "argsWithCompletionA": 11525,
+    "argsWithCompletionB": 11525,
+    "completionDrift": 0,
+    "completionPayloadDrift": 0,
+    "typeMismatches": 0
+  },
+  "onlyInA": [],
+  "onlyInB": [],
+  "completionDrift": [],
+  "completionPayloadDrift": [],
+  "typeMismatches": []
+}
