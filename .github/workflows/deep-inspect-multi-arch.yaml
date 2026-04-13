@@ -196,7 +196,7 @@ jobs:
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -475,7 +475,7 @@ jobs:
         run: |
           bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
             --output-dir . --skip-openapi --test-crash-paths --transport rest \
-            --request-timeout 120000
+            --request-timeout 30000
 
       - name: Upload deep-inspect.arm64.json
         uses: actions/upload-artifact@v4
