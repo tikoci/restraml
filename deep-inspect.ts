@@ -534,7 +534,14 @@ export async function crawlInspectTree(
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
   const signal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
-  const children = await client.fetchChild(rpath, signal);
+  let children: InspectChildResponse[];
+  try {
+    children = await client.fetchChild(rpath, signal);
+  } catch (err) {
+    const pathStr = `/${rpath.join("/")}`;
+    console.error(`  ⚠ fetchChild failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
+    return memo;
+  }
 
   // Progress logging at top two levels
   if (_depth <= 1 && rpath.length > 0) {
@@ -563,8 +570,13 @@ export async function crawlInspectTree(
       }
     }
 
-    const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1);
-    Object.assign(node, childTree);
+    try {
+      const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1);
+      Object.assign(node, childTree);
+    } catch (err) {
+      const pathStr = `/${newpath.join("/")}`;
+      console.error(`  ⚠ crawl failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   return memo;
