@@ -486,13 +486,18 @@ jobs:
           name: deep-inspect-x86
 
       - name: Run deep-inspect (arm64, enrichment only using x86 tree)
+        # Under TCG, even completion enrichment is too slow for the full tree (~9K args,
+        # each timing out at 5s → massive sequential retry queue > 6 hours). Skip
+        # completions for now — the value is the full tree + crash path testing from arm64.
+        # TODO: configurable COMPLETION_TIMEOUT_MS for TCG would enable partial enrichment.
         run: |
           echo "Using x86 inspect tree as base for arm64 enrichment..."
           ls -lh deep-inspect.x86.json
           bun deep-inspect.ts --inspect-file deep-inspect.x86.json \
             --ros-version "${{ inputs.rosver }}" \
             --arch arm64 --output-suffix arm64 \
-            --output-dir . --skip-openapi --test-crash-paths --transport rest
+            --output-dir . --skip-openapi --test-crash-paths --transport rest \
+            --skip-completion
 
       - name: Upload deep-inspect.arm64.json
         uses: actions/upload-artifact@v4
