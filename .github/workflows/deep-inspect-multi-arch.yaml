@@ -28,6 +28,8 @@ jobs:
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
+      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
+      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,11 +80,11 @@ jobs:
           exit 1
 
       - name: Activate CHR trial license
-        if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+        if: env.MIKROTIK_ACCOUNT != ''
         run: |
           curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
             -H 'Content-Type: application/json' \
-            -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+            -d "{\"account\":\"${MIKROTIK_ACCOUNT}\",\"password\":\"${MIKROTIK_PASSWORD}\",\"level\":\"p1\"}" \
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
@@ -146,6 +148,8 @@ jobs:
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
+      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
+      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -223,11 +227,11 @@ jobs:
           exit 1
 
       - name: Activate CHR trial license
-        if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+        if: env.MIKROTIK_ACCOUNT != ''
         run: |
           curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
             -H 'Content-Type: application/json' \
-            -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+            -d "{\"account\":\"${MIKROTIK_ACCOUNT}\",\"password\":\"${MIKROTIK_PASSWORD}\",\"level\":\"p1\"}" \
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
