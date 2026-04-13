@@ -123,7 +123,7 @@ interface InspectCompletionResponse {
 
 export interface IRouterOSClient {
   fetchVersion(): Promise<string>;
-  fetchChild(path: string[]): Promise<InspectChildResponse[]>;
+  fetchChild(path: string[], signal?: AbortSignal): Promise<InspectChildResponse[]>;
   fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]>;
   fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]>;
   close?(): void;
@@ -179,10 +179,11 @@ export class RouterOSClient implements IRouterOSClient {
     return resp.ret.split(" ")[0];
   }
 
-  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+  async fetchChild(path: string[], signal?: AbortSignal): Promise<InspectChildResponse[]> {
     return this.fetchPost<InspectChildResponse[]>(
       `${this.baseUrl}/console/inspect`,
       { request: "child", path: path.join(",") },
+      signal,
     );
   }
 
@@ -269,7 +270,7 @@ export class NativeRouterOSClient implements IRouterOSClient {
     return version.split(" ")[0];
   }
 
-  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+  async fetchChild(path: string[], _signal?: AbortSignal): Promise<InspectChildResponse[]> {
     try {
       const sentences = await this.api.write(
         "/console/inspect",
@@ -515,14 +516,30 @@ export async function testCrashPaths(client: IRouterOSClient): Promise<CrashPath
 
 // ── Full Crawl (--live mode) ───────────────────────────────────────────────
 
+/** Per-request timeout for tree crawl — generous default, overridable via --request-timeout
+ *  for slow emulation (TCG arm64). Unset = no per-request abort signal. */
+let CRAWL_REQUEST_TIMEOUT_MS: number | undefined;
+
+/** Set the per-request timeout used by crawlInspectTree (called from main). */
+export function setCrawlRequestTimeout(ms: number | undefined) {
+  CRAWL_REQUEST_TIMEOUT_MS = ms;
+}
+
 /** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren) */
 export async function crawlInspectTree(
   client: IRouterOSClient,
   rpath: string[] = [],
   skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
+  _depth = 0,
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
-  const children = await client.fetchChild(rpath);
+  const signal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
+  const children = await client.fetchChild(rpath, signal);
+
+  // Progress logging at top two levels
+  if (_depth <= 1 && rpath.length > 0) {
+    console.log(`  crawl: /${rpath.join("/")} (${children.filter(c => c.type === "child").length} children)`);
+  }
 
   for (const child of children) {
     if (child.type !== "child") continue;
@@ -535,7 +552,8 @@ export async function crawlInspectTree(
       const shouldSkip = newpath.some((segment) => skipPaths.has(segment));
       if (!shouldSkip) {
         try {
-          const syntax = await client.fetchSyntax(newpath);
+          const syntaxSignal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
+          const syntax = await client.fetchSyntax(newpath, syntaxSignal);
           if (syntax.length === 1 && syntax[0].text.length > 0) {
             node.desc = syntax[0].text;
           }
@@ -545,7 +563,7 @@ export async function crawlInspectTree(
       }
     }
 
-    const childTree = await crawlInspectTree(client, newpath, skipPaths);
+    const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1);
     Object.assign(node, childTree);
   }
 
@@ -1032,6 +1050,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       transport: { type: "string", default: "rest" },
       "api-host": { type: "string" },
       "api-port": { type: "string", default: "8728" },
+      "request-timeout": { type: "string" },
     },
     strict: true,
     allowPositionals: true,
@@ -1065,6 +1084,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       transport: transportRaw,
       apiHost: values["api-host"],
       apiPort: parseInt(values["api-port"] ?? "8728", 10),
+      requestTimeout: values["request-timeout"] ? parseInt(values["request-timeout"], 10) : undefined,
     },
     pathArgs,
   };
@@ -1090,6 +1110,7 @@ Options:
   --transport <mode>      Transport: rest (default), auto, or native
   --api-host <host>       Native API host (default: derived from URLBASE)
   --api-port <port>       Native API port (default: 8728)
+  --request-timeout <ms>  Per-request timeout in ms for tree crawl (default: no limit; use 120000 for TCG)
   --version               Print RouterOS version and exit
   --help                  Show this help
 
@@ -1196,6 +1217,11 @@ async function main() {
       for (const r of crashResults) {
         if (r.safe) skipPaths.delete(r.path);
       }
+    }
+
+    if (opts.requestTimeout) {
+      setCrawlRequestTimeout(opts.requestTimeout);
+      console.log(`Per-request timeout: ${opts.requestTimeout}ms`);
     }
 
     inspectTree = await crawlInspectTree(client, pathArgs, skipPaths);
