@@ -140,11 +140,11 @@ jobs:
             echo "QEMU process terminated."
           fi
 
-  # ── arm64 deep-inspect (KVM on native arm64 runner, fast) ──────────────────
+  # ── arm64 deep-inspect (native arm64 runner; KVM if available, else TCG) ──
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -166,12 +166,29 @@ jobs:
           which qemu-system-aarch64
           qemu-system-aarch64 --version
 
-      - name: Enable KVM
+      - name: Probe accelerator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          ls -la /dev/kvm
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || true
+
+          # Partner ARM runners may expose /dev/kvm but still reject the KVM API.
+          # Probe the device directly instead of assuming nested virtualization works.
+          if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
+          then
+            echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=30" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_SETTLE=15" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=30" >> "$GITHUB_ENV"
+            echo "Using KVM acceleration"
+          else
+            echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=60" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_SETTLE=30" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=90" >> "$GITHUB_ENV"
+            echo "::notice::KVM unavailable on this runner; falling back to TCG"
+          fi
 
       - name: Download CHR arm64 image
         run: |
@@ -185,7 +202,7 @@ jobs:
           rm -f chr-arm64.img.zip
           ls -lh chr-arm64.img
 
-      - name: Start arm64 CHR in QEMU (KVM native)
+      - name: Start arm64 CHR in QEMU
         # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
         # On the 'virt' machine, if=virtio resolves to virtio-blk-device (MMIO) which
         # RouterOS does NOT support — the kernel stalls silently.
@@ -204,9 +221,15 @@ jobs:
           truncate -s "$CODE_SIZE" /tmp/aavmf-vars.fd
           echo "UEFI code: $(du -h "$AAVMF_CODE" | cut -f1), vars: $(du -h /tmp/aavmf-vars.fd | cut -f1)"
 
-          # Boot arm64 CHR with KVM — native arm64 runner, full hardware acceleration
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            CPU_ARGS=( -cpu host -enable-kvm )
+          else
+            CPU_ARGS=( -cpu cortex-a72 -accel tcg )
+          fi
+
+          echo "Starting arm64 CHR with accel=${ARM_ACCEL}"
           nohup qemu-system-aarch64 \
-            -M virt -cpu host -m 256 -enable-kvm -nographic \
+            -M virt "${CPU_ARGS[@]}" -m 256 -nographic \
             -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
             -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
             -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
@@ -219,16 +242,18 @@ jobs:
 
       - name: Wait for REST API
         run: |
-          echo "Waiting for arm64 RouterOS REST API (up to 5 min)..."
-          for i in {1..30}; do
+          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, attempts=${ARM_BOOT_ATTEMPTS})..."
+          for i in $(seq 1 "${ARM_BOOT_ATTEMPTS}"); do
             if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is up after $i attempt(s)."
+              echo "REST API is up after $i attempt(s) with accel=${ARM_ACCEL}."
               exit 0
             fi
-            echo "Attempt $i/30: not ready, retrying in 10s..."
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/${ARM_BOOT_ATTEMPTS}: not ready yet (~$((i * 10))s elapsed, accel=${ARM_ACCEL})..."
+            fi
             sleep 10
           done
-          echo "::error::arm64 CHR did not start within 5 minutes. QEMU log:"
+          echo "::error::arm64 CHR did not start in time with accel=${ARM_ACCEL}. QEMU log:"
           cat /tmp/qemu.log
           exit 1
 
@@ -255,17 +280,19 @@ jobs:
           curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
             -H 'Content-Type: application/json' || \
             ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
-          sleep 15
-          echo "Waiting for arm64 CHR to restart with extra packages (up to 5 min)..."
-          for i in {1..30}; do
+          sleep "${ARM_REBOOT_SETTLE}"
+          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, attempts=${ARM_REBOOT_ATTEMPTS})..."
+          for i in $(seq 1 "${ARM_REBOOT_ATTEMPTS}"); do
             if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is back up after $i attempt(s)."
+              echo "REST API is back up after $i attempt(s) with accel=${ARM_ACCEL}."
               exit 0
             fi
-            echo "Attempt $i/30: not ready, retrying in 10s..."
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/${ARM_REBOOT_ATTEMPTS}: not ready yet (~$((i * 10))s elapsed, accel=${ARM_ACCEL})..."
+            fi
             sleep 10
           done
-          echo "::error::arm64 CHR did not restart after extra-packages reboot."
+          echo "::error::arm64 CHR did not restart after extra-packages reboot with accel=${ARM_ACCEL}."
           exit 1
 
       - name: List installed packages
