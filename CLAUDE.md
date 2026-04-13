@@ -71,6 +71,7 @@ restraml/
         ├── manual-using-docker-in-docker.yaml           # Build: base RouterOS schema
         ├── manual-using-extra-docker-in-docker.yaml     # Build: schema with extra packages
         ├── appyamlschemas.yaml                          # Build: validate and publish /app YAML schemas
+        ├── deep-inspect-multi-arch.yaml                 # Build: per-arch deep-inspect (x86 KVM + arm64 TCG) with diff
         └── manual-from-secrets.yaml                     # Build: using a real RouterOS device (secrets)
 ```
 
@@ -810,10 +811,11 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks 3 artifacts (`schema.raml`, `extra/schema.raml`, `routeros-app-yaml-schema.json`) and dispatches only the builds that are missing; outputs a step summary table. Accepts a `skip_versions` input (see below). |
+| `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks 4 artifacts (`schema.raml`, `extra/schema.raml`, `routeros-app-yaml-schema.json`, `extra/deep-inspect.x86.json`) and dispatches only the builds that are missing; outputs a step summary table. Accepts a `skip_versions` input (see below). |
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
+| `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (TCG) CHRs with extra packages in parallel, runs live deep-inspect crawl on each, diffs results, publishes `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/` |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
@@ -822,7 +824,7 @@ All builds commit schema files to `main` as `github-actions[bot]` and publish vi
 
 `auto.yaml` accepts a `skip_versions` workflow_dispatch input (comma-separated list of RouterOS
 version strings, e.g. `7.23beta5,7.23beta6`). Versions in this list are excluded from **all**
-build types (base, extra-packages, and /app YAML schemas) for that run.
+build types (base, extra-packages, /app YAML schemas, and deep-inspect multi-arch) for that run.
 
 The default for the `workflow_dispatch` input is `7.23beta5`. When triggered by the daily
 schedule (cron), the same default applies via an `||` fallback in the `env:` block.

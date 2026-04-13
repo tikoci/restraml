@@ -7,9 +7,10 @@
  *   1. Structural delta — paths present on one arch but not the other. Usually
  *      driven by extra packages (wifi-qcom, zerotier, switch-marvell, etc).
  *   2. Completion enum drift — args present on both arches but with different
- *      `_completion` keysets. This is the interesting bucket: it surfaces
- *      real schema gaps that neither arch's view shows alone.
- *   3. _meta side-by-side — versions, transports, completion stats, crash
+ *      `_completion` keysets.
+ *   3. Completion payload drift — shared `_completion` keys with different
+ *      payload fields (`style`, `preference`, `desc`).
+ *   4. _meta side-by-side — versions, transports, completion stats, crash
  *      paths. Makes differences in the run itself obvious.
  *
  * Usage:
@@ -71,6 +72,16 @@ interface CompletionDrift {
   sharedCount: number;
 }
 
+interface CompletionPayloadKeyDrift {
+  key: string;
+  fields: string[];
+}
+
+interface CompletionPayloadDrift {
+  path: string;
+  differingKeys: CompletionPayloadKeyDrift[];
+}
+
 interface TypeMismatch {
   path: string;
   aType: NodeType | undefined;
@@ -91,12 +102,22 @@ interface DiffReport {
     argsWithCompletionA: number;
     argsWithCompletionB: number;
     completionDrift: number;
+    completionPayloadDrift: number;
     typeMismatches: number;
   };
   onlyInA: string[];
   onlyInB: string[];
   completionDrift: CompletionDrift[];
+  completionPayloadDrift: CompletionPayloadDrift[];
   typeMismatches: TypeMismatch[];
+}
+
+function completionPayloadFieldDrift(a: CompletionEntry, b: CompletionEntry): string[] {
+  const fields: string[] = [];
+  if ((a.style ?? "") !== (b.style ?? "")) fields.push("style");
+  if ((a.preference ?? null) !== (b.preference ?? null)) fields.push("preference");
+  if ((a.desc ?? "") !== (b.desc ?? "")) fields.push("desc");
+  return fields;
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────
@@ -226,6 +247,7 @@ function diff(
   const onlyInB: string[] = [];
   const typeMismatches: TypeMismatch[] = [];
   const completionDrift: CompletionDrift[] = [];
+  const completionPayloadDrift: CompletionPayloadDrift[] = [];
 
   for (const [p, na] of mapA) {
     const nb = mapB.get(p);
@@ -244,9 +266,21 @@ function diff(
       if (keysA.size === 0 && keysB.size === 0) continue;
       const oa = [...keysA].filter((k) => !keysB.has(k));
       const ob = [...keysB].filter((k) => !keysA.has(k));
-      if (oa.length === 0 && ob.length === 0) continue;
       const shared = [...keysA].filter((k) => keysB.has(k)).length;
-      completionDrift.push({ path: p, onlyInA: oa.sort(), onlyInB: ob.sort(), sharedCount: shared });
+
+      if (oa.length > 0 || ob.length > 0) {
+        completionDrift.push({ path: p, onlyInA: oa.sort(), onlyInB: ob.sort(), sharedCount: shared });
+      }
+
+      const sharedKeys = [...keysA].filter((k) => keysB.has(k)).sort();
+      const differingKeys: CompletionPayloadKeyDrift[] = [];
+      for (const key of sharedKeys) {
+        const fields = completionPayloadFieldDrift(ca[key] ?? {}, cb[key] ?? {});
+        if (fields.length > 0) differingKeys.push({ key, fields });
+      }
+      if (differingKeys.length > 0) {
+        completionPayloadDrift.push({ path: p, differingKeys });
+      }
     }
   }
   for (const p of mapB.keys()) {
@@ -259,6 +293,7 @@ function diff(
   completionDrift.sort(
     (x, y) => y.onlyInA.length + y.onlyInB.length - (x.onlyInA.length + x.onlyInB.length),
   );
+  completionPayloadDrift.sort((x, y) => y.differingKeys.length - x.differingKeys.length);
 
   const argsA = countArgs(mapA);
   const argsB = countArgs(mapB);
@@ -279,11 +314,13 @@ function diff(
       argsWithCompletionA: argsA.withCompletion,
       argsWithCompletionB: argsB.withCompletion,
       completionDrift: completionDrift.length,
+      completionPayloadDrift: completionPayloadDrift.length,
       typeMismatches: typeMismatches.length,
     },
     onlyInA,
     onlyInB,
     completionDrift,
+    completionPayloadDrift,
     typeMismatches,
   };
 }
@@ -332,6 +369,7 @@ function textReport(r: DiffReport, opts: Opts): string {
   lines.push(`    only in ${B}: ${c.pathsOnlyB}`);
   lines.push(`  args : ${A} ${c.argsA} (${c.argsWithCompletionA} w/ completions), ${B} ${c.argsB} (${c.argsWithCompletionB} w/ completions)`);
   lines.push(`  completion drift: ${c.completionDrift} arg(s) with different _completion keysets`);
+  lines.push(`  completion payload drift: ${c.completionPayloadDrift} arg(s) with shared keys but differing style/preference/desc`);
   lines.push(`  type mismatches : ${c.typeMismatches}`);
   lines.push("");
 
@@ -390,6 +428,23 @@ function textReport(r: DiffReport, opts: Opts): string {
         const more = d.onlyInB.length > 10 ? ` … +${d.onlyInB.length - 10}` : "";
         lines.push(`      ${B} only: ${keys}${more}`);
       }
+    }
+    if (truncated > 0) lines.push(`  … +${truncated} more (use --all to expand)`);
+    lines.push("");
+  }
+
+  if (r.completionPayloadDrift.length > 0) {
+    lines.push(`━━━ Completion Payload Drift (${r.completionPayloadDrift.length}) ━━━`);
+    lines.push("  (same _completion keys exist, but payload fields differ)");
+    lines.push("  (fields tracked: style, preference, desc)");
+    const { shown, truncated } = cap(r.completionPayloadDrift, opts.cap, opts.all);
+    for (const d of shown) {
+      lines.push(`  ${d.path}  (${d.differingKeys.length} key(s) differ)`);
+      const { shown: kshown, truncated: ktrunc } = cap(d.differingKeys, 10, opts.all);
+      for (const k of kshown) {
+        lines.push(`      ${k.key}: ${k.fields.join(", ")}`);
+      }
+      if (ktrunc > 0) lines.push(`      … +${ktrunc} more differing key(s) (use --all to expand)`);
     }
     if (truncated > 0) lines.push(`  … +${truncated} more (use --all to expand)`);
     lines.push("");

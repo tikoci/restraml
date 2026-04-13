@@ -23,8 +23,10 @@
     "lint:workflows": "bun validate-workflows.mjs"
   },
   "dependencies": {
-    "@tikoci/quickchr": "file:../quickchr",
     "js-yaml": "^4.1.1"
+  },
+  "optionalDependencies": {
+    "@tikoci/quickchr": "file:../quickchr"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

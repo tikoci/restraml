@@ -40,6 +40,7 @@ jobs:
       base_versions: ${{ steps.needs-builds.outputs.base_versions }}
       extra_versions: ${{ steps.needs-builds.outputs.extra_versions }}
       app_schema_versions: ${{ steps.needs-builds.outputs.app_schema_versions }}
+      deep_inspect_versions: ${{ steps.needs-builds.outputs.deep_inspect_versions }}
       skipped_versions: ${{ steps.needs-builds.outputs.skipped_versions }}
     steps:
       - name: Checkout repository
@@ -111,6 +112,7 @@ jobs:
           BASE_VERSIONS=()
           EXTRA_VERSIONS=()
           APP_SCHEMA_VERSIONS=()
+          DEEP_INSPECT_VERSIONS=()
           SKIPPED_VERSIONS=()
 
           # Parse the skip list (comma-separated, trim whitespace)
@@ -171,6 +173,14 @@ jobs:
             else
               echo "docs/${VER}/routeros-app-yaml-schema.json exists — app-schema OK"
             fi
+
+            # Check deep-inspect artifacts (requires extra-packages)
+            if [ ! -f "docs/${VER}/extra/deep-inspect.x86.json" ] || [ ! -f "docs/${VER}/extra/deep-inspect.arm64.json" ] || [ ! -f "docs/${VER}/extra/diff-deep-inspect.json" ]; then
+              echo "docs/${VER}/extra/deep-inspect.{x86,arm64}.json or diff-deep-inspect.json not found — $VER needs deep-inspect build"
+              DEEP_INSPECT_VERSIONS+=("$VER")
+            else
+              echo "docs/${VER}/extra/deep-inspect.{x86,arm64}.json + diff-deep-inspect.json exist — deep-inspect OK"
+            fi
           done
 
           # Use jq to produce properly-formatted JSON arrays
@@ -184,17 +194,20 @@ jobs:
           BASE_JSON=$(to_json BASE_VERSIONS)
           EXTRA_JSON=$(to_json EXTRA_VERSIONS)
           APP_JSON=$(to_json APP_SCHEMA_VERSIONS)
+          DEEP_INSPECT_JSON=$(to_json DEEP_INSPECT_VERSIONS)
           SKIPPED_JSON=$(to_json SKIPPED_VERSIONS)
 
           echo "base_versions=${BASE_JSON}" >> $GITHUB_OUTPUT
           echo "extra_versions=${EXTRA_JSON}" >> $GITHUB_OUTPUT
           echo "app_schema_versions=${APP_JSON}" >> $GITHUB_OUTPUT
+          echo "deep_inspect_versions=${DEEP_INSPECT_JSON}" >> $GITHUB_OUTPUT
           echo "skipped_versions=${SKIPPED_JSON}" >> $GITHUB_OUTPUT
 
           echo "Skipped versions: ${SKIPPED_JSON}"
           echo "Base builds needed: ${BASE_JSON}"
           echo "Extra-packages builds needed: ${EXTRA_JSON}"
           echo "/app YAML schema builds needed: ${APP_JSON}"
+          echo "Deep-inspect builds needed: ${DEEP_INSPECT_JSON}"
 
       - name: Summary
         env:
@@ -215,6 +228,7 @@ jobs:
           echo "- Base: ${{ steps.needs-builds.outputs.base_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "- Extra-packages: ${{ steps.needs-builds.outputs.extra_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "- /app YAML schemas: ${{ steps.needs-builds.outputs.app_schema_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Deep-inspect multi-arch: ${{ steps.needs-builds.outputs.deep_inspect_versions }}" >> $GITHUB_STEP_SUMMARY
           SKIPPED='${{ steps.needs-builds.outputs.skipped_versions }}'
           if [ "$SKIPPED" != "[]" ] && [ -n "$SKIPPED" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -302,6 +316,36 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'appyamlschemas.yaml',
+              ref: 'main',
+              inputs: {
+                rosver: '${{ matrix.version }}'
+              }
+            })
+            console.log('Dispatched successfully')
+
+  build-deep-inspect:
+    needs: check
+    runs-on: ubuntu-latest
+    # Runs independently — checks its own list of versions missing
+    # docs/{version}/extra/deep-inspect.x86.json, deep-inspect.arm64.json,
+    # or diff-deep-inspect.json.
+    if: ${{ fromJSON(needs.check.outputs.deep_inspect_versions)[0] != null }}
+    strategy:
+      matrix:
+        version: ${{ fromJSON(needs.check.outputs.deep_inspect_versions) }}
+      max-parallel: 1
+    name: "Trigger deep-inspect build: ${{ matrix.version }}"
+    steps:
+      - name: Dispatch deep-inspect multi-arch build for ${{ matrix.version }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log(`Triggering deep-inspect multi-arch build for RouterOS ${{ matrix.version }}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deep-inspect-multi-arch.yaml',
               ref: 'main',
               inputs: {
                 rosver: '${{ matrix.version }}'

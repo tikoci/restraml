@@ -89,7 +89,7 @@ happens, not Phase 3.
 | Phase 1 | Completion bug fix + metadata | ✅ Shipped |
 | Phase 2 | Native API transport | ✅ Shipped, unused in CI |
 | Phase 2.9 | Native API non-determinism finding | ✅ Resolved |
-| Phase 3 | ARM64 per-arch enrichment | 🟡 3.1–3.4 shipped locally; 3.5 (CI) pending |
+| Phase 3 | ARM64 per-arch enrichment | 🟡 3.1–3.4 shipped locally; 3.5 (CI) in progress |
 | Phase 4 | Multi-arch merge + `_source` | 🔲 Deferred |
 | Phase 5 | Per-package provenance (`_package`) | 🔲 Deferred |
 
@@ -189,23 +189,26 @@ Diff outcome — numbers pass the sniff test:
 **Takeaway:** the per-arch pipeline is producing usable output and the arm64
 view does meaningfully more than x86. Ready to proceed to 3.5.
 
-#### 3.5 — CI integration (pending)
+#### 3.5 — CI integration (in progress)
 
-- New job that boots ARM64 CHR via QEMU TCG on an X86 runner. Boot time is
-  empirically ~5 min for install + post-reboot ready; measure on the real
-  runner before committing to a timeout. Enrichment is ~4× slower than x86
-  (325s vs 76s on the local run — TCG emulation tax).
-- Runs crawl + enrich, publishes `docs/{version}/deep-inspect.arm64.json`
-  (and `docs/{version}/extra/deep-inspect.arm64.json`).
-- **`@tikoci/quickchr` is currently a `file:../quickchr` local dependency.**
-  For CI, it must be published to npm or vendored. Resolve before this step.
-- **Runs `scripts/diff-deep-inspect.ts` against the x86 and arm64 outputs and
-  publishes the text report as a build artifact** (step summary + uploaded
-  file). Initially informational — no hard gate until we have a baseline
-  across multiple versions. The report is the point: it's the human-readable
-  record of what each build surfaced.
-- `auto.yaml` extended to check for missing `deep-inspect.arm64.json`
-  alongside existing artifacts.
+- **Workflow created:** `deep-inspect-multi-arch.yaml` — 3-job pipeline:
+  1. `deep-inspect-x86` — x86 CHR with KVM, all extra packages, live crawl (~10–15 min)
+  2. `deep-inspect-arm64` — arm64 CHR with TCG cross-arch emulation, UEFI/AAVMF firmware,
+     all extra packages, live crawl (~45–90 min). Uses `cortex-a72` CPU, explicit
+     `virtio-blk-pci` (not `if=virtio`), pflash size matching.
+  3. `diff-and-publish` — runs `diff-deep-inspect.ts`, generates step summary, commits
+     `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `docs/{ver}/extra/`
+- **`auto.yaml` updated:** checks for missing `deep-inspect.x86.json` or
+  `deep-inspect.arm64.json` in `docs/{ver}/extra/` and dispatches deep-inspect builds.
+  Versions in `skip_versions` are excluded.
+- **quickchr dependency:** moved to `optionalDependencies` in `package.json` so CI
+  `bun install` doesn't fail when `../quickchr` doesn't exist. The CI workflow calls
+  `deep-inspect.ts` directly (zero npm deps), not the local quickchr orchestrator.
+- **Backfill strategy:** auto.yaml handles current channel versions automatically.
+  For older versions (7.20.8 long-term onward), manually dispatch
+  `deep-inspect-multi-arch.yaml` via `workflow_dispatch` for each version.
+- **Still pending:** first CI run to validate arm64 QEMU boot + TCG enrichment timing
+  on GitHub-hosted runners. Timeout tuning may be needed after first run.
 
 ### Explicitly not in Phase 3
 
@@ -293,3 +296,14 @@ Nothing in the HTML tools consumes `deep-inspect.*.json` yet, so a few hours
 of broken state during backfill is acceptable. `openapi.json` IS consumed by
 `openapi.html` and must continue to regenerate correctly — verify against the
 existing version first.
+
+### Deep-inspect contract coverage
+
+- Add unit/integration coverage for the Phase 3 output contract: `--arch`,
+  `--output-suffix`, `_meta.architecture`, and the expected suffixed filenames.
+  Current tests validate generic `_meta` shape but do not lock these new
+  per-arch invariants yet.
+- Revisit `scripts/diff-deep-inspect.ts` once the first CI runs land. Today it
+  reports `_completion` keyset drift only; if payload-level changes (`style`,
+  `preference`, `desc`) prove meaningful in practice, extend the report rather
+  than treating keyset equality as full semantic equality.

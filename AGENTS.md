@@ -219,6 +219,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `.github/workflows/manual-using-docker-in-docker.yaml` | Build: base RouterOS schema |
 | `.github/workflows/manual-using-extra-docker-in-docker.yaml` | Build: schema + extra packages |
 | `.github/workflows/appyamlschemas.yaml` | Build: validate and publish /app YAML schemas per-version |
+| `.github/workflows/deep-inspect-multi-arch.yaml` | Build: per-arch deep-inspect (x86 KVM + arm64 TCG) with diff |
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `docs/restraml-shared.js` | Shared JS utilities for all tool pages (version parsing, theme, share modal) |
 | `docs/restraml-shared.css` | Shared CSS for all tool pages (fonts, logo, theme, guide, modal, utilities) |

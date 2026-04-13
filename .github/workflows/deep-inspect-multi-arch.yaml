@@ -1,0 +1,393 @@
+name: "Build: Deep-Inspect Multi-Arch"
+
+# Produces per-architecture deep-inspect files by booting x86 and arm64 CHRs
+# with all extra packages, running a live /console/inspect crawl + completion
+# enrichment on each, and diffing the results. Each architecture does its own
+# independent crawl (BACKLOG.md principle 2). Output files:
+#
+#   docs/{version}/extra/deep-inspect.x86.json
+#   docs/{version}/extra/deep-inspect.arm64.json
+#   docs/{version}/extra/diff-deep-inspect.json
+#
+# Dispatched by auto.yaml when per-arch deep-inspect files are missing,
+# or triggered manually (workflow_dispatch) for backfill / re-generation.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rosver:
+        description: 'RouterOS Version (e.g. 7.22.1, 7.23beta5)'
+        required: true
+
+jobs:
+  # ── x86 deep-inspect (KVM, fast) ─────────────────────────────────────────
+  deep-inspect-x86:
+    name: "x86: ${{ inputs.rosver }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      URLBASE: http://localhost:9180/rest
+      BASICAUTH: "admin:"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install QEMU (x86)
+        run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86 qemu-utils
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+
+      - name: Download CHR x86 image
+        run: |
+          VER="${{ inputs.rosver }}"
+          wget -q "https://download.mikrotik.com/routeros/${VER}/chr-${VER}.vdi.zip" -O chr.vdi.zip \
+            || (rm -f chr.vdi.zip && wget -q "https://cdn.mikrotik.com/routeros/${VER}/chr-${VER}.vdi.zip" -O chr.vdi.zip)
+          unzip -q chr.vdi.zip
+          qemu-img convert -f vdi -O qcow2 chr-*.vdi chr.qcow2
+          rm -f chr-*.vdi chr.vdi.zip
+
+      - name: Start x86 CHR in QEMU
+        run: |
+          nohup qemu-system-x86_64 \
+            -enable-kvm -cpu host -m 256 -nographic \
+            -drive file=chr.qcow2,format=qcow2,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            &>/tmp/qemu.log &
+          echo $! > /tmp/qemu.pid
+          echo "QEMU started with PID: $(cat /tmp/qemu.pid)"
+
+      - name: Wait for REST API
+        run: |
+          echo "Waiting for x86 RouterOS REST API (up to 5 min)..."
+          for i in {1..30}; do
+            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST API is up after $i attempt(s)."
+              exit 0
+            fi
+            echo "Attempt $i/30: not ready, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::x86 CHR did not start within 5 minutes. QEMU log:"
+          cat /tmp/qemu.log
+          exit 1
+
+      - name: Activate CHR trial license
+        if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+        run: |
+          curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
+            -H 'Content-Type: application/json' \
+            -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+            && echo "License activated to p1 (trial)" \
+            || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
+
+      - name: Download and install extra packages
+        run: |
+          VER="${{ inputs.rosver }}"
+          mkdir extra && cd extra
+          wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip" \
+            || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip"
+          unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
+          scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
+
+      - name: Reboot CHR and wait for extra packages
+        run: |
+          curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' || \
+            ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
+          sleep 15
+          echo "Waiting for x86 CHR to restart with extra packages (up to 5 min)..."
+          for i in {1..30}; do
+            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST API is back up after $i attempt(s)."
+              exit 0
+            fi
+            echo "Attempt $i/30: not ready, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::x86 CHR did not restart after extra-packages reboot."
+          exit 1
+
+      - name: List installed packages
+        run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Run deep-inspect (x86, live crawl + enrichment)
+        run: |
+          bun deep-inspect.ts --live --arch x86 --output-suffix x86 \
+            --output-dir . --skip-openapi --test-crash-paths --transport rest
+
+      - name: Upload deep-inspect.x86.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-inspect-x86
+          path: deep-inspect.x86.json
+
+      - name: Cleanup QEMU
+        if: always()
+        run: |
+          if [ -f /tmp/qemu.pid ]; then
+            kill "$(cat /tmp/qemu.pid)" || true
+            echo "QEMU process terminated."
+          fi
+
+  # ── arm64 deep-inspect (TCG cross-arch emulation, slow) ──────────────────
+  deep-inspect-arm64:
+    name: "arm64: ${{ inputs.rosver }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      URLBASE: http://localhost:9180/rest
+      BASICAUTH: "admin:"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install QEMU for aarch64 emulation
+        # qemu-system-arm provides qemu-system-aarch64
+        # qemu-efi-aarch64 provides AAVMF UEFI firmware (required for arm64 CHR boot)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y qemu-system-arm qemu-efi-aarch64
+          echo "Verifying UEFI firmware files..."
+          ls -la /usr/share/AAVMF/AAVMF_CODE.fd /usr/share/AAVMF/AAVMF_VARS.fd
+          echo "QEMU aarch64 binary:"
+          which qemu-system-aarch64
+          qemu-system-aarch64 --version
+
+      - name: Download CHR arm64 image
+        run: |
+          VER="${{ inputs.rosver }}"
+          echo "Downloading RouterOS ${VER} arm64 CHR image..."
+          wget -q "https://download.mikrotik.com/routeros/${VER}/chr-${VER}-arm64.img.zip" -O chr-arm64.img.zip \
+            || (rm -f chr-arm64.img.zip && wget -q "https://cdn.mikrotik.com/routeros/${VER}/chr-${VER}-arm64.img.zip" -O chr-arm64.img.zip)
+          unzip -q chr-arm64.img.zip
+          # The zip contains chr-{ver}-arm64.img — rename for simplicity
+          mv chr-*-arm64.img chr-arm64.img
+          rm -f chr-arm64.img.zip
+          ls -lh chr-arm64.img
+
+      - name: Start arm64 CHR in QEMU (TCG cross-arch emulation)
+        # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
+        # On the 'virt' machine, if=virtio resolves to virtio-blk-device (MMIO) which
+        # RouterOS does NOT support — the kernel stalls silently.
+        # See SKILL routeros-qemu-chr "The if=virtio Trap (aarch64)".
+        #
+        # UEFI pflash units must have identical size. Copy the vars template and
+        # truncate to match the code ROM size to be safe.
+        run: |
+          # Prepare writable UEFI vars (copy of template)
+          cp /usr/share/AAVMF/AAVMF_VARS.fd /tmp/aavmf-vars.fd
+          CODE_SIZE=$(stat -c%s /usr/share/AAVMF/AAVMF_CODE.fd)
+          truncate -s "$CODE_SIZE" /tmp/aavmf-vars.fd
+          echo "UEFI code: $(du -h /usr/share/AAVMF/AAVMF_CODE.fd | cut -f1), vars: $(du -h /tmp/aavmf-vars.fd | cut -f1)"
+
+          # Boot arm64 CHR under TCG — no KVM for cross-arch (x86 host → arm64 guest)
+          nohup qemu-system-aarch64 \
+            -M virt -cpu cortex-a72 -m 256 -accel tcg \
+            -drive if=pflash,format=raw,readonly=on,unit=0,file=/usr/share/AAVMF/AAVMF_CODE.fd \
+            -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
+            -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
+            -device virtio-blk-pci,drive=drive0 \
+            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            -nographic \
+            &>/tmp/qemu.log &
+          echo $! > /tmp/qemu.pid
+          echo "QEMU aarch64 started with PID: $(cat /tmp/qemu.pid)"
+
+      - name: Wait for REST API (extended timeout for TCG emulation)
+        # arm64 under TCG on x86 host is significantly slower than native.
+        # Allow up to 10 minutes for initial boot.
+        run: |
+          echo "Waiting for arm64 RouterOS REST API (up to 10 min, TCG is slow)..."
+          for i in {1..60}; do
+            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST API is up after $i attempt(s) (~$((i * 10))s)."
+              exit 0
+            fi
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/60: not ready yet (~$((i * 10))s elapsed)..."
+            fi
+            sleep 10
+          done
+          echo "::error::arm64 CHR did not start within 10 minutes. QEMU log (last 50 lines):"
+          tail -50 /tmp/qemu.log
+          exit 1
+
+      - name: Activate CHR trial license
+        if: ${{ secrets.MIKROTIK_ACCOUNT != '' }}
+        run: |
+          curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
+            -H 'Content-Type: application/json' \
+            -d "{\"account\":\"${{ secrets.MIKROTIK_ACCOUNT }}\",\"password\":\"${{ secrets.MIKROTIK_PASSWORD }}\",\"level\":\"p1\"}" \
+            && echo "License activated to p1 (trial)" \
+            || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
+
+      - name: Download and install arm64 extra packages
+        run: |
+          VER="${{ inputs.rosver }}"
+          mkdir extra && cd extra
+          wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
+            || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
+          unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
+          scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
+
+      - name: Reboot CHR and wait for extra packages (extended timeout)
+        run: |
+          curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' || \
+            ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
+          sleep 30
+          echo "Waiting for arm64 CHR to restart with extra packages (up to 10 min)..."
+          for i in {1..60}; do
+            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST API is back up after $i attempt(s) (~$((i * 10))s)."
+              exit 0
+            fi
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/60: not ready yet (~$((i * 10))s elapsed)..."
+            fi
+            sleep 10
+          done
+          echo "::error::arm64 CHR did not restart after extra-packages reboot."
+          exit 1
+
+      - name: List installed packages
+        run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Run deep-inspect (arm64, live crawl + enrichment)
+        run: |
+          bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
+            --output-dir . --skip-openapi --test-crash-paths --transport rest
+
+      - name: Upload deep-inspect.arm64.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-inspect-arm64
+          path: deep-inspect.arm64.json
+
+      - name: Cleanup QEMU
+        if: always()
+        run: |
+          if [ -f /tmp/qemu.pid ]; then
+            kill "$(cat /tmp/qemu.pid)" || true
+            echo "QEMU process terminated."
+          fi
+
+  # ── Diff + Publish ────────────────────────────────────────────────────────
+  diff-and-publish:
+    name: "Diff & Publish: ${{ inputs.rosver }}"
+    needs: [deep-inspect-x86, deep-inspect-arm64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git for automated commits
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Download x86 deep-inspect artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deep-inspect-x86
+
+      - name: Download arm64 deep-inspect artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deep-inspect-arm64
+
+      - name: Verify artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          ls -lh deep-inspect.x86.json deep-inspect.arm64.json
+          echo "x86 _meta.version: $(jq -r '._meta.version' deep-inspect.x86.json)"
+          echo "arm64 _meta.version: $(jq -r '._meta.version' deep-inspect.arm64.json)"
+          echo "x86 argsTotal: $(jq '._meta.completionStats.argsTotal' deep-inspect.x86.json)"
+          echo "arm64 argsTotal: $(jq '._meta.completionStats.argsTotal' deep-inspect.arm64.json)"
+
+      - name: Run diff (text report to stdout + JSON to file)
+        run: |
+          echo "=== Text diff report ==="
+          bun scripts/diff-deep-inspect.ts deep-inspect.x86.json deep-inspect.arm64.json
+          echo ""
+          echo "=== Generating JSON diff ==="
+          bun scripts/diff-deep-inspect.ts deep-inspect.x86.json deep-inspect.arm64.json --json > diff-deep-inspect.json
+          echo "diff-deep-inspect.json: $(du -h diff-deep-inspect.json | cut -f1)"
+
+      - name: Generate step summary
+        run: |
+          echo "### Deep-Inspect Multi-Arch: ${{ inputs.rosver }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| deep-inspect.x86.json | $(du -h deep-inspect.x86.json | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| deep-inspect.arm64.json | $(du -h deep-inspect.arm64.json | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| diff-deep-inspect.json | $(du -h diff-deep-inspect.json | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          bun scripts/diff-deep-inspect.ts deep-inspect.x86.json deep-inspect.arm64.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Publish deep-inspect files to docs
+        run: |
+          VER="${{ inputs.rosver }}"
+          DOCS_PATH="docs/${VER}/extra"
+          mkdir -p "$DOCS_PATH"
+          cp deep-inspect.x86.json "$DOCS_PATH/"
+          cp deep-inspect.arm64.json "$DOCS_PATH/"
+          cp diff-deep-inspect.json "$DOCS_PATH/"
+          echo "Published to: $DOCS_PATH"
+          ls -lh "$DOCS_PATH"/deep-inspect.*.json "$DOCS_PATH"/diff-deep-inspect.json
+
+      - name: Commit and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ inputs.rosver }}"
+          git add "docs/${VER}/extra/"
+          # Only commit if there are changes (handles re-runs gracefully)
+          if git diff --cached --quiet; then
+            echo "No changes to commit — files already match."
+            exit 0
+          fi
+          git commit -m "Publish ${VER} deep-inspect multi-arch [${{ github.workflow }}]"
+          # Retry push with pull --rebase to handle concurrent build conflicts.
+          for attempt in {1..5}; do
+            if git push origin main; then
+              break
+            elif [ $attempt -eq 5 ]; then
+              echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
+              exit 1
+            fi
+            echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
+            git checkout -- .
+            git clean -fd
+            git pull --rebase
+            sleep $((RANDOM % 10 + 5))
+          done
+
+      - name: Upload all build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-inspect-multi-arch-${{ inputs.rosver }}
+          path: |
+            deep-inspect.x86.json
+            deep-inspect.arm64.json
+            diff-deep-inspect.json
