@@ -66,16 +66,36 @@ jobs:
 
       - name: Wait for REST API
         run: |
-          echo "Waiting for x86 RouterOS REST API (up to 5 min)..."
-          for i in {1..30}; do
-            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is up after $i attempt(s)."
-              exit 0
-            fi
-            echo "Attempt $i/30: not ready, retrying in 10s..."
-            sleep 10
-          done
-          echo "::error::x86 CHR did not start within 5 minutes. QEMU log:"
+          wait_for_rest_ready() {
+            local attempts="$1"
+            local consecutive=0
+
+            for i in $(seq 1 "$attempts"); do
+              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+                >/dev/null 2>&1; then
+                consecutive=$((consecutive + 1))
+                if [ "$consecutive" -ge 2 ]; then
+                  echo "REST API is ready after $i attempt(s)."
+                  return 0
+                fi
+              else
+                consecutive=0
+              fi
+
+              if [ $((i % 6)) -eq 0 ]; then
+                echo "Attempt $i/$attempts: REST not fully ready yet (~$((i * 5))s elapsed)..."
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          echo "Waiting for x86 RouterOS REST API (up to 120s)..."
+          if wait_for_rest_ready 24; then
+            exit 0
+          fi
+          echo "::error::x86 CHR did not become REST-ready within 120s. QEMU log:"
           cat /tmp/qemu.log
           exit 1
 
@@ -99,20 +119,52 @@ jobs:
 
       - name: Reboot CHR and wait for extra packages
         run: |
-          curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' || \
-            ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
-          sleep 15
-          echo "Waiting for x86 CHR to restart with extra packages (up to 5 min)..."
-          for i in {1..30}; do
-            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is back up after $i attempt(s)."
-              exit 0
-            fi
-            echo "Attempt $i/30: not ready, retrying in 10s..."
-            sleep 10
-          done
-          echo "::error::x86 CHR did not restart after extra-packages reboot."
+          wait_for_rest_down() {
+            for i in $(seq 1 15); do
+              if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
+                echo "REST API went down after $i attempt(s)."
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::warning::REST API never visibly went down after reboot request; continuing with readiness wait."
+          }
+
+          wait_for_rest_ready() {
+            local attempts="$1"
+            local consecutive=0
+
+            for i in $(seq 1 "$attempts"); do
+              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+                >/dev/null 2>&1; then
+                consecutive=$((consecutive + 1))
+                if [ "$consecutive" -ge 2 ]; then
+                  echo "REST API is ready after $i attempt(s)."
+                  return 0
+                fi
+              else
+                consecutive=0
+              fi
+
+              if [ $((i % 6)) -eq 0 ]; then
+                echo "Attempt $i/$attempts: REST not fully ready yet (~$((i * 5))s elapsed)..."
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' > /dev/null 2>&1 || \
+            ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
+
+          wait_for_rest_down
+          echo "Waiting for x86 CHR to restart with extra packages (up to 240s)..."
+          if wait_for_rest_ready 48; then
+            exit 0
+          fi
+          echo "::error::x86 CHR did not become REST-ready after extra-packages reboot within 240s."
           exit 1
 
       - name: List installed packages
@@ -178,15 +230,13 @@ jobs:
           if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
           then
             echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=30" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_SETTLE=15" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=30" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
             echo "Using KVM acceleration"
           else
             echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=60" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_SETTLE=30" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=90" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
             echo "::notice::KVM unavailable on this runner; falling back to TCG"
           fi
 
@@ -242,18 +292,36 @@ jobs:
 
       - name: Wait for REST API
         run: |
-          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, attempts=${ARM_BOOT_ATTEMPTS})..."
-          for i in $(seq 1 "${ARM_BOOT_ATTEMPTS}"); do
-            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is up after $i attempt(s) with accel=${ARM_ACCEL}."
-              exit 0
-            fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Attempt $i/${ARM_BOOT_ATTEMPTS}: not ready yet (~$((i * 10))s elapsed, accel=${ARM_ACCEL})..."
-            fi
-            sleep 10
-          done
-          echo "::error::arm64 CHR did not start in time with accel=${ARM_ACCEL}. QEMU log:"
+          wait_for_rest_ready() {
+            local attempts="$1"
+            local consecutive=0
+
+            for i in $(seq 1 "$attempts"); do
+              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+                >/dev/null 2>&1; then
+                consecutive=$((consecutive + 1))
+                if [ "$consecutive" -ge 2 ]; then
+                  echo "REST API is ready after $i attempt(s) with accel=${ARM_ACCEL}."
+                  return 0
+                fi
+              else
+                consecutive=0
+              fi
+
+              if [ $((i % 6)) -eq 0 ]; then
+                echo "Attempt $i/${attempts}: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, up to 120s)..."
+          if wait_for_rest_ready "${ARM_BOOT_ATTEMPTS}"; then
+            exit 0
+          fi
+          echo "::error::arm64 CHR did not become REST-ready in time with accel=${ARM_ACCEL}. QEMU log:"
           cat /tmp/qemu.log
           exit 1
 
@@ -277,22 +345,52 @@ jobs:
 
       - name: Reboot CHR and wait for extra packages
         run: |
-          curl -sS --fail -X POST http://admin@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' || \
-            ssh -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot || true
-          sleep "${ARM_REBOOT_SETTLE}"
-          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, attempts=${ARM_REBOOT_ATTEMPTS})..."
-          for i in $(seq 1 "${ARM_REBOOT_ATTEMPTS}"); do
-            if curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST API is back up after $i attempt(s) with accel=${ARM_ACCEL}."
-              exit 0
-            fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Attempt $i/${ARM_REBOOT_ATTEMPTS}: not ready yet (~$((i * 10))s elapsed, accel=${ARM_ACCEL})..."
-            fi
-            sleep 10
-          done
-          echo "::error::arm64 CHR did not restart after extra-packages reboot with accel=${ARM_ACCEL}."
+          wait_for_rest_down() {
+            for i in $(seq 1 15); do
+              if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
+                echo "REST API went down after $i attempt(s) with accel=${ARM_ACCEL}."
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::warning::REST API never visibly went down after reboot request with accel=${ARM_ACCEL}; continuing with readiness wait."
+          }
+
+          wait_for_rest_ready() {
+            local attempts="$1"
+            local consecutive=0
+
+            for i in $(seq 1 "$attempts"); do
+              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+                >/dev/null 2>&1; then
+                consecutive=$((consecutive + 1))
+                if [ "$consecutive" -ge 2 ]; then
+                  echo "REST API is ready after $i attempt(s) with accel=${ARM_ACCEL}."
+                  return 0
+                fi
+              else
+                consecutive=0
+              fi
+
+              if [ $((i % 6)) -eq 0 ]; then
+                echo "Attempt $i/${attempts}: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' > /dev/null 2>&1 || \
+            ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
+
+          wait_for_rest_down
+          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, up to 240s)..."
+          if wait_for_rest_ready "${ARM_REBOOT_ATTEMPTS}"; then
+            exit 0
+          fi
+          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within 240s with accel=${ARM_ACCEL}."
           exit 1
 
       - name: List installed packages
