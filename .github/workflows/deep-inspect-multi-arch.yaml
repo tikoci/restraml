@@ -230,13 +230,13 @@ jobs:
           if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
           then
             echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=18" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=36" >> "$GITHUB_ENV"
             echo "Using KVM acceleration"
           else
             echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
-            echo "ARM_REBOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
+            echo "ARM_BOOT_ATTEMPTS=18" >> "$GITHUB_ENV"
+            echo "ARM_REBOOT_ATTEMPTS=36" >> "$GITHUB_ENV"
             echo "::notice::KVM unavailable on this runner; falling back to TCG"
           fi
 
@@ -359,11 +359,12 @@ jobs:
           wait_for_rest_ready() {
             local attempts="$1"
             local consecutive=0
+            local status
+            local preview
 
             for i in $(seq 1 "$attempts"); do
-              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
-                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
-                >/dev/null 2>&1; then
+              status=$(curl -sS -m 3 -o /tmp/rest-resource.body -w "%{http_code}" http://admin:@localhost:9180/rest/system/resource 2>/dev/null || echo "000")
+              if [ "$status" = "200" ] && python3 -c 'import json, sys; body = json.load(open("/tmp/rest-resource.body", "r", encoding="utf-8")); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' >/dev/null 2>&1; then
                 consecutive=$((consecutive + 1))
                 if [ "$consecutive" -ge 2 ]; then
                   echo "REST API is ready after $i attempt(s) with accel=${ARM_ACCEL}."
@@ -373,24 +374,47 @@ jobs:
                 consecutive=0
               fi
 
-              if [ $((i % 6)) -eq 0 ]; then
-                echo "Attempt $i/${attempts}: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
+              if [ $((i % 3)) -eq 0 ]; then
+                preview=$(head -c 140 /tmp/rest-resource.body 2>/dev/null | tr '\n' ' ' | tr '\r' ' ' || true)
+                [ -z "$preview" ] && preview="(empty)"
+                echo "Attempt $i/${attempts}: status=${status}, consecutive=${consecutive}, preview=${preview}"
               fi
               sleep 5
             done
             return 1
           }
 
-          curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' > /dev/null 2>&1 || \
-            ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
+          reboot_method="none"
+          if curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' > /dev/null 2>&1; then
+            reboot_method="rest"
+          elif ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1; then
+            reboot_method="ssh"
+          else
+            reboot_method="best-effort"
+          fi
+          echo "Reboot request path: ${reboot_method}"
 
           wait_for_rest_down
-          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, up to 240s)..."
+          echo "Waiting for arm64 CHR to restart with extra packages (accel=${ARM_ACCEL}, up to 180s)..."
           if wait_for_rest_ready "${ARM_REBOOT_ATTEMPTS}"; then
             exit 0
           fi
-          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within 240s with accel=${ARM_ACCEL}."
+          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within 180s with accel=${ARM_ACCEL}."
+          echo "--- Diagnostic: /dev/kvm and qemu process ---"
+          ls -la /dev/kvm || true
+          if [ -f /tmp/qemu.pid ]; then
+            QPID=$(cat /tmp/qemu.pid)
+            echo "QEMU pid: ${QPID}"
+            ps -p "${QPID}" -o pid,stat,%cpu,%mem,etime,args || true
+          fi
+          echo "--- Diagnostic: listeners on 9180/9122 ---"
+          ss -tln 2>/dev/null | rg '(:9180|:9122)' || true
+          echo "--- Diagnostic: qemu log tail ---"
+          tail -120 /tmp/qemu.log || true
+          echo "--- Diagnostic: final REST probes ---"
+          curl -sS -m 5 -i http://localhost:9180/ | head -30 || true
+          curl -sS -m 5 -i http://admin:@localhost:9180/rest/system/resource | head -40 || true
           exit 1
 
       - name: List installed packages
