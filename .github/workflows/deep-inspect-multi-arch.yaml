@@ -377,7 +377,7 @@ jobs:
             NAME=$(basename "$npk")
             SIZE=$(du -h "$npk" | cut -f1)
             echo "  [$COUNT/$TOTAL] Fetching $NAME ($SIZE)..."
-            RESULT=$(curl -sS -m 120 -X POST http://admin:@localhost:9180/rest/tool/fetch \
+            RESULT=$(curl -sS -m 300 -X POST http://admin:@localhost:9180/rest/tool/fetch \
               -H 'Content-Type: application/json' \
               -d "{\"url\":\"http://10.0.2.2:8888/$NAME\",\"dst-path\":\"$NAME\"}" 2>&1)
             echo "    $RESULT"
