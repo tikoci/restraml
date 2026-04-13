@@ -1,4 +1,7 @@
 import { describe, test, expect } from "bun:test";
+import { join } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import {
   filterCompletions,
   completionsToObject,
@@ -513,5 +516,179 @@ describe("deep-inspect.json output structure", () => {
     expect(output._meta.completionStats.argsTotal).toBe(100);
     // Tree data is preserved alongside _meta
     expect((output.convert as InspectNode)._type).toBe("cmd");
+  });
+});
+
+// ── CLI: --arch + --output-suffix contract ─────────────────────────────────
+//
+// These tests spawn deep-inspect.ts as a subprocess using --inspect-file so
+// no live router is needed. They lock down the per-arch filename and _meta
+// contract consumed by rosetta's extract-commands.ts and auto.yaml.
+
+async function runDeepInspect(args: string[], _outDir: string): Promise<{
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}> {
+  const proc = Bun.spawn(
+    ["bun", "deep-inspect.ts", ...args],
+    {
+      cwd: import.meta.dir,
+      env: { ...process.env, URLBASE: undefined, BASICAUTH: undefined },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { exitCode, stdout, stderr };
+}
+
+describe("CLI: --arch + --output-suffix contract", () => {
+  // Each test gets its own temp dir so runs are isolated.
+  let tmpDir: string;
+
+  test("--arch x86 --output-suffix x86 writes deep-inspect.x86.json with correct _meta", async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-"));
+    try {
+      const { exitCode } = await runDeepInspect(
+        [
+          "--inspect-file", "fixtures/sample-inspect.json",
+          "--skip-completion",
+          "--skip-openapi",
+          "--arch", "x86",
+          "--output-suffix", "x86",
+          "--output-dir", tmpDir,
+        ],
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      // Correct filename per the output-suffix contract
+      const outFile = Bun.file(join(tmpDir, "deep-inspect.x86.json"));
+      expect(await outFile.exists()).toBe(true);
+
+      // No unsuffixed file should be written
+      const bare = Bun.file(join(tmpDir, "deep-inspect.json"));
+      expect(await bare.exists()).toBe(false);
+
+      const data = await outFile.json() as DeepInspectOutput;
+      // _meta.architecture must be "x86" — rosetta derives arch from this
+      expect(data._meta.architecture).toBe("x86");
+      expect(data._meta.version).toBeDefined();
+      expect(data._meta.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      // completionStats fields required by rosetta's ros_versions insert
+      expect(typeof data._meta.completionStats.argsTotal).toBe("number");
+      expect(typeof data._meta.completionStats.argsWithCompletion).toBe("number");
+      expect(typeof data._meta.completionStats.argsFailed).toBe("number");
+      expect(typeof data._meta.completionStats.argsTimedOut).toBe("number");
+      expect(typeof data._meta.completionStats.argsBlankOnRetry).toBe("number");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("--arch arm64 --output-suffix arm64 writes deep-inspect.arm64.json with correct _meta", async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-"));
+    try {
+      const { exitCode } = await runDeepInspect(
+        [
+          "--inspect-file", "fixtures/sample-inspect.json",
+          "--skip-completion",
+          "--skip-openapi",
+          "--arch", "arm64",
+          "--output-suffix", "arm64",
+          "--output-dir", tmpDir,
+        ],
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      const outFile = Bun.file(join(tmpDir, "deep-inspect.arm64.json"));
+      expect(await outFile.exists()).toBe(true);
+
+      const data = await outFile.json() as DeepInspectOutput;
+      expect(data._meta.architecture).toBe("arm64");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("no --arch no --output-suffix writes deep-inspect.json with architecture=undefined", async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-"));
+    try {
+      const { exitCode } = await runDeepInspect(
+        [
+          "--inspect-file", "fixtures/sample-inspect.json",
+          "--skip-completion",
+          "--skip-openapi",
+          "--output-dir", tmpDir,
+        ],
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      const outFile = Bun.file(join(tmpDir, "deep-inspect.json"));
+      expect(await outFile.exists()).toBe(true);
+
+      const data = await outFile.json() as DeepInspectOutput;
+      // architecture is optional; omit when not set — rosetta defaults to "x86"
+      expect(data._meta.architecture).toBeUndefined();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("--arch with invalid value exits nonzero", async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-"));
+    try {
+      const { exitCode } = await runDeepInspect(
+        [
+          "--inspect-file", "fixtures/sample-inspect.json",
+          "--skip-completion",
+          "--skip-openapi",
+          "--arch", "mips",
+          "--output-dir", tmpDir,
+        ],
+        tmpDir,
+      );
+      expect(exitCode).not.toBe(0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("filename suffix matches rosetta deriveArch() pattern", async () => {
+    // rosetta/src/extract-commands.ts deriveArch() uses:
+    //   /deep-inspect\.arm64\b/.test(filepath) → "arm64"
+    //   /deep-inspect\.x86\b/.test(filepath)   → "x86"
+    // Verify that deep-inspect.ts produces exactly those filename patterns.
+    tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-"));
+    try {
+      for (const arch of ["x86", "arm64"] as const) {
+        const { exitCode } = await runDeepInspect(
+          [
+            "--inspect-file", "fixtures/sample-inspect.json",
+            "--skip-completion",
+            "--skip-openapi",
+            "--arch", arch,
+            "--output-suffix", arch,
+            "--output-dir", tmpDir,
+          ],
+          tmpDir,
+        );
+        expect(exitCode).toBe(0);
+        const filename = `deep-inspect.${arch}.json`;
+        // rosetta arm64 pattern
+        expect(/deep-inspect\.arm64\b/.test(filename)).toBe(arch === "arm64");
+        // rosetta x86 pattern
+        expect(/deep-inspect\.x86\b/.test(filename)).toBe(arch === "x86");
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
