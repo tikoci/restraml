@@ -383,10 +383,51 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      # NOTE: SCP + reboot steps were replaced by pre-boot disk injection (see
-      # "Inject extra packages into disk image" before QEMU start). RouterOS SSH
-      # under TCG emulation is catastrophically slow — 13+ minutes for SCP vs ~52s
-      # for a full boot. Packages are now on disk before the first boot.
+      - name: Reboot CHR to activate extra packages
+        # Packages were pre-injected into the disk image before QEMU started.
+        # RouterOS processes .npk files during reboot (not initial fresh boot).
+        # REST reboot is instant — avoids SCP entirely (which hangs under TCG).
+        run: |
+          echo "Triggering REST API reboot to activate pre-injected packages..."
+          curl -sS -m 10 -X POST http://admin:@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' || true
+
+          # Wait for REST API to go down (confirms CHR is rebooting)
+          echo "Waiting for REST API to go down..."
+          for i in $(seq 1 20); do
+            if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST API went down after $i attempt(s)."
+              break
+            fi
+            sleep 2
+          done
+
+          # Wait for REST API to come back with packages installed
+          echo "Waiting for CHR to restart with extra packages (up to 240s)..."
+          consecutive=0
+          for i in $(seq 1 48); do
+            if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+              | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+              >/dev/null 2>&1; then
+              consecutive=$((consecutive + 1))
+              if [ "$consecutive" -ge 2 ]; then
+                echo "REST API is ready after $i attempt(s)."
+                break
+              fi
+            else
+              consecutive=0
+            fi
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/48: not ready yet (~$((i * 5))s elapsed)..."
+            fi
+            sleep 5
+          done
+
+          if [ "$consecutive" -lt 2 ]; then
+            echo "::error::CHR did not come back after reboot within 240s."
+            tail -80 /tmp/qemu.log || true
+            exit 1
+          fi
 
       - name: List installed packages
         run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
