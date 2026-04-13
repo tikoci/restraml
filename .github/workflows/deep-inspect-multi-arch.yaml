@@ -353,22 +353,42 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      - name: Upload extra packages via HTTP
-        # Upload .npk files via HTTP PUT (WebFig upload endpoint) instead of SCP.
-        # RouterOS SSH under TCG emulation is catastrophically slow (13+ min hang).
-        # HTTP PUT has minimal overhead — no SSH handshake, no encryption.
+      - name: Upload extra packages via fetch
+        # HTTP PUT is 501 Not Implemented on RouterOS CHR. SCP hangs under TCG.
+        # Instead: run a host-side HTTP server and use RouterOS /tool/fetch to PULL
+        # packages from it. Guest reaches host at 10.0.2.2 (QEMU user-mode NAT).
         run: |
-          echo "Uploading extra packages via HTTP PUT..."
+          # Start HTTP server serving the extra/ directory
+          cd extra && python3 -m http.server 8888 --bind 0.0.0.0 &
+          HTTP_PID=$!
+          cd ..
+          sleep 1
+
+          echo "Uploading extra packages via /tool/fetch (host→guest pull)..."
           TOTAL=$(ls extra/*.npk | wc -l)
           COUNT=0
+          FAILED=0
           for npk in extra/*.npk; do
             COUNT=$((COUNT + 1))
             NAME=$(basename "$npk")
             SIZE=$(du -h "$npk" | cut -f1)
-            echo "  [$COUNT/$TOTAL] Uploading $NAME ($SIZE)..."
-            curl -sS -m 120 -u admin: -T "$npk" "http://localhost:9180/$NAME"
+            echo "  [$COUNT/$TOTAL] Fetching $NAME ($SIZE)..."
+            RESULT=$(curl -sS -m 120 -X POST http://admin:@localhost:9180/rest/tool/fetch \
+              -H 'Content-Type: application/json' \
+              -d "{\"url\":\"http://10.0.2.2:8888/$NAME\",\"dst-path\":\"$NAME\"}" 2>&1)
+            echo "    $RESULT"
+            # Give the guest a moment to process
+            sleep 1
           done
-          echo "Upload complete. Verifying files on RouterOS..."
+
+          # Stop the HTTP server
+          kill $HTTP_PID 2>/dev/null || true
+
+          # Wait for all fetches to complete (tool/fetch is async on RouterOS)
+          echo "Waiting for fetches to settle..."
+          sleep 10
+
+          echo "Verifying files on RouterOS..."
           curl -sS --fail http://admin:@localhost:9180/rest/file \
             | jq '[.[] | select(.name | endswith(".npk")) | {name, size}]'
 
