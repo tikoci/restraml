@@ -184,19 +184,23 @@ jobs:
         # RouterOS does NOT support — the kernel stalls silently.
         # See SKILL routeros-qemu-chr "The if=virtio Trap (aarch64)".
         #
-        # UEFI pflash units must have identical size. Copy the vars template and
-        # truncate to match the code ROM size to be safe.
+        # UEFI pflash units must have identical size. On Ubuntu, AAVMF_CODE.fd is a
+        # symlink; dereference it before measuring size or the vars file gets truncated
+        # to the symlink length instead of the 64 MiB firmware blob.
         run: |
+          AAVMF_CODE=$(readlink -f /usr/share/AAVMF/AAVMF_CODE.fd)
+          AAVMF_VARS=$(readlink -f /usr/share/AAVMF/AAVMF_VARS.fd)
+
           # Prepare writable UEFI vars (copy of template)
-          cp /usr/share/AAVMF/AAVMF_VARS.fd /tmp/aavmf-vars.fd
-          CODE_SIZE=$(stat -c%s /usr/share/AAVMF/AAVMF_CODE.fd)
+          cp "$AAVMF_VARS" /tmp/aavmf-vars.fd
+          CODE_SIZE=$(stat -Lc%s "$AAVMF_CODE")
           truncate -s "$CODE_SIZE" /tmp/aavmf-vars.fd
-          echo "UEFI code: $(du -h /usr/share/AAVMF/AAVMF_CODE.fd | cut -f1), vars: $(du -h /tmp/aavmf-vars.fd | cut -f1)"
+          echo "UEFI code: $(du -h "$AAVMF_CODE" | cut -f1), vars: $(du -h /tmp/aavmf-vars.fd | cut -f1)"
 
           # Boot arm64 CHR under TCG — no KVM for cross-arch (x86 host → arm64 guest)
           nohup qemu-system-aarch64 \
             -M virt -cpu cortex-a72 -m 256 -accel tcg \
-            -drive if=pflash,format=raw,readonly=on,unit=0,file=/usr/share/AAVMF/AAVMF_CODE.fd \
+            -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
             -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
             -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
             -device virtio-blk-pci,drive=drive0 \
