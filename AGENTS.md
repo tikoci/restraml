@@ -157,6 +157,13 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 2. Identify the failing step and error message.
 3. Fix the workflow YAML or the referenced script.
 4. Validate YAML syntax locally if possible.
+5. **Read `BACKLOG.md` and `CLAUDE.md` → "CI Anti-Patterns" before changing timeouts or
+   adding workarounds.** Never increase a timeout without first understanding why the step is
+   slow. Never skip a crawl or enrichment step to make a build "pass".
+6. **For `deep-inspect-multi-arch.yaml` specifically:** The ARM64 job is currently broken
+   (extra packages not installing). See `BACKLOG.md` Phase 3.5 for the full post-mortem and
+   fix requirements. Run `scripts/experiment-arm64-reboot-timing.sh` locally before making
+   CI changes.
 
 ### Create a custom docs page (from a GitHub Issue)
 1. Read the issue for the desired feature/view.

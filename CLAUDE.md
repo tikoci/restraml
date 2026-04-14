@@ -915,6 +915,20 @@ unilaterally; flag them in code comments and issue discussions.
 
 ## Things That Are Known-Broken or Incomplete
 
+### `deep-inspect-multi-arch.yaml` — ARM64 Extra Packages Not Installing
+The ARM64 CI job in `deep-inspect-multi-arch.yaml` produces output without extra packages.
+The `List installed packages` step shows only `["routeros"]` instead of 12+ packages. The
+x86 job works correctly. **Do not increase timeouts or add workarounds — fix the package
+install/reboot cycle first.** See `BACKLOG.md` Phase 3.5 for the full post-mortem, CI
+evidence, and fix requirements.
+
+**Key facts:**
+- Correct arm64 output has ~36,023 args (with extra packages); CI produces ~577 (base only)
+- Correct diff shows ~1,433 arm64-only paths; CI shows 0 or shows x86-only paths
+- Local reference files at `/tmp/multi-arch-dev/` show what correct output looks like
+- The experiment script `scripts/experiment-arm64-reboot-timing.sh` should be run locally
+  before making CI changes
+
 ### Native API `/console/inspect` Completion Non-Determinism
 RouterOS 7.22.1 (and likely all 7.x) returns non-deterministic results for `request=completion`
 queries via the native API binary protocol. ~20-30% of calls randomly drop entries. REST is
@@ -923,6 +937,38 @@ unaffected. See `BACKLOG.md` Phase 2.9 and `docs/mikrotik-bug-native-api-inspect
 `ros-api-protocol.ts` remain in the codebase for potential use if MikroTik fixes the bug.
 Research test files (`benchmark.test.ts`, `native-api.test.ts`) and the experimental CI
 workflow (`test-transport-equivalence.yaml`) were removed as part of the REST-only decision.
+
+---
+
+## CI Anti-Patterns — Lessons from deep-inspect ARM64 (April 2026)
+
+These rules apply to **all agents working on CI workflows** in this repository:
+
+1. **Never increase a timeout without first understanding why the step is slow.** If a step
+   takes 10× longer than the measured baseline, the timeout is not the problem. ARM64 TCG on
+   x86_64 boots in ~20s, not 600s. See `BACKLOG.md` for measured timing baselines.
+
+2. **Always verify extra packages are actually installed.** After any reboot step that activates
+   packages, `GET /rest/system/package` must show >10 packages. If it shows only `["routeros"]`,
+   the job MUST fail — not continue with base-only output.
+
+3. **Check the output, not just the exit code.** A green CI badge means nothing if the arm64
+   file has 577 args instead of 36,023. Add assertions for expected arg counts and diff ranges.
+
+4. **Do not violate BACKLOG.md guiding principles to work around bugs.** Both arches must do
+   their own live crawl (principle 2). Per-arch files before merge (principle 4). If the arm64
+   crawl is "too slow", the fix is to debug why, not to skip it.
+
+5. **Verify locally before pushing to CI.** CI builds take 30–90 minutes per attempt. Use
+   `scripts/experiment-arm64-reboot-timing.sh` for local QEMU experiments (5–10 minutes).
+
+6. **ARM64 QEMU boot timing reference:**
+   | Host → Guest | Accelerator | Boot time |
+   |---|---|---|
+   | x86_64 → x86_64 | KVM | <5s |
+   | x86_64 → aarch64 | TCG | ~20s |
+   | aarch64 → aarch64 | KVM/TCG | <5s / ~25s |
+   | aarch64 → x86_64 | TCG | >300s — NOT VIABLE |
 
 ---
 
