@@ -213,10 +213,8 @@ If it takes 600s, the problem is not "TCG is slow" — it's a broken boot.
 
 **The `ubuntu-24.04-arm` runner (current arm64 job):**
 The current workflow runs the arm64 job on `ubuntu-24.04-arm` (GitHub ARM64
-runner). This means ARM64-on-ARM64, which could use KVM if the runner exposes
-it (the workflow probes for KVM and falls back to TCG). This is actually the
-RIGHT choice for performance, but it doesn't matter if packages aren't
-installed.
+runner). This means ARM64-on-ARM64, with TSG. Hard to know if
+RIGHT choice for performance vs ARM64-on-X86 with TSG... but it doesn't matter if packages aren't installed.
 
 **Package upload strategy — what works locally:**
 The local orchestrator (`scripts/deep-inspect-multi-arch.ts`) uses quickchr's
