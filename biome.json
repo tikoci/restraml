@@ -76,7 +76,7 @@
             }
         },
         {
-            "includes": ["docs/openapi.html"],
+            "includes": ["docs/openapi.html", "docs/tikapp.html"],
             "linter": {
                 "rules": {
                     "complexity": {

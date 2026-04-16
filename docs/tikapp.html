@@ -181,6 +181,12 @@
             font-weight: inherit;
         }
 
+        /* Hide "No suggestions." tooltip — Monaco triggers it spuriously during
+           initialization and setValue; it adds no value for a schema-driven editor
+           where our custom completion provider handles all suggestion logic.
+           The .suggest-widget gets class "message" when showing the empty state. */
+        .monaco-editor .suggest-widget.message { display: none !important; }
+
         /* MikroTik symbol SVG: invert to white in dark mode */
         .mt-symbol { height: 0.9em; width: auto; vertical-align: middle; margin: 0 2px; }
         @media (prefers-color-scheme: dark) { :root:not([data-theme=light]) .mt-symbol { filter: invert(1); } }
@@ -592,16 +598,78 @@
             const root = useStoreSchema ? storeSchemaObj : singleSchemaObj
             if (!root) return
 
+            // Also refresh hover provider when completions are re-registered
+            registerYamlHover()
+
             completionDisposable = monaco.languages.registerCompletionItemProvider('yaml', {
-                triggerCharacters: [' ', '-'],
+                triggerCharacters: [' ', '-', ':', '\n'],
                 provideCompletionItems(model, position) {
                     const line = model.getLineContent(position.lineNumber)
                     const lineBefore = line.substring(0, position.column - 1)
                     const indent = lineBefore.match(/^(\s*)/)[1].length
-
-                    // Only suggest keys at start of key-value position (after indentation)
                     const trimmed = lineBefore.trim()
-                    if (trimmed !== '' && !/^[\w-]*$/.test(trimmed)) return { suggestions: [] }
+
+                    // --- Value completions: after "key: " offer enum/boolean values ---
+                    const valueMatch = lineBefore.match(/^(\s*)(\S[\w-]*):\s*(.*)$/)
+                    if (valueMatch) {
+                        const valueKey = valueMatch[2]
+                        // Build parent path for this key
+                        const valParentKeys = []
+                        let valTargetIndent = indent - 2
+                        const allLines = model.getLinesContent()
+                        for (let i = position.lineNumber - 2; i >= 0 && valTargetIndent >= 0; i--) {
+                            const l = allLines[i]
+                            const li = l.match(/^(\s*)/)[1].length
+                            if (li === valTargetIndent) {
+                                const m = l.trim().match(/^([\w-]+):\s*$/)
+                                if (m) { valParentKeys.unshift(m[1]); valTargetIndent -= 2 }
+                                else if (l.trim().startsWith('- ') || l.trim() === '-') {
+                                    valTargetIndent -= 2
+                                }
+                            }
+                        }
+                        const valNode = schemaAtPath(root, [...valParentKeys, valueKey])
+                        if (valNode) {
+                            const valMerged = mergeSchema(root, valNode)
+                            const valueSuggestions = []
+                            const valWord = model.getWordUntilPosition(position)
+                            const valRange = {
+                                startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+                                startColumn: valWord.startColumn, endColumn: valWord.endColumn,
+                            }
+                            // Enum values
+                            const enumVals = valMerged?.enum || []
+                            for (const v of enumVals) {
+                                valueSuggestions.push({
+                                    label: String(v),
+                                    kind: monaco.languages.CompletionItemKind.Value,
+                                    detail: 'enum',
+                                    insertText: String(v),
+                                    range: valRange,
+                                    sortText: `0${String(v)}`,
+                                })
+                            }
+                            // Boolean type
+                            const types = Array.isArray(valMerged?.type) ? valMerged.type : [valMerged?.type]
+                            if (types.includes('boolean')) {
+                                for (const bv of ['true', 'false']) {
+                                    valueSuggestions.push({
+                                        label: bv,
+                                        kind: monaco.languages.CompletionItemKind.Value,
+                                        detail: 'boolean',
+                                        insertText: bv,
+                                        range: valRange,
+                                        sortText: `0${bv}`,
+                                    })
+                                }
+                            }
+                            if (valueSuggestions.length > 0) return { suggestions: valueSuggestions }
+                        }
+                    }
+
+                    // --- Key completions: on empty lines or when typing a key name ---
+                    // Allow: empty line, line with only whitespace, or partial key name
+                    if (trimmed !== '' && !/^[\w-]*$/.test(trimmed)) return
 
                     // Walk up lines to build parent key path
                     const parentKeys = []
@@ -614,7 +682,6 @@
                             const m = l.trim().match(/^([\w-]+):\s*$/)
                             if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
                             else if (l.trim().startsWith('- ') || l.trim() === '-') {
-                                // array item context; don't add a key, just go up
                                 targetIndent -= 2
                             }
                         }
@@ -633,6 +700,28 @@
                     const merged = mergeSchema(root, node)
                     const props = merged?.properties || {}
 
+                    // Collect keys already used at this indent level (suppress duplicates)
+                    const usedKeys = new Set()
+                    for (let i = position.lineNumber - 2; i >= 0; i--) {
+                        const l = lines[i]
+                        const li = l.match(/^(\s*)/)[1].length
+                        if (li < indent) break      // parent scope — stop
+                        if (li === indent) {
+                            const km = l.trim().match(/^([\w-]+):/)
+                            if (km) usedKeys.add(km[1])
+                        }
+                    }
+                    // Also check lines below current position at same indent
+                    for (let i = position.lineNumber; i < lines.length; i++) {
+                        const l = lines[i]
+                        const li = l.match(/^(\s*)/)[1].length
+                        if (li < indent) break
+                        if (li === indent) {
+                            const km = l.trim().match(/^([\w-]+):/)
+                            if (km) usedKeys.add(km[1])
+                        }
+                    }
+
                     const word = model.getWordUntilPosition(position)
                     const range = {
                         startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
@@ -640,27 +729,113 @@
                     }
 
                     const required = new Set(merged?.required || [])
-                    const suggestions = Object.entries(props).map(([key, propDef]) => {
+                    const suggestions = Object.entries(props)
+                        .filter(([key]) => !usedKeys.has(key))
+                        .map(([key, propDef]) => {
                         const resolved = resolveRef(root, propDef)
                         const rm = mergeSchema(root, resolved)
-                        const type = rm?.type || (rm?.properties ? 'object' : undefined)
-                        let insertText = `${key}: `
-                        if (type === 'object') insertText = `${key}:\n${' '.repeat(indent + 2)}`
-                        else if (type === 'array') insertText = `${key}:\n${' '.repeat(indent + 2)}- `
+                        const rawType = rm?.type
+                        const type = rawType || (rm?.properties ? 'object' : undefined)
+                        const isReq = required.has(key)
+
+                        // Build rich insert text with snippets for structured types
+                        let insertText = `${key}: \${1}`
+                        const insertTextRules = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+                        if (type === 'object') {
+                            insertText = `${key}:\n${' '.repeat(indent + 2)}\${1}`
+                        } else if (type === 'array') {
+                            insertText = `${key}:\n${' '.repeat(indent + 2)}- \${1}`
+                        } else if (rm?.enum) {
+                            // Offer choice placeholder for enums
+                            const choices = rm.enum.map(v => String(v)).join(',')
+                            insertText = `${key}: \${1|${choices}|}`
+                        } else if (Array.isArray(rawType) ? rawType.includes('boolean') : rawType === 'boolean') {
+                            insertText = `${key}: \${1|true,false|}`
+                        }
+
                         const doc = rm?.description || rm?.title || ''
+                        const detail = [isReq ? '(required)' : '', type || ''].filter(Boolean).join(' ')
                         return {
-                            label: key,
-                            kind: monaco.languages.CompletionItemKind.Property,
+                            label: { label: key, description: isReq ? '★ required' : '' },
+                            kind: isReq ? monaco.languages.CompletionItemKind.Keyword : monaco.languages.CompletionItemKind.Property,
                             documentation: doc ? { value: doc } : undefined,
-                            detail: type || '',
+                            detail,
                             insertText,
+                            insertTextRules,
                             range,
-                            // Required properties sort first
-                            sortText: required.has(key) ? `0${key}` : `1${key}`,
+                            sortText: isReq ? `0${key}` : `1${key}`,
+                            preselect: isReq,
                         }
                     })
 
+                    // Return undefined (not empty array) when no suggestions —
+                    // empty array causes Monaco to show "No suggestions." tooltip
+                    if (suggestions.length === 0) return
                     return { suggestions }
+                }
+            })
+        }
+
+        // --- Hover provider: schema docs on hover over YAML keys ---------
+        let hoverDisposable = null
+        function registerYamlHover() {
+            if (hoverDisposable) { hoverDisposable.dispose(); hoverDisposable = null }
+            if (!monacoReady) return
+            const root = useStoreSchema ? storeSchemaObj : singleSchemaObj
+            if (!root) return
+
+            hoverDisposable = monaco.languages.registerHoverProvider('yaml', {
+                provideHover(model, position) {
+                    const line = model.getLineContent(position.lineNumber)
+                    // Match a YAML key at the current position
+                    const keyMatch = line.match(/^(\s*)([\w-]+)\s*:/)
+                    if (!keyMatch) return null
+                    const keyStart = keyMatch[1].length + 1
+                    const keyEnd = keyStart + keyMatch[2].length
+                    if (position.column < keyStart || position.column > keyEnd) return null
+
+                    const key = keyMatch[2]
+                    const indent = keyMatch[1].length
+
+                    // Build parent path
+                    const parentKeys = []
+                    let targetIndent = indent - 2
+                    const lines = model.getLinesContent()
+                    for (let i = position.lineNumber - 2; i >= 0 && targetIndent >= 0; i--) {
+                        const l = lines[i]
+                        const li = l.match(/^(\s*)/)[1].length
+                        if (li === targetIndent) {
+                            const m = l.trim().match(/^([\w-]+):\s*$/)
+                            if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
+                            else if (l.trim().startsWith('- ') || l.trim() === '-') {
+                                targetIndent -= 2
+                            }
+                        }
+                    }
+
+                    const node = schemaAtPath(root, [...parentKeys, key])
+                    if (!node) return null
+                    const merged = mergeSchema(root, node)
+                    if (!merged) return null
+
+                    const parts = []
+                    if (merged.description) parts.push(merged.description)
+                    const type = merged.type || (merged.properties ? 'object' : '')
+                    if (type) parts.push(`**Type:** \`${Array.isArray(type) ? type.join(' | ') : type}\``)
+                    if (merged.enum) parts.push(`**Values:** ${merged.enum.map(v => `\`${v}\``).join(', ')}`)
+                    if (merged.examples?.length) parts.push(`**Example:** \`${merged.examples[0]}\``)
+
+                    // Check if required in parent
+                    const parentNode = schemaAtPath(root, parentKeys)
+                    const parentMerged = mergeSchema(root, parentNode)
+                    if (parentMerged?.required?.includes(key)) parts.push('**★ Required**')
+
+                    if (parts.length === 0) return null
+
+                    return {
+                        range: new monaco.Range(position.lineNumber, keyStart, position.lineNumber, keyEnd),
+                        contents: [{ value: parts.join('\n\n'), isTrusted: true }]
+                    }
                 }
             })
         }
@@ -1157,11 +1332,47 @@
                     wordBasedSuggestions: 'off',
                     acceptSuggestionOnEnter: 'on',
                     tabCompletion: 'on',
-                    quickSuggestions: { other: true, comments: false, strings: true },
-                    suggestOnTriggerCharacters: true,
+                    // Suggestions handled by custom onDidChangeCursorPosition trigger
+                    quickSuggestions: false,
+                    suggestOnTriggerCharacters: false,
+                    snippetSuggestions: 'top',
+                    suggest: {
+                        filterGraceful: true,
+                        showIcons: true,
+                        preview: true,
+                        showStatusBar: true,
+                        insertMode: 'replace',
+                    },
                 })
 
                 new ResizeObserver(() => { editor.layout() }).observe(editorContainer)
+
+                // Auto-trigger suggest on empty/new lines and after colon+space
+                let _autoSuggestTimer = null
+                // Suppress auto-suggest during init and scaffold application
+                // to prevent "No suggestions." popup from firing
+                let _suppressAutoSuggest = true
+                setTimeout(() => { _suppressAutoSuggest = false }, 1500)
+                editor.onDidChangeCursorPosition(e => {
+                    // Cancel any pending auto-suggest (prevents stale triggers after setValue/setPosition)
+                    if (_autoSuggestTimer) { clearTimeout(_autoSuggestTimer); _autoSuggestTimer = null }
+                    if (_suppressAutoSuggest) return
+                    if (e.reason === monaco.editor.CursorChangeReason.Explicit ||
+                        e.reason === monaco.editor.CursorChangeReason.ContentFlush) {
+                        return
+                    }
+                    const line = editor.getModel().getLineContent(e.position.lineNumber)
+                    const before = line.substring(0, e.position.column - 1)
+                    const trimmed = before.trim()
+                    // Trigger on: empty line, whitespace-only, after "key: " (value position)
+                    if (trimmed === '' || /^[\w-]+:\s+$/.test(before.trimStart())) {
+                        // Small delay to let Monaco settle after the keystroke
+                        _autoSuggestTimer = setTimeout(() => {
+                            _autoSuggestTimer = null
+                            editor.trigger('autosuggest', 'editor.action.triggerSuggest', {})
+                        }, 50)
+                    }
+                })
 
                 editor.onDidChangeModelContent(() => {
                     if (suppressChangeEvent) return
@@ -1431,36 +1642,133 @@
             plausible?.('App YAML Import File', {})
         })
 
+        // --- Scaffold template from schema --------------------------------
+        function generateScaffold() {
+            const root = useStoreSchema ? storeSchemaObj : singleSchemaObj
+            if (!root) return ''
+            const resolved = resolveRef(root, root)
+
+            if (useStoreSchema) {
+                // Store schema is an array — scaffold one entry
+                const items = resolved?.items ? resolveRef(root, resolved.items) : null
+                const inner = items ? scaffoldObject(root, items, 0) : ''
+                return `# RouterOS /app store — array of /app definitions\n# Each entry defines one container application\n- ${inner.trimStart()}`
+            }
+
+            return scaffoldObject(root, resolved, 0)
+        }
+
+        function scaffoldObject(root, node, indent) {
+            const merged = mergeSchema(root, node)
+            if (!merged?.properties) return ''
+            const required = new Set(merged.required || [])
+            const pad = ' '.repeat(indent)
+            const lines = []
+
+            // Sort: required first, then alphabetical
+            const keys = Object.keys(merged.properties).sort((a, b) => {
+                const ra = required.has(a), rb = required.has(b)
+                if (ra !== rb) return ra ? -1 : 1
+                return a.localeCompare(b)
+            })
+
+            for (const key of keys) {
+                const prop = resolveRef(root, merged.properties[key])
+                const pm = mergeSchema(root, prop)
+                const type = pm?.type || (pm?.properties ? 'object' : undefined)
+                const desc = pm?.description || ''
+                const isReq = required.has(key)
+
+                if (type === 'object' && (pm?.properties || pm?.patternProperties)) {
+                    // Only scaffold required objects or the 'services' key
+                    if (isReq || key === 'services') {
+                        if (pm.patternProperties) {
+                            // Pattern-keyed object (services, volumes, etc.) — add a placeholder entry
+                            const patEntries = Object.entries(pm.patternProperties)
+                            const patSchema = resolveRef(root, patEntries[0]?.[1])
+                            const placeholder = key === 'services' ? 'my-service' : 'my-' + key.replace(/s$/, '')
+                            lines.push(`${pad}${key}:`)
+                            if (desc) lines.push(`${pad}  # ${truncateComment(desc)}`)
+                            if (patSchema?.properties) {
+                                lines.push(`${pad}  ${placeholder}:`)
+                                const inner = scaffoldObject(root, patSchema, indent + 4)
+                                if (inner) lines.push(inner)
+                            } else {
+                                lines.push(`${pad}  ${placeholder}: {}`)
+                            }
+                        } else {
+                            lines.push(`${pad}${key}:`)
+                            const inner = scaffoldObject(root, prop, indent + 2)
+                            if (inner) lines.push(inner)
+                        }
+                    } else {
+                        lines.push(`${pad}# ${key}:  ${desc ? '— ' + truncateComment(desc) : ''}`)
+                    }
+                } else if (type === 'array') {
+                    if (isReq) {
+                        lines.push(`${pad}${key}:`)
+                        lines.push(`${pad}  - ""`)
+                    } else {
+                        lines.push(`${pad}# ${key}:  ${desc ? '— ' + truncateComment(desc) : ''}`)
+                    }
+                } else if (isReq) {
+                    // Required scalar — add with example
+                    if (pm?.enum) {
+                        lines.push(`${pad}${key}: ${pm.enum[0]}  # ${pm.enum.join(' | ')}`)
+                    } else if (pm?.examples?.length) {
+                        lines.push(`${pad}${key}: ${pm.examples[0]}`)
+                    } else {
+                        lines.push(`${pad}${key}: ""`)
+                    }
+                } else {
+                    // Optional scalar — commented out with description
+                    const hint = pm?.enum ? pm.enum.join(' | ') : (pm?.examples?.length ? `e.g. ${pm.examples[0]}` : desc)
+                    lines.push(`${pad}# ${key}:  ${hint ? '— ' + truncateComment(hint) : ''}`)
+                }
+            }
+            return lines.join('\n')
+        }
+
+        function truncateComment(text) {
+            return text.length > 70 ? text.substring(0, 67) + '...' : text
+        }
+
         newBtn.addEventListener('click', () => {
             if (editor) {
+                const scaffold = generateScaffold()
                 const content = editor.getValue().trim()
+                const applyScaffold = () => {
+                    _suppressAutoSuggest = true
+                    suppressChangeEvent = true
+                    editor.setValue(scaffold)
+                    suppressChangeEvent = false
+                    clearCurrentExample()
+                    localStorage.setItem(AUTOSAVE_KEY, scaffold)
+                    runValidation()
+                    setStatus('New — template loaded with /app structure. Fill in the values.', true)
+                    // Place cursor inside the first empty "" value
+                    const lines = scaffold.split('\n')
+                    for (let i = 0; i < lines.length; i++) {
+                        const m = lines[i].match(/:\s+""/)
+                        if (m) {
+                            const col = lines[i].indexOf('""') + 2  // between the quotes
+                            editor.setPosition({ lineNumber: i + 1, column: col })
+                            editor.revealLineInCenter(i + 1)
+                            break
+                        }
+                    }
+                    editor.focus()
+                    // Re-enable auto-suggest after a delay (let Monaco settle)
+                    setTimeout(() => { _suppressAutoSuggest = false }, 1500)
+                    plausible?.('App YAML New', {})
+                }
                 if (isDirty() || (currentExampleName === null && content)) {
-                    setStatus('Clear editor? Current content will be lost.', false, [
-                        {
-                            label: 'Clear', fn: () => {
-                                suppressChangeEvent = true
-                                editor.setValue('')
-                                suppressChangeEvent = false
-                                clearCurrentExample()
-                                localStorage.removeItem(AUTOSAVE_KEY)
-                                runValidation()
-                                setStatus('Editor cleared.', true)
-                                editor.focus()
-                                plausible?.('App YAML New', {})
-                            }
-                        },
+                    setStatus('Replace current content with a new template?', false, [
+                        { label: 'New', fn: applyScaffold },
                         { label: 'Cancel', fn: () => clearStatus() }
                     ])
                 } else {
-                    suppressChangeEvent = true
-                    editor.setValue('')
-                    suppressChangeEvent = false
-                    clearCurrentExample()
-                    localStorage.removeItem(AUTOSAVE_KEY)
-                    runValidation()
-                    setStatus('New — editor cleared.', true)
-                    editor.focus()
-                    plausible?.('App YAML New', {})
+                    applyScaffold()
                 }
             }
         })
