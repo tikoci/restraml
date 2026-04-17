@@ -123,7 +123,7 @@ interface InspectCompletionResponse {
 
 export interface IRouterOSClient {
   fetchVersion(): Promise<string>;
-  fetchChild(path: string[]): Promise<InspectChildResponse[]>;
+  fetchChild(path: string[], signal?: AbortSignal): Promise<InspectChildResponse[]>;
   fetchSyntax(path: string[], signal?: AbortSignal): Promise<InspectSyntaxResponse[]>;
   fetchCompletion(path: string[], signal?: AbortSignal): Promise<InspectCompletionResponse[]>;
   close?(): void;
@@ -179,10 +179,11 @@ export class RouterOSClient implements IRouterOSClient {
     return resp.ret.split(" ")[0];
   }
 
-  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+  async fetchChild(path: string[], signal?: AbortSignal): Promise<InspectChildResponse[]> {
     return this.fetchPost<InspectChildResponse[]>(
       `${this.baseUrl}/console/inspect`,
       { request: "child", path: path.join(",") },
+      signal,
     );
   }
 
@@ -269,7 +270,7 @@ export class NativeRouterOSClient implements IRouterOSClient {
     return version.split(" ")[0];
   }
 
-  async fetchChild(path: string[]): Promise<InspectChildResponse[]> {
+  async fetchChild(path: string[], _signal?: AbortSignal): Promise<InspectChildResponse[]> {
     try {
       const sentences = await this.api.write(
         "/console/inspect",
@@ -515,14 +516,37 @@ export async function testCrashPaths(client: IRouterOSClient): Promise<CrashPath
 
 // ── Full Crawl (--live mode) ───────────────────────────────────────────────
 
+/** Per-request timeout for tree crawl — generous default, overridable via --request-timeout
+ *  for slow emulation (TCG arm64). Unset = no per-request abort signal. */
+let CRAWL_REQUEST_TIMEOUT_MS: number | undefined;
+
+/** Set the per-request timeout used by crawlInspectTree (called from main). */
+export function setCrawlRequestTimeout(ms: number | undefined) {
+  CRAWL_REQUEST_TIMEOUT_MS = ms;
+}
+
 /** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren) */
 export async function crawlInspectTree(
   client: IRouterOSClient,
   rpath: string[] = [],
   skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
+  _depth = 0,
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
-  const children = await client.fetchChild(rpath);
+  const signal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
+  let children: InspectChildResponse[];
+  try {
+    children = await client.fetchChild(rpath, signal);
+  } catch (err) {
+    const pathStr = `/${rpath.join("/")}`;
+    console.error(`  ⚠ fetchChild failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
+    return memo;
+  }
+
+  // Progress logging at top two levels
+  if (_depth <= 1 && rpath.length > 0) {
+    console.log(`  crawl: /${rpath.join("/")} (${children.filter(c => c.type === "child").length} children)`);
+  }
 
   for (const child of children) {
     if (child.type !== "child") continue;
@@ -535,7 +559,8 @@ export async function crawlInspectTree(
       const shouldSkip = newpath.some((segment) => skipPaths.has(segment));
       if (!shouldSkip) {
         try {
-          const syntax = await client.fetchSyntax(newpath);
+          const syntaxSignal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
+          const syntax = await client.fetchSyntax(newpath, syntaxSignal);
           if (syntax.length === 1 && syntax[0].text.length > 0) {
             node.desc = syntax[0].text;
           }
@@ -545,8 +570,13 @@ export async function crawlInspectTree(
       }
     }
 
-    const childTree = await crawlInspectTree(client, newpath, skipPaths);
-    Object.assign(node, childTree);
+    try {
+      const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1);
+      Object.assign(node, childTree);
+    } catch (err) {
+      const pathStr = `/${newpath.join("/")}`;
+      console.error(`  ⚠ crawl failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   return memo;
@@ -1002,6 +1032,8 @@ interface CliOptions {
   rosVersion?: string;
   live: boolean;
   outputDir: string;
+  outputSuffix?: string;
+  arch?: "x86" | "arm64";
   skipOpenapi: boolean;
   skipCompletion: boolean;
   testCrashPaths: boolean;
@@ -1010,6 +1042,7 @@ interface CliOptions {
   transport: "auto" | "rest" | "native";
   apiHost?: string;
   apiPort: number;
+  requestTimeout?: number;
 }
 
 function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
@@ -1020,6 +1053,8 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       "ros-version": { type: "string" },
       live: { type: "boolean", default: false },
       "output-dir": { type: "string", default: "." },
+      "output-suffix": { type: "string" },
+      arch: { type: "string" },
       "skip-openapi": { type: "boolean", default: false },
       "skip-completion": { type: "boolean", default: false },
       "test-crash-paths": { type: "boolean", default: false },
@@ -1028,6 +1063,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       transport: { type: "string", default: "rest" },
       "api-host": { type: "string" },
       "api-port": { type: "string", default: "8728" },
+      "request-timeout": { type: "string" },
     },
     strict: true,
     allowPositionals: true,
@@ -1038,6 +1074,11 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     throw new Error(`--transport must be auto, rest, or native; got "${transportRaw}"`);
   }
 
+  const archRaw = values.arch;
+  if (archRaw !== undefined && archRaw !== "x86" && archRaw !== "arm64") {
+    throw new Error(`--arch must be x86 or arm64; got "${archRaw}"`);
+  }
+
   const [, , ...pathArgs] = positionals;
 
   return {
@@ -1046,6 +1087,8 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       rosVersion: values["ros-version"],
       live: values.live ?? false,
       outputDir: values["output-dir"] ?? ".",
+      outputSuffix: values["output-suffix"],
+      arch: archRaw,
       skipOpenapi: values["skip-openapi"] ?? false,
       skipCompletion: values["skip-completion"] ?? false,
       testCrashPaths: values["test-crash-paths"] ?? false,
@@ -1054,6 +1097,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       transport: transportRaw,
       apiHost: values["api-host"],
       apiPort: parseInt(values["api-port"] ?? "8728", 10),
+      requestTimeout: values["request-timeout"] ? parseInt(values["request-timeout"], 10) : undefined,
     },
     pathArgs,
   };
@@ -1067,13 +1111,16 @@ Usage:
   bun deep-inspect.ts [options] [path...]
 
 Options:
-  --inspect-file <path>   Input inspect.json file (offline enrichment)
+  --inspect-file <path>   Input inspect.json file (offline enrichment, dev only — see BACKLOG.md principle 2)
   --ros-version <ver>     Override RouterOS version (e.g. 7.23beta4)
   --live                  Query live router (URLBASE/BASICAUTH env vars)
+  --arch <x86|arm64>      Record architecture in _meta.architecture (set by orchestrator)
   --output-dir <dir>      Output directory (default: .)
+  --output-suffix <str>   Filename suffix, e.g. "arm64" → deep-inspect.arm64.json
   --skip-openapi          Skip OpenAPI 3.0 generation
   --skip-completion       Skip completion data fetching
   --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
+  --request-timeout <ms>  Per-request timeout in ms (e.g. 120000 for slow TCG emulation)
   --transport <mode>      Transport: rest (default), auto, or native
   --api-host <host>       Native API host (default: derived from URLBASE)
   --api-port <port>       Native API port (default: 8728)
@@ -1110,6 +1157,11 @@ async function main() {
   if (opts.help) {
     printUsage();
     return;
+  }
+
+  // Apply per-request timeout (for slow TCG arm64 emulation)
+  if (opts.requestTimeout) {
+    setCrawlRequestTimeout(opts.requestTimeout);
   }
 
   // Build client if we have connection info
@@ -1249,6 +1301,7 @@ async function main() {
   const meta: DeepInspectMeta = {
     version,
     generatedAt: new Date().toISOString(),
+    architecture: opts.arch,
     apiTransport: (!opts.skipCompletion && client !== null) ? activeTransport : undefined,
     enrichmentDurationMs,
     crashPathsTested: crashPathResults.map((r) => r.path),
@@ -1272,16 +1325,17 @@ async function main() {
     }
   }
 
-  // Write deep-inspect.json
+  // Write deep-inspect.json (or deep-inspect.{suffix}.json if --output-suffix is set)
   const deepInspect: DeepInspectOutput = { _meta: meta, ...inspectTree };
-  const deepInspectPath = `${opts.outputDir}/deep-inspect.json`;
+  const suffix = opts.outputSuffix ? `.${opts.outputSuffix}` : "";
+  const deepInspectPath = `${opts.outputDir}/deep-inspect${suffix}.json`;
   await Bun.write(deepInspectPath, JSON.stringify(deepInspect));
   console.log(`Written: ${deepInspectPath}`);
 
-  // Write openapi.json
+  // Write openapi.json (or openapi.{suffix}.json if --output-suffix is set)
   if (!opts.skipOpenapi) {
     const openapi = generateOpenAPI(inspectTree, version);
-    const openapiPath = `${opts.outputDir}/openapi.json`;
+    const openapiPath = `${opts.outputDir}/openapi${suffix}.json`;
     await Bun.write(openapiPath, JSON.stringify(openapi, null, 2));
     console.log(`Written: ${openapiPath}`);
   }
