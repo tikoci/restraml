@@ -274,16 +274,16 @@ jobs:
           rm -f chr-arm64.img.zip
           ls -lh chr-arm64.img
 
-      - name: Download arm64 extra packages
-        run: |
-          VER="${{ inputs.rosver }}"
-          mkdir extra && cd extra
-          wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
-            || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
-          unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
-          echo "Packages to inject:"
-          ls -lh extra/*.npk | head -30
-          echo "Total: $(ls extra/*.npk | wc -l) packages"
+      # - name: Download arm64 extra packages
+      #   run: |
+      #     VER="${{ inputs.rosver }}"
+      #     mkdir extra && cd extra
+      #     wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
+      #       || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
+      #     unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
+      #     echo "Packages to inject:"
+      #     ls -lh extra/*.npk | head -30
+      #     echo "Total: $(ls extra/*.npk | wc -l) packages"
 
       - name: Start arm64 CHR in QEMU
         # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
@@ -387,10 +387,18 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      - name: Install extra packages via SCP
-        # SLIRP runs in the QEMU host process — it is unaffected by guest events.
-        # SCP uploads directly to the CHR filesystem, same approach as x86 job.
-        run: scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
+      - name: Install extra package via REST :execute and /system/package/enable
+        run: |
+          # TCG: longer timeout for emulated TCP
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CT=10; else CT=30; fi
+          curl -m "$CT" -X POST http://admin:@localhost:9180/rest/execute \
+            -H 'Content-Type: application/json' \
+            -d "{\"script\":\"/system/package/update/check-for-updates duration=15s; /system/package/enable [find]; :delay 10s; /system/package/apply-changes; :delay 10s;\", \"as-string\": true"}" 
+
+      # - name: Install extra packages via SCP
+      #   # SLIRP runs in the QEMU host process — it is unaffected by guest events.
+      #   # SCP uploads directly to the CHR filesystem, same approach as x86 job.
+      #   run: scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
 
       - name: Reboot CHR and wait for extra packages
         # SLIRP runs in the QEMU host process — a guest /system/reboot does not kill
@@ -454,11 +462,12 @@ jobs:
             return 1
           }
 
-          curl -sS -m 10 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
-            -H 'Content-Type: application/json' > /dev/null 2>&1 || \
-            ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
+          # curl -sS -m 10 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+          #   -H 'Content-Type: application/json' > /dev/null 2>&1 || \
+          #   ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
 
-          wait_for_rest_down
+          #wait_for_rest_down
+          sleep 10
           echo "Waiting for arm64 CHR to restart with extra packages (up to ${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL}, curl_timeout=${CURL_TIMEOUT}s)..."
           if wait_for_rest_ready_timed "${REBOOT_TIMEOUT}"; then
             exit 0
