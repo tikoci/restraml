@@ -135,5 +135,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# playwrite mcp
+# playwright mcp
 .playwright-mcp/
