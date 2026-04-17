@@ -220,7 +220,7 @@ jobs:
   # same way they work on the x86 job.
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     env:
       URLBASE: http://localhost:9180/rest
@@ -307,7 +307,7 @@ jobs:
           if [ "${ARM_ACCEL}" = "kvm" ]; then
             CPU_ARGS=( -cpu host -enable-kvm )
           else
-            CPU_ARGS=( -cpu cortex-a72 -accel tcg,tb-size=256 )
+            CPU_ARGS=( -cpu host -accel tcg,tb-size=256 )
           fi
 
           echo "Starting arm64 CHR with accel=${ARM_ACCEL}"
