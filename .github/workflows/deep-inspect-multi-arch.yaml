@@ -168,7 +168,15 @@ jobs:
           exit 1
 
       - name: List installed packages
-        run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
+        run: |
+          PKG_JSON=$(curl -sS --fail http://admin@localhost:9180/rest/system/package)
+          echo "$PKG_JSON" | jq '[.[] | .name]'
+          PKG_COUNT=$(echo "$PKG_JSON" | jq 'length')
+          if [ "$PKG_COUNT" -lt 10 ]; then
+            echo "::error::Only $PKG_COUNT package(s) installed (expected ≥10 with extra packages). Extra package install likely failed."
+            exit 1
+          fi
+          echo "✓ $PKG_COUNT packages installed"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -177,6 +185,16 @@ jobs:
         run: |
           bun deep-inspect.ts --live --arch x86 --output-suffix x86 \
             --output-dir . --skip-openapi --test-crash-paths --transport rest
+
+      - name: Verify x86 deep-inspect output
+        run: |
+          ARGS_TOTAL=$(jq '._meta.completionStats.argsTotal' deep-inspect.x86.json)
+          echo "x86 argsTotal: $ARGS_TOTAL"
+          if [ "$ARGS_TOTAL" -lt 30000 ]; then
+            echo "::error::x86 argsTotal=$ARGS_TOTAL is below expected minimum of 30000. Output is likely incomplete."
+            exit 1
+          fi
+          echo "✓ x86 argsTotal=$ARGS_TOTAL (≥30000)"
 
       - name: Upload deep-inspect.x86.json
         uses: actions/upload-artifact@v4
@@ -193,14 +211,14 @@ jobs:
           fi
 
   # ── arm64 deep-inspect (native arm64 runner; KVM if available, else TCG) ──
-  # Under TCG, a full crawl (~47K paths) takes hours — the router responds too slowly
-  # under software emulation for depth-first recursive discovery. Instead, the arm64 job
-  # downloads the x86 inspect tree (same command structure) and only runs completion
-  # enrichment against the arm64 router. The diff tool then surfaces arch-specific
-  # completion differences (the real value of multi-arch comparison).
+  # Runs on ubuntu-24.04-arm (native aarch64 runner) which has /dev/kvm available.
+  # Under KVM, the arm64 CHR boots and crawls at speed comparable to the x86 job.
+  # Falls back to TCG if KVM is unavailable; --request-timeout 60000 accommodates
+  # slower TCG response times. SLIRP runs in the QEMU host process and survives
+  # guest /system/reboot — SCP and the normal reboot+wait-loop work on arm64 the
+  # same way they work on the x86 job.
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
-    needs: [deep-inspect-x86]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
     env:
@@ -359,145 +377,96 @@ jobs:
             && echo "License activated to p1 (trial)" \
             || echo "::warning::License activation failed — enrichment will run at 1 Mbit/s (free)"
 
-      - name: Upload extra packages via fetch
-        # HTTP PUT is 501 Not Implemented on RouterOS CHR. SCP hangs under TCG.
-        # Instead: run a host-side HTTP server and use RouterOS /tool/fetch to PULL
-        # packages from it. Guest reaches host at 10.0.2.2 (QEMU user-mode NAT).
+      - name: Install extra packages via SCP
+        # SLIRP runs in the QEMU host process — it is unaffected by guest events.
+        # SCP uploads directly to the CHR filesystem, same approach as x86 job.
+        run: scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
+
+      - name: Reboot CHR and wait for extra packages
+        # SLIRP runs in the QEMU host process — a guest /system/reboot does not kill
+        # the host process or its port-forwarding rules. Use the same /system/reboot
+        # + wait-loop approach as the x86 job.
         run: |
-          # Start HTTP server serving the extra/ directory (--directory avoids cd subshell issues)
-          python3 -m http.server 8888 --bind 0.0.0.0 --directory extra &
-          HTTP_PID=$!
-          sleep 1
-
-          echo "Uploading extra packages via /tool/fetch (host→guest pull)..."
-          TOTAL=$(ls extra/*.npk | wc -l)
-          COUNT=0
-          for npk in extra/*.npk; do
-            COUNT=$((COUNT + 1))
-            NAME=$(basename "$npk")
-            SIZE=$(du -h "$npk" | cut -f1)
-            echo "  [$COUNT/$TOTAL] Fetching $NAME ($SIZE)..."
-            RESULT=$(curl -sS -m 300 -X POST http://admin:@localhost:9180/rest/tool/fetch \
-              -H 'Content-Type: application/json' \
-              -d "{\"url\":\"http://10.0.2.2:8888/$NAME\",\"dst-path\":\"$NAME\"}" 2>&1)
-            echo "    $RESULT"
-            # Give the guest a moment to process
-            sleep 1
-          done
-
-          # Stop the HTTP server
-          kill $HTTP_PID 2>/dev/null || true
-
-          # Wait for all fetches to complete (tool/fetch is async on RouterOS)
-          echo "Waiting for fetches to settle..."
-          sleep 15
-
-          echo "Verifying files on RouterOS..."
-          FILE_COUNT=$(curl -sS --fail http://admin:@localhost:9180/rest/file \
-            | jq '[.[] | select(.name | endswith(".npk"))] | length')
-          echo "Found $FILE_COUNT .npk files on RouterOS (expected $TOTAL)"
-          curl -sS --fail http://admin:@localhost:9180/rest/file \
-            | jq '[.[] | select(.name | endswith(".npk")) | {name, size}]'
-          if [ "$FILE_COUNT" -lt "$TOTAL" ]; then
-            echo "::error::Only $FILE_COUNT of $TOTAL packages uploaded."
-            exit 1
-          fi
-
-      - name: Reboot CHR to activate extra packages
-        # QEMU user-mode NAT (SLIRP) does NOT survive guest reboots under aarch64 TCG
-        # emulation — TCP connects succeed at the host but packets never reach the rebooted
-        # guest. Workaround: kill QEMU entirely and cold-boot from the same disk image.
-        # RouterOS discovers .npk files on disk and installs them during cold boot.
-        run: |
-          echo "Killing QEMU to cold-boot with packages (SLIRP doesn't survive guest reboot under TCG)..."
-          if [ -f /tmp/qemu.pid ]; then
-            kill "$(cat /tmp/qemu.pid)" 2>/dev/null || true
-            # Wait for QEMU process to fully exit
-            for i in $(seq 1 10); do
-              if ! kill -0 "$(cat /tmp/qemu.pid)" 2>/dev/null; then
-                echo "QEMU stopped after $i attempt(s)."
-                break
+          wait_for_rest_down() {
+            for i in $(seq 1 15); do
+              if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
+                echo "REST API went down after $i attempt(s)."
+                return 0
               fi
-              sleep 1
+              sleep 2
             done
-          fi
+            echo "::warning::REST API never visibly went down after reboot request; continuing with readiness wait."
+          }
 
-          # Derive QEMU launch command from the same vars used in "Start arm64 CHR in QEMU"
-          AAVMF_CODE=$(readlink -f /usr/share/AAVMF/AAVMF_CODE.fd)
+          wait_for_rest_ready() {
+            local attempts="$1"
+            local consecutive=0
 
-          if [ "${ARM_ACCEL}" = "kvm" ]; then
-            CPU_ARGS=( -cpu host -enable-kvm )
-          else
-            CPU_ARGS=( -cpu cortex-a72 -accel tcg )
-          fi
-
-          echo "Re-launching arm64 CHR with accel=${ARM_ACCEL} (cold boot with packages)..."
-          nohup qemu-system-aarch64 \
-            -M virt "${CPU_ARGS[@]}" -m 256 -nographic \
-            -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
-            -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
-            -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
-            -device virtio-blk-pci,drive=drive0 \
-            -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \
-            -device virtio-net-pci,netdev=net0 \
-            &>/tmp/qemu.log &
-          echo $! > /tmp/qemu.pid
-          echo "QEMU restarted with PID: $(cat /tmp/qemu.pid)"
-
-          # Wait for REST API — package installation + boot under TCG can take 6-10 minutes
-          echo "Waiting for CHR to boot with extra packages (up to 600s)..."
-          consecutive=0
-          for i in $(seq 1 120); do
-            if curl -sS -m 5 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
-              | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
-              >/dev/null 2>&1; then
-              consecutive=$((consecutive + 1))
-              if [ "$consecutive" -ge 2 ]; then
-                echo "REST API is ready after $i attempt(s)."
-                break
+            for i in $(seq 1 "$attempts"); do
+              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+                >/dev/null 2>&1; then
+                consecutive=$((consecutive + 1))
+                if [ "$consecutive" -ge 2 ]; then
+                  echo "REST API is ready after $i attempt(s)."
+                  return 0
+                fi
+              else
+                consecutive=0
               fi
-            else
-              consecutive=0
-            fi
-            if [ $((i % 10)) -eq 0 ]; then
-              echo "Attempt $i/120: not ready yet (~$((i * 5))s elapsed)..."
-            fi
-            sleep 5
-          done
 
-          if [ "$consecutive" -lt 2 ]; then
-            echo "::error::CHR did not come back after cold-boot within 600s."
-            tail -80 /tmp/qemu.log || true
-            exit 1
+              if [ $((i % 6)) -eq 0 ]; then
+                echo "Attempt $i/$attempts: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+            -H 'Content-Type: application/json' > /dev/null 2>&1 || \
+            ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
+
+          wait_for_rest_down
+          MAX_WAIT=$((ARM_BOOT_ATTEMPTS * 5))
+          echo "Waiting for arm64 CHR to restart with extra packages (up to ${MAX_WAIT}s)..."
+          if wait_for_rest_ready "${ARM_BOOT_ATTEMPTS}"; then
+            exit 0
           fi
+          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${MAX_WAIT}s."
+          echo "--- QEMU log (last 80 lines) ---"
+          tail -80 /tmp/qemu.log || true
+          exit 1
 
       - name: List installed packages
-        run: curl -sS --fail http://admin@localhost:9180/rest/system/package | jq '[.[] | .name]'
+        run: |
+          PKG_JSON=$(curl -sS --fail http://admin@localhost:9180/rest/system/package)
+          echo "$PKG_JSON" | jq '[.[] | .name]'
+          PKG_COUNT=$(echo "$PKG_JSON" | jq 'length')
+          if [ "$PKG_COUNT" -lt 10 ]; then
+            echo "::error::Only $PKG_COUNT package(s) installed (expected ≥10 with extra packages). Extra package install likely failed."
+            exit 1
+          fi
+          echo "✓ $PKG_COUNT packages installed"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Download x86 inspect tree
-        # The command tree is arch-independent — only completions differ.
-        # Use the fully-crawled x86 tree as the base instead of re-crawling
-        # under TCG (which only manages ~2% of paths before timeout).
-        uses: actions/download-artifact@v4
-        with:
-          name: deep-inspect-x86
-
-      - name: Run deep-inspect (arm64, enrichment only using x86 tree)
-        # Under TCG, even completion enrichment is too slow for the full tree (~9K args,
-        # each timing out at 5s → massive sequential retry queue > 6 hours). Skip
-        # completions for now — the value is the full tree + crash path testing from arm64.
-        # TODO: configurable COMPLETION_TIMEOUT_MS for TCG would enable partial enrichment.
+      - name: Run deep-inspect (arm64, live crawl + enrichment)
         run: |
-          echo "Using x86 inspect tree as base for arm64 enrichment..."
-          ls -lh deep-inspect.x86.json
-          bun deep-inspect.ts --inspect-file deep-inspect.x86.json \
-            --ros-version "${{ inputs.rosver }}" \
-            --arch arm64 --output-suffix arm64 \
+          bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
             --output-dir . --skip-openapi --test-crash-paths --transport rest \
-            --skip-completion
+            --request-timeout 60000
+
+      - name: Verify arm64 deep-inspect output
+        run: |
+          ARGS_TOTAL=$(jq '._meta.completionStats.argsTotal' deep-inspect.arm64.json)
+          echo "arm64 argsTotal: $ARGS_TOTAL"
+          if [ "$ARGS_TOTAL" -lt 30000 ]; then
+            echo "::error::arm64 argsTotal=$ARGS_TOTAL is below expected minimum of 30000. Output is likely incomplete."
+            exit 1
+          fi
+          echo "✓ arm64 argsTotal=$ARGS_TOTAL (≥30000)"
 
       - name: Upload deep-inspect.arm64.json
         uses: actions/upload-artifact@v4
@@ -558,6 +527,18 @@ jobs:
           echo "=== Generating JSON diff ==="
           bun scripts/diff-deep-inspect.ts deep-inspect.x86.json deep-inspect.arm64.json --json > diff-deep-inspect.json
           echo "diff-deep-inspect.json: $(du -h diff-deep-inspect.json | cut -f1)"
+
+      - name: Verify diff is not a relabeled x86 copy
+        run: |
+          ARM64_ONLY=$(jq '.counts.pathsOnlyB' diff-deep-inspect.json)
+          X86_ONLY=$(jq '.counts.pathsOnlyA' diff-deep-inspect.json)
+          echo "Paths only in arm64: $ARM64_ONLY"
+          echo "Paths only in x86:   $X86_ONLY"
+          if [ "$ARM64_ONLY" -lt 500 ]; then
+            echo "::error::arm64 has only $ARM64_ONLY unique paths (expected ≥500). arm64 output may be a relabeled x86 tree or the crawl was incomplete."
+            exit 1
+          fi
+          echo "✓ arm64 structural delta looks legitimate ($ARM64_ONLY arm64-only paths)"
 
       - name: Generate step summary
         run: |
