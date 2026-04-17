@@ -220,8 +220,8 @@ jobs:
   # same way they work on the x86 job.
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -254,12 +254,13 @@ jobs:
           # Probe the device directly instead of assuming nested virtualization works.
           if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
           then
-            echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
+            # echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
             echo "Using KVM acceleration"
           else
-            echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
+            # echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
             echo "::notice::KVM unavailable on this runner; falling back to TCG"
           fi
+          echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
 
       - name: Download CHR arm64 image
         run: |
@@ -306,7 +307,7 @@ jobs:
           if [ "${ARM_ACCEL}" = "kvm" ]; then
             CPU_ARGS=( -cpu host -enable-kvm )
           else
-            CPU_ARGS=( -cpu cortex-a72 -accel tcg )
+            CPU_ARGS=( -cpu cortex-a72 -accel tcg,tb-size=256 )
           fi
 
           echo "Starting arm64 CHR with accel=${ARM_ACCEL}"
