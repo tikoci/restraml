@@ -210,21 +210,23 @@ jobs:
             echo "QEMU process terminated."
           fi
 
-  # ── arm64 deep-inspect (KVM required) ────────────────────────────────────
-  # Runs on ubuntu-24.04-arm (native aarch64 runner) with KVM.
-  # KVM is REQUIRED — TCG is not viable for deep-inspect enrichment:
-  #   - KVM: ~53ms per REST call, ~8 min for 9000 paths
-  #   - TCG: ~5 min per REST call, ~750 hours total (proven in CI runs #37-#39)
-  # If KVM is unavailable, the job fails fast. auto.yaml will retry on the next
-  # daily run, eventually landing on a runner with KVM.
+  # ── arm64 deep-inspect (KVM preferred, TCG viable) ───────────────────────
+  # Runs on ubuntu-24.04-arm (native aarch64 runner).
+  # Uses KVM if available (fast: ~53ms/call, ~8 min total), falls back to TCG
+  # (viable: ~44-71ms/call locally, ~10 min total — but needs ≥1024 MB RAM).
   #
-  # Package installation uses REST /execute to trigger check-for-updates + enable,
-  # avoiding SCP which is pathologically slow under TCG (~53 min for 50 MB in CI).
-  # With KVM, SCP works fine, but the REST approach is simpler (no download step).
+  # Previous CI failures with TCG were caused by -m 256 (memory pressure,
+  # not TCG speed). With 17 extra packages loaded, 256 MB causes the guest
+  # to thrash, inflating REST calls from ~70ms to ~10s+ and eventually
+  # crashing the REST server. Local TCG with 1024 MB: 44ms child, 71ms
+  # completion — projecting ~10 min for full deep-inspect.
+  #
+  # Package installation uses REST /execute (check-for-updates + enable +
+  # apply-changes). This works under both KVM and TCG — no SCP needed.
   deep-inspect-arm64:
     name: "arm64: ${{ inputs.rosver }}"
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -240,10 +242,10 @@ jobs:
           sudo apt-get install -y -qq qemu-system-arm qemu-efi-aarch64 > /dev/null
           qemu-system-aarch64 --version | head -1
 
-      - name: Require KVM
-        # KVM is mandatory — TCG is ~5700× slower per REST call (proven non-viable).
-        # Probe /dev/kvm with the KVM ioctl; partner ARM runners may expose the
-        # device but still reject the API call.
+      - name: Probe accelerator
+        # Try KVM first (fast path); fall back to TCG (viable with enough RAM).
+        # Partner ARM runners may expose /dev/kvm but reject the ioctl — probe
+        # the KVM API directly, don't trust device presence alone.
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules > /dev/null
@@ -258,10 +260,11 @@ jobs:
           print(f"KVM API version: {ver}")
           sys.exit(0 if ver == 12 else 1)
           ' 2>/dev/null; then
-            echo "✓ KVM available"
+            echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
+            echo "✓ KVM available — using hardware acceleration"
           else
-            echo "::error::KVM is not available on this runner. arm64 deep-inspect requires KVM — TCG is ~5700× too slow (5 min/REST call vs 53 ms). The job will retry on the next auto.yaml run."
-            exit 1
+            echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
+            echo "⚠ KVM not available — using TCG (software emulation, ~10 min deep-inspect)"
           fi
 
       - name: Download CHR arm64 image
@@ -275,17 +278,25 @@ jobs:
           ls -lh chr-arm64.img
 
       - name: Start arm64 CHR in QEMU
-        # CRITICAL: Must use explicit virtio-blk-pci (NOT if=virtio) on aarch64.
-        # if=virtio resolves to virtio-blk-device (MMIO) on the 'virt' machine
-        # which RouterOS does NOT support — kernel stalls silently.
+        # CRITICAL aarch64 rules:
+        #   1. virtio-blk-pci (NOT if=virtio) — MMIO causes silent kernel stall
+        #   2. 1024 MB RAM — 256 MB causes memory pressure with extra packages,
+        #      inflating REST calls from ~70ms to ~10s+ under TCG
+        #   3. KVM: -cpu host -enable-kvm; TCG: -cpu cortex-a72 -accel tcg,tb-size=256
         run: |
           AAVMF_CODE=$(readlink -f /usr/share/AAVMF/AAVMF_CODE.fd)
           AAVMF_VARS=$(readlink -f /usr/share/AAVMF/AAVMF_VARS.fd)
           cp "$AAVMF_VARS" /tmp/aavmf-vars.fd
           truncate -s "$(stat -Lc%s "$AAVMF_CODE")" /tmp/aavmf-vars.fd
 
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            CPU_ARGS=( -cpu host -enable-kvm )
+          else
+            CPU_ARGS=( -cpu cortex-a72 -accel tcg,tb-size=256 )
+          fi
+
           nohup qemu-system-aarch64 \
-            -M virt -cpu host -enable-kvm -m 256 -nographic \
+            -M virt "${CPU_ARGS[@]}" -m 1024 -nographic \
             -drive if=pflash,format=raw,readonly=on,unit=0,file="$AAVMF_CODE" \
             -drive if=pflash,format=raw,unit=1,file=/tmp/aavmf-vars.fd \
             -drive file=chr-arm64.img,format=raw,if=none,id=drive0 \
@@ -294,38 +305,58 @@ jobs:
             -device virtio-net-pci,netdev=net0 \
             &>/tmp/qemu.log &
           echo $! > /tmp/qemu.pid
-          echo "QEMU aarch64 started (KVM) PID=$(cat /tmp/qemu.pid)"
+          echo "QEMU aarch64 started (${ARM_ACCEL}, 1024 MB) PID=$(cat /tmp/qemu.pid)"
 
       - name: Wait for REST API
+        # TCG boot takes ~60-100s (vs ~5s KVM). Per-call HTTP round-trip under
+        # TCG is 5-15s through the emulated TCP stack — curl -m 3 silently times
+        # out. Use -m 15 for TCG.
         run: |
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            BOOT_TIMEOUT=120; CURL_TIMEOUT=3; SLEEP_INT=5
+          else
+            BOOT_TIMEOUT=300; CURL_TIMEOUT=15; SLEEP_INT=10
+          fi
+
           start_time=$(date +%s)
           consecutive=0
+          MAX_ATTEMPTS=$(( BOOT_TIMEOUT / (CURL_TIMEOUT + SLEEP_INT) + 1 ))
 
-          echo "Waiting for arm64 RouterOS REST API (KVM, up to 120s)..."
-          for attempt in $(seq 1 24); do
-            if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+          echo "Waiting for arm64 REST API (accel=${ARM_ACCEL}, curl_timeout=${CURL_TIMEOUT}s, up to ${BOOT_TIMEOUT}s)..."
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            elapsed=$(( $(date +%s) - start_time ))
+            [ "$elapsed" -ge "$BOOT_TIMEOUT" ] && break
+
+            if curl -sS -m "${CURL_TIMEOUT}" --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
               | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d,dict) and "board-name" in d else 1)' \
               >/dev/null 2>&1; then
               consecutive=$((consecutive + 1))
               if [ "$consecutive" -ge 2 ]; then
-                echo "REST ready after $(( $(date +%s) - start_time ))s (attempt $attempt)."
+                echo "REST ready after ${elapsed}s (attempt $attempt, accel=${ARM_ACCEL})."
                 exit 0
               fi
             else
               consecutive=0
             fi
-            [ $((attempt % 6)) -eq 0 ] && echo "  attempt $attempt/24 (~$((attempt * 5))s)..."
-            sleep 5
+            [ $((attempt % 5)) -eq 0 ] && echo "  attempt $attempt: ${elapsed}s/${BOOT_TIMEOUT}s (accel=${ARM_ACCEL})..."
+            sleep "$SLEEP_INT"
           done
 
-          echo "::error::arm64 CHR did not become REST-ready within 120s."
+          echo "::error::arm64 CHR did not become REST-ready in ${BOOT_TIMEOUT}s (accel=${ARM_ACCEL})."
+          echo "--- QEMU process ---"
+          ps -p "$(cat /tmp/qemu.pid)" -o pid,stat,%cpu,%mem,etime,args 2>/dev/null || echo "QEMU not running!"
+          echo "--- Diagnostic probe ---"
+          curl -sS -m 20 -w 'connect:%{time_connect}s total:%{time_total}s http_code:%{http_code}\n' \
+            http://admin:@localhost:9180/rest/system/resource 2>&1 || true
+          echo "--- QEMU log (last 40 lines) ---"
           tail -40 /tmp/qemu.log || true
           exit 1
 
       - name: Activate CHR trial license
         if: env.MIKROTIK_ACCOUNT != ''
         run: |
-          curl -sS -m 10 -X POST http://admin:@localhost:9180/rest/system/license/renew \
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CURL_T=10; else CURL_T=30; fi
+          curl -sS -m "$CURL_T" -X POST http://admin:@localhost:9180/rest/system/license/renew \
             -H 'Content-Type: application/json' \
             -d "{\"account\":\"${MIKROTIK_ACCOUNT}\",\"password\":\"${MIKROTIK_PASSWORD}\",\"level\":\"p1\"}" \
             && echo "License activated (p1 trial)" \
@@ -337,10 +368,10 @@ jobs:
         #   2. enable [find] — enables all discovered packages
         #   3. delay 5s — let package state settle
         #   4. apply-changes — triggers automatic reboot
-        # The curl returns immediately; the script runs asynchronously on the CHR.
-        # This avoids download-on-runner + SCP entirely.
+        # Fire-and-forget: curl returns immediately, script runs on the CHR.
         run: |
-          curl -sS -m 10 -X POST http://admin:@localhost:9180/rest/execute \
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CURL_T=10; else CURL_T=30; fi
+          curl -sS -m "$CURL_T" -X POST http://admin:@localhost:9180/rest/execute \
             -H 'Content-Type: application/json' \
             -d '{"script":"/system/package/update/check-for-updates duration=15s; /system/package/enable [find]; :delay 5s; /system/package/apply-changes","as-string":"true"}' \
             && echo "Package install script dispatched (async — CHR will reboot)" \
@@ -348,43 +379,54 @@ jobs:
 
       - name: Wait for package activation reboot
         # The execute script runs ~20s then triggers apply-changes (reboot).
-        # Wait for REST to go down (reboot started), then come back (packages active).
+        # Wait for REST to go down, then come back with extra packages active.
         run: |
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            DOWN_TIMEOUT=3; CURL_TIMEOUT=3; SLEEP_INT=5; REBOOT_TIMEOUT=240
+          else
+            DOWN_TIMEOUT=15; CURL_TIMEOUT=15; SLEEP_INT=10; REBOOT_TIMEOUT=600
+          fi
+
           echo "Waiting for CHR to go down (execute script takes ~20s before reboot)..."
           for i in $(seq 1 20); do
-            if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
-              echo "REST went down after $((i * 2))s."
+            if ! curl -sS -m "$DOWN_TIMEOUT" --fail http://localhost:9180/ > /dev/null 2>&1; then
+              echo "REST went down after $((i * 3))s."
               break
             fi
-            sleep 2
+            sleep 3
           done
 
-          echo "Waiting for arm64 CHR to restart with extra packages (up to 240s)..."
+          echo "Waiting for arm64 CHR to restart with extra packages (up to ${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL})..."
           start_time=$(date +%s)
           consecutive=0
-          for attempt in $(seq 1 48); do
-            if curl -sS -m 5 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+          MAX_ATTEMPTS=$(( REBOOT_TIMEOUT / (CURL_TIMEOUT + SLEEP_INT) + 1 ))
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            elapsed=$(( $(date +%s) - start_time ))
+            [ "$elapsed" -ge "$REBOOT_TIMEOUT" ] && break
+
+            if curl -sS -m "${CURL_TIMEOUT}" --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
               | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d,dict) and "board-name" in d else 1)' \
               >/dev/null 2>&1; then
               consecutive=$((consecutive + 1))
               if [ "$consecutive" -ge 2 ]; then
-                echo "REST ready after $(( $(date +%s) - start_time ))s (attempt $attempt)."
+                echo "REST ready after ${elapsed}s (attempt $attempt, accel=${ARM_ACCEL})."
                 exit 0
               fi
             else
               consecutive=0
             fi
-            [ $((attempt % 8)) -eq 0 ] && echo "  attempt $attempt/48 (~$((attempt * 5))s)..."
-            sleep 5
+            [ $((attempt % 5)) -eq 0 ] && echo "  attempt $attempt: ${elapsed}s/${REBOOT_TIMEOUT}s (accel=${ARM_ACCEL})..."
+            sleep "$SLEEP_INT"
           done
 
-          echo "::error::arm64 CHR did not become REST-ready after package activation (240s)."
+          echo "::error::arm64 CHR did not become REST-ready after package activation (${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL})."
           tail -40 /tmp/qemu.log || true
           exit 1
 
       - name: List installed packages
         run: |
-          PKG_JSON=$(curl -sS -m 10 --fail http://admin@localhost:9180/rest/system/package)
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CURL_T=10; else CURL_T=20; fi
+          PKG_JSON=$(curl -sS -m "$CURL_T" --fail http://admin@localhost:9180/rest/system/package)
           echo "$PKG_JSON" | jq '[.[] | .name]'
           PKG_COUNT=$(echo "$PKG_JSON" | jq 'length')
           if [ "$PKG_COUNT" -lt 10 ]; then
@@ -397,9 +439,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Run deep-inspect (arm64, live crawl + enrichment)
+        # TCG per-request timeout: 120s (generous margin over measured ~70ms;
+        # handles occasional slow calls without masking real failures).
+        # KVM: 30s is sufficient.
         run: |
+          if [ "${ARM_ACCEL}" = "kvm" ]; then REQ_TIMEOUT=30000; else REQ_TIMEOUT=120000; fi
           bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
-            --output-dir . --skip-openapi --test-crash-paths --transport rest
+            --output-dir . --skip-openapi --test-crash-paths --transport rest \
+            --request-timeout "$REQ_TIMEOUT"
 
       - name: Verify arm64 deep-inspect output
         run: |
