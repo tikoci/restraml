@@ -324,12 +324,13 @@ jobs:
 
       - name: Wait for REST API
         run: |
-          # KVM: 120s is plenty (initial boot ~5s).
-          # TCG: 240s (initial arm64 boot takes ~45s in CI, ~150s cross-arch).
+          # Under TCG, a single HTTP round-trip through the emulated guest TCP stack
+          # takes 5-15s — curl -m 3 silently times out every probe.  Use -m 15 for
+          # TCG so probes can actually succeed.
           if [ "${ARM_ACCEL}" = "kvm" ]; then
-            BOOT_TIMEOUT=120
+            BOOT_TIMEOUT=120; CURL_TIMEOUT=3; SLEEP_INT=5
           else
-            BOOT_TIMEOUT=240
+            BOOT_TIMEOUT=300; CURL_TIMEOUT=15; SLEEP_INT=10
           fi
 
           start_time=$(date +%s)
@@ -337,10 +338,10 @@ jobs:
           consecutive=0
           attempt=0
 
-          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, up to ${BOOT_TIMEOUT}s)..."
+          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, curl_timeout=${CURL_TIMEOUT}s, up to ${BOOT_TIMEOUT}s)..."
           while [ "$(date +%s)" -lt "$deadline" ]; do
             attempt=$((attempt + 1))
-            if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+            if curl -sS -m "${CURL_TIMEOUT}" --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
               | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
               >/dev/null 2>&1; then
               consecutive=$((consecutive + 1))
@@ -353,11 +354,11 @@ jobs:
               consecutive=0
             fi
 
-            if [ $((attempt % 6)) -eq 0 ]; then
+            if [ $((attempt % 4)) -eq 0 ]; then
               elapsed=$(( $(date +%s) - start_time ))
               echo "Attempt $attempt: REST not ready yet (${elapsed}s/${BOOT_TIMEOUT}s, accel=${ARM_ACCEL})..."
             fi
-            sleep 5
+            sleep "${SLEEP_INT}"
           done
 
           echo "::error::arm64 CHR did not become REST-ready in ${BOOT_TIMEOUT}s with accel=${ARM_ACCEL}."
@@ -369,14 +370,17 @@ jobs:
           ss -tln 2>/dev/null | grep -E '(:9180|:9122)' || echo "No listeners on 9180/9122"
           echo "--- QEMU log (last 80 lines) ---"
           tail -80 /tmp/qemu.log || true
-          echo "--- Final REST probe ---"
-          curl -sS -m 5 -i http://admin:@localhost:9180/rest/system/resource 2>&1 | head -30 || true
+          echo "--- Diagnostic probe (timing) ---"
+          curl -sS -m 20 -w 'connect:%{time_connect}s total:%{time_total}s http_code:%{http_code}\n' \
+            http://admin:@localhost:9180/rest/system/resource 2>&1 | tail -5 || true
           exit 1
 
       - name: Activate CHR trial license
         if: env.MIKROTIK_ACCOUNT != ''
         run: |
-          curl -sS -X POST http://admin:@localhost:9180/rest/system/license/renew \
+          # TCG: longer timeout for emulated TCP
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CT=10; else CT=30; fi
+          curl -sS -m "$CT" -X POST http://admin:@localhost:9180/rest/system/license/renew \
             -H 'Content-Type: application/json' \
             -d "{\"account\":\"${MIKROTIK_ACCOUNT}\",\"password\":\"${MIKROTIK_PASSWORD}\",\"level\":\"p1\"}" \
             && echo "License activated to p1 (trial)" \
@@ -392,15 +396,22 @@ jobs:
         # the host process or its port-forwarding rules. Use the same /system/reboot
         # + wait-loop approach as the x86 job.
         #
-        # Timing (verified by local testing + CI serial logs):
-        #   KVM:  package reboot ~36s   → 240s timeout (same as x86)
-        #   TCG:  package reboot ~1200s → 1500s timeout (25 min)
-        # TCG is slow because all 17 packages are extracted under software emulation.
-        # CI run 24548045114 serial log showed packages finishing at ~19 min.
+        # Under TCG, curl -m 3 is too short — a single HTTP round-trip through the
+        # emulated guest TCP stack takes 5-15s, so every probe silently times out.
+        # Use -m 15 for TCG so probes can actually succeed.
         run: |
+          # TCG curl timeout: the root cause of all prior failures.
+          # quickchr local test: arm64 TCG reboot+packages = 66s (same-arch),
+          # but each HTTP probe needs 5-15s through emulated TCP.
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            CURL_TIMEOUT=3; SLEEP_INT=5; REBOOT_TIMEOUT=240
+          else
+            CURL_TIMEOUT=15; SLEEP_INT=10; REBOOT_TIMEOUT=600
+          fi
+
           wait_for_rest_down() {
             for i in $(seq 1 15); do
-              if ! curl -sS -m 3 --fail http://localhost:9180/ > /dev/null 2>&1; then
+              if ! curl -sS -m "${CURL_TIMEOUT}" --fail http://localhost:9180/ > /dev/null 2>&1; then
                 echo "REST API went down after $i attempt(s)."
                 return 0
               fi
@@ -409,9 +420,6 @@ jobs:
             echo "::warning::REST API never visibly went down after reboot request; continuing with readiness wait."
           }
 
-          # Wall-clock based wait — previous attempt-counting was inaccurate
-          # (each attempt takes ~8s real time due to curl timeout + sleep,
-          #  but the display showed i*5 which underreported by ~40%).
           wait_for_rest_ready_timed() {
             local timeout_s="$1"
             local start_time=$(date +%s)
@@ -421,7 +429,7 @@ jobs:
 
             while [ "$(date +%s)" -lt "$deadline" ]; do
               attempt=$((attempt + 1))
-              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+              if curl -sS -m "${CURL_TIMEOUT}" --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
                 | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
                 >/dev/null 2>&1; then
                 consecutive=$((consecutive + 1))
@@ -434,41 +442,37 @@ jobs:
                 consecutive=0
               fi
 
-              if [ $((attempt % 6)) -eq 0 ]; then
+              if [ $((attempt % 4)) -eq 0 ]; then
                 local elapsed=$(( $(date +%s) - start_time ))
                 echo "Attempt $attempt: REST not ready yet (${elapsed}s/${timeout_s}s, accel=${ARM_ACCEL})..."
               fi
-              sleep 5
+              sleep "${SLEEP_INT}"
             done
             return 1
           }
 
-          curl -sS -m 5 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
+          curl -sS -m 10 --fail -X POST http://admin:@localhost:9180/rest/system/reboot \
             -H 'Content-Type: application/json' > /dev/null 2>&1 || \
             ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
 
           wait_for_rest_down
-          # KVM: 240s is plenty (x86 KVM reboot with packages takes ~36s).
-          # TCG: 1500s (25 min). CI run 24548045114 showed packages completing at
-          # ~19 min under TCG. quickchr uses 960s for same-arch TCG with packages.
-          # We add margin because CI runners vary in speed.
-          if [ "${ARM_ACCEL}" = "kvm" ]; then
-            REBOOT_TIMEOUT=240
-          else
-            REBOOT_TIMEOUT=1500
-          fi
-          echo "Waiting for arm64 CHR to restart with extra packages (up to ${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL})..."
+          echo "Waiting for arm64 CHR to restart with extra packages (up to ${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL}, curl_timeout=${CURL_TIMEOUT}s)..."
           if wait_for_rest_ready_timed "${REBOOT_TIMEOUT}"; then
             exit 0
           fi
           echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${REBOOT_TIMEOUT}s."
           echo "--- QEMU log (last 80 lines) ---"
           tail -80 /tmp/qemu.log || true
+          echo "--- Diagnostic probe (timing) ---"
+          curl -sS -m 20 -w 'connect:%{time_connect}s total:%{time_total}s http_code:%{http_code}\n' \
+            http://admin:@localhost:9180/rest/system/resource 2>&1 | tail -5 || true
           exit 1
 
       - name: List installed packages
         run: |
-          PKG_JSON=$(curl -sS --fail http://admin@localhost:9180/rest/system/package)
+          # TCG needs longer curl timeout (emulated TCP stack is slow)
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CT=5; else CT=20; fi
+          PKG_JSON=$(curl -sS -m "$CT" --fail http://admin@localhost:9180/rest/system/package)
           echo "$PKG_JSON" | jq '[.[] | .name]'
           PKG_COUNT=$(echo "$PKG_JSON" | jq 'length')
           if [ "$PKG_COUNT" -lt 10 ]; then
