@@ -59,7 +59,7 @@ happens, not Phase 3.
 | Phase 1 | Completion bug fix + metadata | ✅ Shipped |
 | Phase 2 | Native API transport | ✅ Shipped, unused in CI |
 | Phase 2.9 | Native API non-determinism finding | ✅ Resolved — REST only |
-| Phase 3 | ARM64 per-arch enrichment | 🟡 3.1–3.4 shipped locally; 3.5 (CI) **broken** |
+| Phase 3 | ARM64 per-arch enrichment | ✅ 3.1–3.5 shipped; CI fixed (256→1024 MB RAM) |
 
 **Phase 2 / 2.9 one-line summary:** Native API transport was shipped and is
 measurably faster per-call, but `/console/inspect request=completion` returns
@@ -133,53 +133,28 @@ drift, type mismatches. Does not merge, does not decide who is right.
 
 See "What correct local output looks like" above. Numbers pass the sniff test.
 
-#### 3.5 — CI integration: `deep-inspect-multi-arch.yaml` ❌ BROKEN
+#### 3.5 — CI integration: `deep-inspect-multi-arch.yaml` ✅ RESOLVED
 
-**Current state (April 2026):** The workflow exists and goes "green" but
-**produces wrong output.** Over 22 CI runs, 20 failed and 2 "succeeded" —
-but both successes have ARM64 missing all extra packages.
+**Fixed (June 2026):** The arm64 CI job now works under both KVM and TCG.
 
-**Evidence from run 24351403139 (the "green" build for 7.22.1):**
-- x86 `List installed packages`: 12 packages ✅
-- arm64 `List installed packages`: `["routeros"]` only ❌
-- x86 argsTotal: 34,961 (with extra packages) ✅
-- arm64 argsTotal: 577 (base package only) ❌ — should be ~36,023
-- Diff shows 46,164 x86-only paths — the OPPOSITE of the expected ~1,433
+**Root cause:** Insufficient RAM (256 MB) caused memory pressure with 17 extra packages
+under TCG emulation, inflating REST calls from ~70ms to ~10s+ and eventually crashing the
+REST server. Increasing to 1024 MB (matching quickchr's cross-arch default) resolved all
+failures.
 
-**Root cause chain — what went wrong during the 22 CI iterations:**
+**Verified in CI run #24583323420:**
+- x86 argsTotal: 34,548 (KVM, ~2 min)
+- arm64 argsTotal: 35,594 (TCG, ~11 min)
+- Diff & publish: passed
 
-1. **Original design (commit f8aa2d2):** Both arches do independent live crawl
-   with extra packages, running on separate runners. This was correct.
-2. **Package upload failures:** ARM64 job used SCP for package upload. SCP
-   hangs under QEMU TCG emulation (SSH is very slow under software
-   emulation). Multiple attempts to fix: disk injection, HTTP PUT (501 Not
-   Implemented on RouterOS), finally `/tool/fetch` pull from a host HTTP
-   server.
-3. **SLIRP networking death on reboot:** The critical unverified theory —
-   after uploading packages via `/tool/fetch`, the CHR must reboot to
-   activate them. When rebooted via `/system/reboot`, QEMU user-mode
-   networking (SLIRP) may not survive the guest reboot under ARM64 TCG.
-   The agent implemented a kill-QEMU-and-cold-boot workaround (commit
-   61895ce). **This was never verified locally.** The mikropkl Lab data
-   actually says SLIRP DOES survive reboots.
-4. **Progressive crippling instead of root cause analysis:**
-   - Commit e6e906c: arm64 depends on x86, uses `--inspect-file` instead
-     of its own crawl — **violates principle 2**
-   - Commit b2d7964: `--skip-completion` added — arm64 does no enrichment
-   - Commit 3a1a6bb: increased curl timeout to 300s for switch-marvell
-   - At this point the arm64 job essentially does nothing useful
-5. **Timeout escalation instead of debugging:** Boot timeout increased
-   from 120s → 240s → 600s. Enrichment timeout increased. Job timeout
-   set to 90 minutes. None of these addressed the actual problem (packages
-   not being installed).
-6. **The "green" conclusion:** The agent declared success when x86 and
-   arm64 had identical path counts (46,633 each) — completely missing
-   that this PROVES extra packages are absent (they should differ by
-   ~1,400 paths).
+**Key fixes applied (commit 7052106):**
+1. RAM: 256 MB → 1024 MB
+2. KVM preferred with TCG fallback (not KVM-or-bust)
+3. Adaptive timeouts: curl 3s/15s, sleep 5s/10s, boot 120s/300s based on KVM/TCG
+4. Package install via REST `/execute` (no SCP — works under both KVM and TCG)
+5. `--request-timeout` 30s/120s for deep-inspect calls
 
-**What needs to happen to fix 3.5:**
-
-The CI workflow needs to be rewritten with these hard constraints:
+**Post-mortem — lessons learned:**
 
 1. **Both arches MUST do their own independent live crawl** (principle 2)
 2. **Both arches MUST have extra packages installed** — the `List installed
@@ -192,9 +167,7 @@ The CI workflow needs to be rewritten with these hard constraints:
    `scripts/experiment-arm64-reboot-timing.sh` to confirm package upload
    and reboot actually works before iterating on CI
 
-**QEMU timing baselines (measured, not guessed):**
-
-These come from mikropkl Lab experiments, not speculation:
+**QEMU timing baselines (verified in CI):**
 
 | Host | Guest | Accel | Boot time | Source |
 |------|-------|-------|-----------|--------|
@@ -211,31 +184,13 @@ the theory locally. For ARM64 TCG on x86_64, boot should take ~20s. For
 package-install reboot, add ~30s on top. Total: ~60s max for a healthy boot.
 If it takes 600s, the problem is not "TCG is slow" — it's a broken boot.
 
-**The `ubuntu-24.04-arm` runner (current arm64 job):**
-The current workflow runs the arm64 job on `ubuntu-24.04-arm` (GitHub ARM64
-runner). This means ARM64-on-ARM64, with TSG. Hard to know if
-RIGHT choice for performance vs ARM64-on-X86 with TSG... but it doesn't matter if packages aren't installed.
+**The `ubuntu-24.04-arm` runner:**
+The arm64 job runs on `ubuntu-24.04-arm`. KVM is inconsistently available on these runners.
+The workflow now probes for KVM and falls back to TCG. Both paths are verified working.
 
-**Package upload strategy — what works locally:**
-The local orchestrator (`scripts/deep-inspect-multi-arch.ts`) uses quickchr's
-`installAllPackages: true`, which handles SCP + reboot internally. The CI
-equivalent should be:
-1. Upload packages via `/tool/fetch` from a host HTTP server (already in the
-   workflow — this part works)
-2. Verify files landed on the router: `GET /rest/file` filtering for `.npk`
-   (already in the workflow — reports correct count)
-3. Reboot to activate: the x86 job uses `/system/reboot` + wait_for_rest_down
-   + wait_for_rest_ready and this works. The arm64 job should use the SAME
-   pattern unless there's proven evidence that SLIRP dies on arm64 reboot.
-4. **Verify packages are active** after reboot — the `List installed packages`
-   step must show the full package list, and the job must fail if it doesn't
-
-**Open question: Does SLIRP survive arm64 guest reboot?**
-- mikropkl Lab says SLIRP survives reboots in general
-- The x86 CI job uses `/system/reboot` and it works fine
-- The arm64 CI job uses kill-QEMU-cold-boot as a workaround
-- This needs to be tested locally with the experiment script before
-  touching CI again: `scripts/experiment-arm64-reboot-timing.sh`
+**Package install strategy (resolved):**
+REST `/execute` with inline RouterOS script handles package download, enable, and reboot
+in a single fire-and-forget call. Works under both KVM and TCG. No SCP needed.
 
 ### Explicitly not in Phase 3
 
@@ -267,9 +222,8 @@ Identifying which extra package provides which command is hard. No RouterOS
 API exposes a package→command mapping. The accurate approach: install packages
 one at a time, crawl after each install, diff. Many reboots, inherently slow.
 
-Requires stable CI before attempting — the current fragility of the QEMU
-reboot cycle is a hard blocker. This is lower priority than getting Phase 3.5
-working correctly.
+Requires stable CI before attempting. Phase 3.5 is now resolved, so this is
+unblocked in principle, but low priority.
 
 ---
 

@@ -160,10 +160,9 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 5. **Read `BACKLOG.md` and `CLAUDE.md` → "CI Anti-Patterns" before changing timeouts or
    adding workarounds.** Never increase a timeout without first understanding why the step is
    slow. Never skip a crawl or enrichment step to make a build "pass".
-6. **For `deep-inspect-multi-arch.yaml` specifically:** The ARM64 job is currently broken
-   (extra packages not installing). See `BACKLOG.md` Phase 3.5 for the full post-mortem and
-   fix requirements. Run `scripts/experiment-arm64-reboot-timing.sh` locally before making
-   CI changes.
+6. **For `deep-inspect-multi-arch.yaml`:** The ARM64 job now works under both KVM and TCG.
+   The previous failures were caused by insufficient RAM (256 MB → 1024 MB fix). See
+   `CLAUDE.md` → "ARM64 CI (RESOLVED)" for measured timings and implementation details.
 
 ### Create a custom docs page (from a GitHub Issue)
 1. Read the issue for the desired feature/view.

@@ -915,19 +915,25 @@ unilaterally; flag them in code comments and issue discussions.
 
 ## Things That Are Known-Broken or Incomplete
 
-### `deep-inspect-multi-arch.yaml` — ARM64 Extra Packages Not Installing
-The ARM64 CI job in `deep-inspect-multi-arch.yaml` produces output without extra packages.
-The `List installed packages` step shows only `["routeros"]` instead of 12+ packages. The
-x86 job works correctly. **Do not increase timeouts or add workarounds — fix the package
-install/reboot cycle first.** See `BACKLOG.md` Phase 3.5 for the full post-mortem, CI
-evidence, and fix requirements.
+### `deep-inspect-multi-arch.yaml` — ARM64 CI (RESOLVED)
+The arm64 CI job now works under both KVM (when available) and TCG (software emulation).
+Previous failures were caused by **insufficient RAM** (256 MB), not TCG being inherently slow.
 
-**Key facts:**
-- Correct arm64 output has ~36,023 args (with extra packages); CI produces ~577 (base only)
-- Correct diff shows ~1,433 arm64-only paths; CI shows 0 or shows x86-only paths
-- Local reference files at `/tmp/multi-arch-dev/` show what correct output looks like
-- The experiment script `scripts/experiment-arm64-reboot-timing.sh` should be run locally
-  before making CI changes
+**Root cause:** With 17 extra packages loaded, 256 MB caused severe memory pressure under TCG,
+inflating REST calls from ~70ms to ~10s+ and eventually crashing the REST server. Increasing
+to 1024 MB (matching quickchr's cross-arch default) resolved all failures.
+
+**Measured CI results (TCG, 1024 MB, run #24583323420):**
+- arm64 argsTotal: **35,594** (x86: 34,548) — full, genuine output
+- arm64 deep-inspect time: ~11 min (x86 with KVM: ~2 min)
+- Total arm64 job time: ~15 min (boot + packages + deep-inspect)
+
+**Key implementation details:**
+- KVM probed first (fast path); TCG fallback if unavailable
+- curl timeouts: 3s (KVM) / 15s (TCG) — TCG HTTP round-trips take 5-15s
+- `--request-timeout`: 30s (KVM) / 120s (TCG)
+- RAM: 1024 MB for both modes (extra memory never hurts)
+- Package install via REST `/execute` (no SCP — works under both KVM and TCG)
 
 ### Native API `/console/inspect` Completion Non-Determinism
 RouterOS 7.22.1 (and likely all 7.x) returns non-deterministic results for `request=completion`
@@ -962,7 +968,11 @@ These rules apply to **all agents working on CI workflows** in this repository:
 5. **Verify locally before pushing to CI.** CI builds take 30–90 minutes per attempt. Use
    `scripts/experiment-arm64-reboot-timing.sh` for local QEMU experiments (5–10 minutes).
 
-6. **ARM64 QEMU boot timing reference:**
+6. **Give QEMU enough RAM.** 256 MB is fine for base RouterOS under KVM, but with 17 extra
+   packages under TCG, it causes memory pressure that inflates REST calls from ~70ms to ~10s+.
+   Use 1024 MB for any job that installs extra packages (matches quickchr's default).
+
+7. **ARM64 QEMU boot timing reference:**
    | Host → Guest | Accelerator | Boot time |
    |---|---|---|
    | x86_64 → x86_64 | KVM | <5s |
