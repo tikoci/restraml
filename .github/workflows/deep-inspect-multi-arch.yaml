@@ -428,9 +428,13 @@ jobs:
             ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
 
           wait_for_rest_down
-          MAX_WAIT=$((ARM_BOOT_ATTEMPTS * 5))
+          # Package installation under TCG is CPU-intensive — 17 packages need
+          # extraction during the reboot cycle.  The initial clean boot takes ~45s
+          # under TCG; the package-activation reboot can take 3-5× longer.
+          REBOOT_ATTEMPTS=$((ARM_BOOT_ATTEMPTS * 3))
+          MAX_WAIT=$((REBOOT_ATTEMPTS * 5))
           echo "Waiting for arm64 CHR to restart with extra packages (up to ${MAX_WAIT}s)..."
-          if wait_for_rest_ready "${ARM_BOOT_ATTEMPTS}"; then
+          if wait_for_rest_ready "${REBOOT_ATTEMPTS}"; then
             exit 0
           fi
           echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${MAX_WAIT}s."
