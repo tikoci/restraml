@@ -393,7 +393,7 @@ jobs:
           if [ "${ARM_ACCEL}" = "kvm" ]; then CT=10; else CT=30; fi
           curl -m "$CT" -X POST http://admin:@localhost:9180/rest/execute \
             -H 'Content-Type: application/json' \
-            -d "{\"script\":\"/system/package/update/check-for-updates duration=15s; /system/package/enable [find]; :delay 10s; /system/package/apply-changes; :delay 10s;\", \"as-string\": true}" 
+            -d "{\"script\":\"/system/package/update/check-for-updates duration=15s; /system/package/enable [find]; :delay 10s; /system/package/apply-changes\", \"as-string\": true}" >/dev/null 2>&1
 
       # - name: Install extra packages via SCP
       #   # SLIRP runs in the QEMU host process — it is unaffected by guest events.
