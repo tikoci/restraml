@@ -396,22 +396,24 @@ jobs:
         # the host process or its port-forwarding rules. Use the same /system/reboot
         # + wait-loop approach as the x86 job.
         #
-        # Under TCG, curl -m 3 is too short — a single HTTP round-trip through the
-        # emulated guest TCP stack takes 5-15s, so every probe silently times out.
-        # Use -m 15 for TCG so probes can actually succeed.
+        # Under TCG, a single HTTP round-trip through the emulated guest TCP stack
+        # takes 5-15s for initial boot (routeros-only). After all 17 packages are
+        # installed, HTTP responses take even longer (>20s in CI run 24552436207)
+        # because all extra services compete for the emulated CPU.
+        # Use -m 60 for TCG reboot so probes can actually receive a response.
         run: |
-          # TCG curl timeout: the root cause of all prior failures.
-          # quickchr local test: arm64 TCG reboot+packages = 66s (same-arch),
-          # but each HTTP probe needs 5-15s through emulated TCP.
+          # Per-request timeout after packages: much longer than initial boot.
+          # CI run 24552436207: -m 15 → 0 bytes in 20s (diagnostic probe).
+          # Under cross-arch TCG with 17 packages, each response needs 30-60s.
           if [ "${ARM_ACCEL}" = "kvm" ]; then
-            CURL_TIMEOUT=3; SLEEP_INT=5; REBOOT_TIMEOUT=240
+            CURL_TIMEOUT=5; SLEEP_INT=5; REBOOT_TIMEOUT=240
           else
-            CURL_TIMEOUT=15; SLEEP_INT=10; REBOOT_TIMEOUT=600
+            CURL_TIMEOUT=60; SLEEP_INT=15; REBOOT_TIMEOUT=1200
           fi
 
           wait_for_rest_down() {
             for i in $(seq 1 15); do
-              if ! curl -sS -m "${CURL_TIMEOUT}" --fail http://localhost:9180/ > /dev/null 2>&1; then
+              if ! curl -sS -m 5 --fail http://localhost:9180/ > /dev/null 2>&1; then
                 echo "REST API went down after $i attempt(s)."
                 return 0
               fi
@@ -463,15 +465,15 @@ jobs:
           echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${REBOOT_TIMEOUT}s."
           echo "--- QEMU log (last 80 lines) ---"
           tail -80 /tmp/qemu.log || true
-          echo "--- Diagnostic probe (timing) ---"
-          curl -sS -m 20 -w 'connect:%{time_connect}s total:%{time_total}s http_code:%{http_code}\n' \
+          echo "--- Diagnostic probe (timing, 90s timeout) ---"
+          curl -sS -m 90 -w 'connect:%{time_connect}s total:%{time_total}s http_code:%{http_code}\n' \
             http://admin:@localhost:9180/rest/system/resource 2>&1 | tail -5 || true
           exit 1
 
       - name: List installed packages
         run: |
-          # TCG needs longer curl timeout (emulated TCP stack is slow)
-          if [ "${ARM_ACCEL}" = "kvm" ]; then CT=5; else CT=20; fi
+          # TCG with all packages: HTTP responses take 30-60s under cross-arch TCG
+          if [ "${ARM_ACCEL}" = "kvm" ]; then CT=10; else CT=90; fi
           PKG_JSON=$(curl -sS -m "$CT" --fail http://admin@localhost:9180/rest/system/package)
           echo "$PKG_JSON" | jq '[.[] | .name]'
           PKG_COUNT=$(echo "$PKG_JSON" | jq 'length')
