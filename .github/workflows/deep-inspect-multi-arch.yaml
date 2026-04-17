@@ -213,8 +213,9 @@ jobs:
   # ── arm64 deep-inspect (native arm64 runner; KVM if available, else TCG) ──
   # Runs on ubuntu-24.04-arm (native aarch64 runner) which has /dev/kvm available.
   # Under KVM, the arm64 CHR boots and crawls at speed comparable to the x86 job.
-  # Falls back to TCG if KVM is unavailable; --request-timeout 60000 accommodates
-  # slower TCG response times. SLIRP runs in the QEMU host process and survives
+  # Falls back to TCG if KVM is unavailable; package-reboot timeout is 1500s
+  # (25 min) under TCG because all 17 packages extract in software emulation.
+  # SLIRP runs in the QEMU host process and survives
   # guest /system/reboot — SCP and the normal reboot+wait-loop work on arm64 the
   # same way they work on the x86 job.
   deep-inspect-arm64:
@@ -254,11 +255,9 @@ jobs:
           if python3 -c 'import fcntl, os, sys; fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC); version = fcntl.ioctl(fd, 0xAE00, 0); os.close(fd); print(f"KVM API version: {version}"); sys.exit(0 if version == 12 else 1)' 2>/dev/null
           then
             echo "ARM_ACCEL=kvm" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=24" >> "$GITHUB_ENV"
             echo "Using KVM acceleration"
           else
             echo "ARM_ACCEL=tcg" >> "$GITHUB_ENV"
-            echo "ARM_BOOT_ATTEMPTS=48" >> "$GITHUB_ENV"
             echo "::notice::KVM unavailable on this runner; falling back to TCG"
           fi
 
@@ -325,37 +324,43 @@ jobs:
 
       - name: Wait for REST API
         run: |
-          wait_for_rest_ready() {
-            local attempts="$1"
-            local consecutive=0
-
-            for i in $(seq 1 "$attempts"); do
-              if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
-                | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
-                >/dev/null 2>&1; then
-                consecutive=$((consecutive + 1))
-                if [ "$consecutive" -ge 2 ]; then
-                  echo "REST API is ready after $i attempt(s) with accel=${ARM_ACCEL}."
-                  return 0
-                fi
-              else
-                consecutive=0
-              fi
-
-              if [ $((i % 6)) -eq 0 ]; then
-                echo "Attempt $i/${attempts}: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
-              fi
-              sleep 5
-            done
-            return 1
-          }
-
-          MAX_WAIT=$((ARM_BOOT_ATTEMPTS * 5))
-          echo "Waiting for arm64 RouterOS REST API with extra packages (accel=${ARM_ACCEL}, up to ${MAX_WAIT}s)..."
-          if wait_for_rest_ready "${ARM_BOOT_ATTEMPTS}"; then
-            exit 0
+          # KVM: 120s is plenty (initial boot ~5s).
+          # TCG: 240s (initial arm64 boot takes ~45s in CI, ~150s cross-arch).
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            BOOT_TIMEOUT=120
+          else
+            BOOT_TIMEOUT=240
           fi
-          echo "::error::arm64 CHR did not become REST-ready in ${MAX_WAIT}s with accel=${ARM_ACCEL}."
+
+          start_time=$(date +%s)
+          deadline=$((start_time + BOOT_TIMEOUT))
+          consecutive=0
+          attempt=0
+
+          echo "Waiting for arm64 RouterOS REST API (accel=${ARM_ACCEL}, up to ${BOOT_TIMEOUT}s)..."
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
+            if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
+              | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
+              >/dev/null 2>&1; then
+              consecutive=$((consecutive + 1))
+              if [ "$consecutive" -ge 2 ]; then
+                elapsed=$(( $(date +%s) - start_time ))
+                echo "REST API is ready after ${elapsed}s (attempt $attempt, accel=${ARM_ACCEL})."
+                exit 0
+              fi
+            else
+              consecutive=0
+            fi
+
+            if [ $((attempt % 6)) -eq 0 ]; then
+              elapsed=$(( $(date +%s) - start_time ))
+              echo "Attempt $attempt: REST not ready yet (${elapsed}s/${BOOT_TIMEOUT}s, accel=${ARM_ACCEL})..."
+            fi
+            sleep 5
+          done
+
+          echo "::error::arm64 CHR did not become REST-ready in ${BOOT_TIMEOUT}s with accel=${ARM_ACCEL}."
           echo "--- QEMU process ---"
           if [ -f /tmp/qemu.pid ]; then
             ps -p "$(cat /tmp/qemu.pid)" -o pid,stat,%cpu,%mem,etime,args || echo "QEMU process not running!"
@@ -386,6 +391,12 @@ jobs:
         # SLIRP runs in the QEMU host process — a guest /system/reboot does not kill
         # the host process or its port-forwarding rules. Use the same /system/reboot
         # + wait-loop approach as the x86 job.
+        #
+        # Timing (verified by local testing + CI serial logs):
+        #   KVM:  package reboot ~36s   → 240s timeout (same as x86)
+        #   TCG:  package reboot ~1200s → 1500s timeout (25 min)
+        # TCG is slow because all 17 packages are extracted under software emulation.
+        # CI run 24548045114 serial log showed packages finishing at ~19 min.
         run: |
           wait_for_rest_down() {
             for i in $(seq 1 15); do
@@ -398,25 +409,34 @@ jobs:
             echo "::warning::REST API never visibly went down after reboot request; continuing with readiness wait."
           }
 
-          wait_for_rest_ready() {
-            local attempts="$1"
+          # Wall-clock based wait — previous attempt-counting was inaccurate
+          # (each attempt takes ~8s real time due to curl timeout + sleep,
+          #  but the display showed i*5 which underreported by ~40%).
+          wait_for_rest_ready_timed() {
+            local timeout_s="$1"
+            local start_time=$(date +%s)
+            local deadline=$((start_time + timeout_s))
             local consecutive=0
+            local attempt=0
 
-            for i in $(seq 1 "$attempts"); do
+            while [ "$(date +%s)" -lt "$deadline" ]; do
+              attempt=$((attempt + 1))
               if curl -sS -m 3 --fail http://admin:@localhost:9180/rest/system/resource 2>/dev/null \
                 | python3 -c 'import json, sys; body = json.load(sys.stdin); sys.exit(0 if isinstance(body, dict) and "board-name" in body else 1)' \
                 >/dev/null 2>&1; then
                 consecutive=$((consecutive + 1))
                 if [ "$consecutive" -ge 2 ]; then
-                  echo "REST API is ready after $i attempt(s)."
+                  local elapsed=$(( $(date +%s) - start_time ))
+                  echo "REST API is ready after ${elapsed}s (attempt $attempt)."
                   return 0
                 fi
               else
                 consecutive=0
               fi
 
-              if [ $((i % 6)) -eq 0 ]; then
-                echo "Attempt $i/$attempts: REST not fully ready yet (~$((i * 5))s elapsed, accel=${ARM_ACCEL})..."
+              if [ $((attempt % 6)) -eq 0 ]; then
+                local elapsed=$(( $(date +%s) - start_time ))
+                echo "Attempt $attempt: REST not ready yet (${elapsed}s/${timeout_s}s, accel=${ARM_ACCEL})..."
               fi
               sleep 5
             done
@@ -428,16 +448,20 @@ jobs:
             ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 9122 admin@localhost /system/reboot > /dev/null 2>&1 || true
 
           wait_for_rest_down
-          # Package installation under TCG is CPU-intensive — 17 packages need
-          # extraction during the reboot cycle.  The initial clean boot takes ~45s
-          # under TCG; the package-activation reboot can take 3-5× longer.
-          REBOOT_ATTEMPTS=$((ARM_BOOT_ATTEMPTS * 3))
-          MAX_WAIT=$((REBOOT_ATTEMPTS * 5))
-          echo "Waiting for arm64 CHR to restart with extra packages (up to ${MAX_WAIT}s)..."
-          if wait_for_rest_ready "${REBOOT_ATTEMPTS}"; then
+          # KVM: 240s is plenty (x86 KVM reboot with packages takes ~36s).
+          # TCG: 1500s (25 min). CI run 24548045114 showed packages completing at
+          # ~19 min under TCG. quickchr uses 960s for same-arch TCG with packages.
+          # We add margin because CI runners vary in speed.
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            REBOOT_TIMEOUT=240
+          else
+            REBOOT_TIMEOUT=1500
+          fi
+          echo "Waiting for arm64 CHR to restart with extra packages (up to ${REBOOT_TIMEOUT}s, accel=${ARM_ACCEL})..."
+          if wait_for_rest_ready_timed "${REBOOT_TIMEOUT}"; then
             exit 0
           fi
-          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${MAX_WAIT}s."
+          echo "::error::arm64 CHR did not become REST-ready after extra-packages reboot within ${REBOOT_TIMEOUT}s."
           echo "--- QEMU log (last 80 lines) ---"
           tail -80 /tmp/qemu.log || true
           exit 1
@@ -458,9 +482,17 @@ jobs:
 
       - name: Run deep-inspect (arm64, live crawl + enrichment)
         run: |
+          # TCG per-request timeout: 120s (individual REST calls can be slow
+          # under software emulation when the router is extracting packages or
+          # processing large subtrees). KVM: 30s is sufficient.
+          if [ "${ARM_ACCEL}" = "kvm" ]; then
+            REQ_TIMEOUT=30000
+          else
+            REQ_TIMEOUT=120000
+          fi
           bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
             --output-dir . --skip-openapi --test-crash-paths --transport rest \
-            --request-timeout 60000
+            --request-timeout "$REQ_TIMEOUT"
 
       - name: Verify arm64 deep-inspect output
         run: |
