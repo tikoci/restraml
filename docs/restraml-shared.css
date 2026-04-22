@@ -338,10 +338,17 @@ nav details.dropdown > summary.nav-btn-icon svg.nav-icon {
 .cl-section-header:first-child { margin-top: 0; }
 .cl-section-current { font-size: 1.05em; }
 .cl-item {
-    display: block;
-    padding-left: 1.5em;
-    text-indent: -1.5em;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35em;
     margin-bottom: 0.1em;
+    padding-left: 0.25em;
+}
+.cl-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 /* Red text: security-related items AND lines starting with "!)" */
 .cl-item-important { color: var(--pico-del-color, #c0392b); font-weight: 600; }

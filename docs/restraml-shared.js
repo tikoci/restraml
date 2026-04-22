@@ -256,6 +256,84 @@ function _clHighlight(str, query) {
 }
 
 /**
+ * Parse a single RouterOS changelog entry line.
+ *
+ * @param {string} line
+ * @returns {{raw: string, important: boolean, secure: boolean, subsystem: string, text: string} | null}
+ */
+function parseChangelogEntry(line) {
+    const trimmed = line.trim()
+    if (!/^[*!]\)/.test(trimmed)) return null
+
+    const important = trimmed.startsWith('!)')
+    const body = trimmed.replace(/^[*!]\)\s*/, '')
+    const dashIdx = body.indexOf(' - ')
+    let subsystem = ''
+    let text = body
+
+    if (dashIdx > 0 && dashIdx < 30) {
+        subsystem = body.substring(0, dashIdx).trim()
+        text = body.substring(dashIdx + 3)
+    }
+
+    return {
+        raw: trimmed,
+        important,
+        secure: /security|vulnerabilit|CVE-/i.test(trimmed),
+        subsystem,
+        text,
+    }
+}
+
+/**
+ * Render one parsed changelog entry to HTML.
+ *
+ * @param {{important: boolean, secure: boolean, subsystem: string, text: string}} entry
+ * @param {string} query
+ * @returns {string}
+ */
+function renderChangelogEntryHtml(entry, query) {
+    const subsystemHtml = entry.subsystem
+        ? `<span class="cl-subsystem">${_clEscapeHtml(entry.subsystem)}</span>`
+        : ''
+    const cls = `cl-item${(entry.secure || entry.important) ? ' cl-item-important' : ''}`
+    return `<span class="${cls}">${subsystemHtml}<span class="cl-text">${_clHighlight(entry.text, query)}</span></span>`
+}
+
+/**
+ * Parse RouterOS CHANGELOG text into per-version sections.
+ *
+ * @param {string} rawText
+ * @returns {{version: string, date: string, heading: string, entries: Array<{raw: string, important: boolean, secure: boolean, subsystem: string, text: string}>}[]}
+ */
+function parseChangelogSections(rawText) {
+    const sections = []
+    let current = null
+
+    for (const line of rawText.split('\n')) {
+        const trimmed = line.trim()
+        const headerMatch = trimmed.match(/^What's new in ([^\s]+) \(([^)]+)\):/i)
+        if (headerMatch) {
+            if (current) sections.push(current)
+            current = {
+                version: headerMatch[1],
+                date: headerMatch[2],
+                heading: trimmed,
+                entries: [],
+            }
+            continue
+        }
+
+        if (!current) continue
+        const entry = parseChangelogEntry(trimmed)
+        if (entry) current.entries.push(entry)
+    }
+
+    if (current) sections.push(current)
+    return sections
+}
+
+/**
  * Render MikroTik CHANGELOG text into `contentEl`.
  * Items starting with "!)" are highlighted in red (important/breaking).
  *
@@ -292,26 +370,12 @@ function renderChangelogContent(rawText, targetVersion, query, contentEl, itemCo
 
         // Changelog item: "*)" regular item, "!)" important/breaking item (red)
         if (/^[*!]\)/.test(trimmed)) {
-            const isImportant = trimmed.startsWith('!)')
+            const entry = parseChangelogEntry(trimmed)
             totalItems++
             const isMatch = !q || trimmed.toLowerCase().includes(q)
             if (isMatch) {
                 visibleItems++
-                const body = trimmed.replace(/^[*!]\)\s*/, '')
-                const dashIdx = body.indexOf(' - ')
-                let subsystemHtml = ''
-                let bodyHtml = ''
-                if (dashIdx > 0 && dashIdx < 30) {
-                    const sub = body.substring(0, dashIdx).trim()
-                    const rest = body.substring(dashIdx + 3)
-                    subsystemHtml = `<span class="cl-subsystem">${_clEscapeHtml(sub)}</span>`
-                    bodyHtml = _clHighlight(rest, query)
-                } else {
-                    bodyHtml = _clHighlight(body, query)
-                }
-                const isSecure = /security|vulnerabilit|CVE-/i.test(trimmed)
-                const cls = `cl-item${(isSecure || isImportant) ? ' cl-item-important' : ''}`
-                html += `<span class="${cls}">${subsystemHtml}${bodyHtml}</span>`
+                html += renderChangelogEntryHtml(entry, query)
             }
             prevBlank = false
             continue

@@ -415,7 +415,8 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   Parameter names per page:
   - `index.html`: `compare1`, `compare2`, `extra` (false to disable), `testing` (true to enable)
   - `diff.html`: `compare1`, `compare2`, `extra`, `testing`, `format` (side-by-side|line-by-line),
-    `context` (0|3), `hunks` (showing|hiding)
+    `context` (0|3), `hunks` (showing|hiding), `changelog` (open), `changelogFilter` (filter text),
+    `changelogSort` (newest-first|oldest-first)
   - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
     `testing` (true), `extra` (true)
 - **Share button — two patterns exist**:

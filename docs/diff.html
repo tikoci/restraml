@@ -174,6 +174,77 @@
         /* Spacing tweaks */
         #section-diff > nav { margin-bottom: 0.75rem; }
 
+        /* Inline changelog section */
+        #changelog-range-panel[hidden] { display: none; }
+        #changelog-range-panel summary {
+            font-size: 0.88rem;
+            margin-bottom: 0.75rem;
+            width: fit-content;
+        }
+        #changelog-range-panel > article {
+            margin-top: 0;
+        }
+        #changelog-range-panel > article > header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        #changelog-range-panel > article > footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        #changelog-range-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        #changelog-range-controls input,
+        #changelog-range-controls select {
+            margin: 0;
+        }
+        #changelog-range-filter {
+            min-width: min(22rem, 100%);
+        }
+        #changelog-range-status[hidden],
+        #changelog-range-content[hidden] { display: none; }
+        #changelog-range-content {
+            max-height: 26rem;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            padding-top: 0.35rem;
+            font-family: var(--pico-font-family-monospace);
+            font-size: 0.82rem;
+            line-height: 1.6;
+            min-height: 10rem;
+        }
+        #changelog-range-content .cl-section-header:first-child {
+            margin-top: 0;
+        }
+        #changelog-range-content .cl-section-header-link {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        #changelog-range-content .cl-section-header-link a {
+            font-size: 0.8em;
+            font-weight: 500;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        #changelog-range-count {
+            opacity: 0.7;
+        }
+
     </style>
 </head>
 
@@ -282,6 +353,37 @@
                 </div>
             </fieldset>
 
+            <details id="changelog-range-panel" hidden>
+                <summary class="outline secondary">
+                    <span id="changelog-range-summary">Show CHANGELOGs</span>
+                </summary>
+                <article>
+                    <header>
+                        <div>
+                            <strong id="changelog-range-title">RouterOS CHANGELOGs</strong><br>
+                            <small id="changelog-range-hint">Release notes context for the selected comparison.</small>
+                        </div>
+                        <div id="changelog-range-controls">
+                            <input id="changelog-range-filter" type="search" placeholder="Filter release note entries…" aria-label="Filter changelog entries">
+                            <label>
+                                Sort
+                                <select id="changelog-range-sort" class="inline-select" aria-label="Sort changelog releases">
+                                    <option value="newest-first" selected>newest first</option>
+                                    <option value="oldest-first">oldest first</option>
+                                </select>
+                            </label>
+                        </div>
+                    </header>
+                    <div id="changelog-range-status" hidden>
+                        <p aria-busy="true">Loading RouterOS release notes&hellip;</p>
+                    </div>
+                    <div id="changelog-range-content" role="region" aria-live="polite" aria-label="Release notes for the selected version range" hidden></div>
+                    <footer>
+                        <small id="changelog-range-count"></small>
+                    </footer>
+                </article>
+            </details>
+
             <div id="diff-options" hidden>
                 <small>
                     Show
@@ -331,7 +433,8 @@
                     no button needed. The <mark>extra-packages</mark> toggle includes commands
                     from <kbd>container</kbd>, <kbd>iot</kbd>, <kbd>zerotier</kbd>, and other
                     optional packages; <mark>testing</mark> includes beta and RC builds in the
-                    version list. Hit <b>⇄</b> between the dropdowns to swap the two versions.
+                    version list. Hit <b>⇄</b> between the dropdowns to swap the two versions,
+                    then open <b>Show CHANGELOGs</b> for the human release notes between them.
                 </p>
                 <p>
                     Below each version, the command and attribute counts for that schema are
@@ -432,13 +535,24 @@
         const diffstatus = document.getElementById('diffstatus')
         const diffcodedetails = document.getElementById('diffcodedetails')
         const diffoutput = document.getElementById('diffoutput')
+        const changelogRangePanel = document.getElementById('changelog-range-panel')
+        const changelogRangeSummary = document.getElementById('changelog-range-summary')
+        const changelogRangeTitle = document.getElementById('changelog-range-title')
+        const changelogRangeHint = document.getElementById('changelog-range-hint')
+        const changelogRangeFilter = document.getElementById('changelog-range-filter')
+        const changelogRangeSort = document.getElementById('changelog-range-sort')
+        const changelogRangeStatus = document.getElementById('changelog-range-status')
+        const changelogRangeContent = document.getElementById('changelog-range-content')
+        const changelogRangeCount = document.getElementById('changelog-range-count')
         // Trigger comparison when both versions are selected
-        compare1.addEventListener('change', () => {
-            if (compare2.value) document.dispatchEvent(new Event('vercompare'))
-        })
-        compare2.addEventListener('change', () => {
-            if (compare1.value) document.dispatchEvent(new Event('vercompare'))
-        })
+        function dispatchCompareIfReady() {
+            syncChangelogRangePanel()
+            _loadedRangeSections = null
+            _loadedRangeKey = null
+            if (compare1.value && compare2.value) document.dispatchEvent(new Event('vercompare'))
+        }
+        compare1.addEventListener('change', dispatchCompareIfReady)
+        compare2.addEventListener('change', dispatchCompareIfReady)
         diffextra.addEventListener('change', () => {
             if (compare1.value && compare2.value) document.dispatchEvent(new Event('vercompare'))
         })
@@ -449,6 +563,7 @@
             const v2 = compare2.value
             compare1.value = v2
             compare2.value = v1
+            syncChangelogRangePanel()
             if (v1 && v2) document.dispatchEvent(new Event('vercompare'))
         })
 
@@ -467,6 +582,208 @@
         // All collected versions for diff dropdowns (sorted at insertion time)
         const _diffVersions = []
         let _diffShowAll = false
+        const _changelogCache = {}
+        let _loadedRangeSections = null
+        let _loadedRangeKey = null
+
+        function getChangelogRange() {
+            if (!compare1.value || !compare2.value) return null
+            const newerFirst = compareVersions(compare1.value, compare2.value) <= 0
+            return newerFirst
+                ? { older: compare2.value, newer: compare1.value }
+                : { older: compare1.value, newer: compare2.value }
+        }
+
+        function syncChangelogRangePanel() {
+            const range = getChangelogRange()
+            changelogRangePanel.hidden = !range
+            if (!range) {
+                changelogRangeCount.textContent = ''
+                changelogRangeContent.hidden = true
+                changelogRangeStatus.hidden = true
+                return
+            }
+
+            const label = range.older === range.newer
+                ? `Show CHANGELOG: ${range.newer}`
+                : `Show CHANGELOGs: ${range.older} → ${range.newer}`
+            changelogRangeSummary.textContent = label
+            changelogRangeTitle.textContent = range.older === range.newer
+                ? `RouterOS ${range.newer} release notes`
+                : `RouterOS CHANGELOGs from ${range.older} to ${range.newer}`
+            changelogRangeHint.textContent = range.older === range.newer
+                ? 'The official release notes for the selected version.'
+                : `Every release note section after ${range.older} up to ${range.newer}, so the API diff has human upgrade context.`
+        }
+
+        function getChangelogVersionsInRange(range) {
+            const candidateVersions = _diffShowAll
+                ? _diffVersions
+                : _diffVersions.filter(version => !isPreRelease(version))
+
+            return candidateVersions.filter(version => {
+                if (range.older === range.newer) return version === range.newer
+                return compareVersions(version, range.newer) >= 0
+                    && compareVersions(version, range.older) < 0
+            })
+        }
+
+        function renderRangeChangelog(sections, range) {
+            const query = changelogRangeFilter.value.trim()
+            const q = query.toLowerCase()
+            const sortOrder = changelogRangeSort.value
+            const orderedSections = sortOrder === 'oldest-first'
+                ? [...sections].reverse()
+                : sections
+
+            let html = ''
+            let totalEntries = 0
+            let visibleEntries = 0
+            let visibleSections = 0
+
+            for (const section of orderedSections) {
+                totalEntries += section.entries.length
+                const headerMatches = q && (
+                    section.heading.toLowerCase().includes(q)
+                    || section.version.toLowerCase().includes(q)
+                    || section.date.toLowerCase().includes(q)
+                )
+                const entries = q
+                    ? (headerMatches
+                        ? section.entries
+                        : section.entries.filter(entry =>
+                            entry.raw.toLowerCase().includes(q)
+                            || entry.subsystem.toLowerCase().includes(q)
+                            || entry.text.toLowerCase().includes(q)
+                        ))
+                    : section.entries
+
+                if (q && entries.length === 0) continue
+
+                visibleSections++
+                const sectionLink = section.sourceUrl
+                    ? `<a href="${escapeHtml(section.sourceUrl)}" target="_blank" rel="noopener" class="secondary">CHANGELOG ↗</a>`
+                    : ''
+                html += `<span class="cl-section-header cl-section-header-link"><span>${_clHighlight(section.heading, query)}</span>${sectionLink}</span>`
+                for (const entry of entries) {
+                    visibleEntries++
+                    html += renderChangelogEntryHtml(entry, query)
+                }
+            }
+
+            changelogRangeStatus.hidden = true
+            changelogRangeContent.hidden = false
+
+            if (!sections.length) {
+                changelogRangeContent.innerHTML = `<p style="opacity:0.65; padding:2rem 0; text-align:center"><em>No release note sections found between ${escapeHtml(range.older)} and ${escapeHtml(range.newer)}.</em></p>`
+                changelogRangeCount.textContent = ''
+                return
+            }
+
+            if (!html.trim()) {
+                changelogRangeContent.innerHTML = '<p style="opacity:0.65; padding:2rem 0; text-align:center"><em>No matching changelog entries found.</em></p>'
+            } else {
+                changelogRangeContent.innerHTML = html
+            }
+
+            if (q) {
+                changelogRangeCount.textContent = `${visibleEntries} of ${totalEntries} entries across ${visibleSections} of ${sections.length} releases match "${query}"`
+            } else {
+                changelogRangeCount.textContent = `${totalEntries} entries across ${sections.length} release${sections.length === 1 ? '' : 's'}`
+            }
+        }
+
+        async function fetchChangelogSectionsForVersion(version) {
+            if (_changelogCache[version]) return _changelogCache[version]
+
+            const request = fetch(`https://download.mikrotik.com/routeros/${version}/CHANGELOG`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+                    return response.text()
+                })
+                .then(text => parseChangelogSections(text))
+
+            _changelogCache[version] = request
+            try {
+                return await request
+            } catch (error) {
+                delete _changelogCache[version]
+                throw error
+            }
+        }
+
+        async function loadRangeChangelog() {
+            const range = getChangelogRange()
+            if (!range || !changelogRangePanel.open) return
+
+            syncChangelogRangePanel()
+
+            const rangeKey = `${range.older}|${range.newer}`
+            if (_loadedRangeKey === rangeKey && _loadedRangeSections) {
+                renderRangeChangelog(_loadedRangeSections, range)
+                return
+            }
+
+            changelogRangeStatus.hidden = false
+            changelogRangeContent.hidden = true
+            changelogRangeCount.textContent = ''
+
+            try {
+                const versions = getChangelogVersionsInRange(range)
+                const sectionGroups = await Promise.all(
+                    versions.map(async version => {
+                        const sections = await fetchChangelogSectionsForVersion(version)
+                        const matchingSections = sections.filter(section => section.version === version)
+                        const selectedSections = matchingSections.length > 0
+                            ? matchingSections
+                            : sections.slice(0, 1)
+
+                        return selectedSections.map(section => ({
+                            ...section,
+                            sourceUrl: `https://download.mikrotik.com/routeros/${version}/CHANGELOG`,
+                        }))
+                    })
+                )
+
+                const flattenedSections = sectionGroups.flat()
+                if (!flattenedSections.length && versions.length === 0) {
+                    throw new Error(`No built RouterOS versions found between ${range.older} and ${range.newer}`)
+                }
+
+                _loadedRangeSections = flattenedSections
+                _loadedRangeKey = rangeKey
+                renderRangeChangelog(flattenedSections, range)
+            } catch (error) {
+                console.warn('Failed to load RouterOS changelog range', range, error)
+                changelogRangeStatus.hidden = true
+                changelogRangeContent.hidden = false
+                changelogRangeCount.textContent = ''
+                const fallbackUrl = escapeHtml(`https://download.mikrotik.com/routeros/${range.newer}/CHANGELOG`)
+                changelogRangeContent.innerHTML = `
+                    <p style="text-align:center; padding:2rem 1rem">
+                        <span style="font-size:2rem">📋</span><br><br>
+                        The release notes could not be loaded inline.<br><br>
+                        <a href="${fallbackUrl}" target="_blank" rel="noopener" role="button">Open RouterOS CHANGELOG ↗</a>
+                    </p>`
+            }
+        }
+
+        changelogRangePanel.addEventListener('toggle', () => {
+            writeQueryParams()
+            if (changelogRangePanel.open) loadRangeChangelog()
+        })
+        changelogRangeFilter.addEventListener('input', () => {
+            writeQueryParams()
+            const range = getChangelogRange()
+            if (!changelogRangePanel.open || !range) return
+            loadRangeChangelog()
+        })
+        changelogRangeSort.addEventListener('change', () => {
+            writeQueryParams()
+            const range = getChangelogRange()
+            if (!changelogRangePanel.open || !range) return
+            loadRangeChangelog()
+        })
 
         document.addEventListener('DOMContentLoaded', () => {
             const diffShowAll = document.getElementById('diffShowAll')
@@ -679,6 +996,14 @@
                     diffstatus.textContent = 'Error: Failed to compare RouterOS schemas. ' + (error && error.message ? error.message : '')
                     diffcodedetails.hidden = true
                 } finally {
+                    syncChangelogRangePanel()
+                    if (changelogRangePanel.open) {
+                        try {
+                            await loadRangeChangelog()
+                        } catch (changelogError) {
+                            console.warn('Failed to refresh changelog panel', changelogError)
+                        }
+                    }
                     compare1.disabled = false
                     compare2.disabled = false
                     diffextra.disabled = false
@@ -777,6 +1102,10 @@
             if (ctx !== '0') params.set('context', ctx)
             const hunks = document.getElementById('diffHunks').value
             if (hunks !== 'showing') params.set('hunks', hunks)
+            if (changelogRangePanel.open) params.set('changelog', 'open')
+            const changelogFilter = changelogRangeFilter.value.trim()
+            if (changelogFilter) params.set('changelogFilter', changelogFilter)
+            if (changelogRangeSort.value !== 'newest-first') params.set('changelogSort', changelogRangeSort.value)
             const qs = params.toString()
             history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
         }
@@ -790,6 +1119,9 @@
             const fmt = params.get('format')
             const ctx = params.get('context')
             const hunks = params.get('hunks')
+            const changelog = params.get('changelog')
+            const changelogFilter = params.get('changelogFilter')
+            const changelogSort = params.get('changelogSort')
             const diffShowAll = document.getElementById('diffShowAll')
 
             if (testing === 'true' && !_diffShowAll) {
@@ -811,6 +1143,10 @@
                 diffHunks.value = hunks
                 diffoutput.classList.toggle('hide-markers', hunks === 'hiding')
             }
+            if (changelogFilter) changelogRangeFilter.value = changelogFilter
+            if (changelogSort && ['newest-first', 'oldest-first'].includes(changelogSort)) {
+                changelogRangeSort.value = changelogSort
+            }
 
             let needsCompare = false
             if (q1 && [...compare1.options].some(o => o.value === q1)) {
@@ -821,6 +1157,8 @@
                 compare2.value = q2
                 needsCompare = true
             }
+            syncChangelogRangePanel()
+            if (changelog === 'open') changelogRangePanel.open = true
             if (needsCompare && compare1.value && compare2.value) {
                 document.dispatchEvent(new Event('vercompare'))
             }
