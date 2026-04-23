@@ -25,8 +25,9 @@ on:
           Use this for beta/RC versions with known schema issues that are pending
           a fix from MikroTik (e.g. duplicate YAML keys, array-typed env vars).
           Versions here are excluded from base, extra-packages, and /app YAML schema builds.
+          **Issue was in 7.23beta4 to 7.23rc1 => fixed in 7.23rc2  
         required: false
-        default: "7.23beta5"
+        default: "7.23rc1,7.23beta5,7.23beta4"
   schedule:
     - cron: "0 4 * * *"
 
