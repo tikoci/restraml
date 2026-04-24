@@ -93,7 +93,7 @@ done
 SCRIPT_START_TS="$(date +%s)"
 
 if [[ -z "$WORKDIR" ]]; then
-  WORKDIR="$(mktemp -d -t restraml-arm64-exp.XXXXXX)"
+  WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/restraml-arm64-exp.XXXXXX")"
 fi
 
 QEMU_PID=""
@@ -254,7 +254,7 @@ echo "[info] extra package files: ${TOTAL_PACKAGES}"
 
 echo "[step] Prepare writable UEFI vars and start QEMU (tcg)"
 cp "$AAVMF_VARS" aavmf-vars.fd
-CODE_SIZE="$(stat -f%z "$AAVMF_CODE" 2>/dev/null || stat -c%s "$AAVMF_CODE")"
+CODE_SIZE="$(stat -f %z "$AAVMF_CODE" 2>/dev/null || stat -c%s "$AAVMF_CODE")"
 truncate -s "$CODE_SIZE" aavmf-vars.fd
 
 qemu-system-aarch64 \

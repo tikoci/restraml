@@ -28,8 +28,18 @@ function shouldSuppressRunnerLabelError(err) {
 		return false;
 	}
 
+	const message = String(err.message ?? "").toLowerCase();
+	if (!message.includes("unknown")) {
+		return false;
+	}
+
 	for (const label of allowedRunnerLabels) {
-		if (err.message.includes(`label "${label}" is unknown`)) {
+		// Match the label surrounded by quotes to avoid false positives from prefix
+		// matches (e.g. allowed "ubuntu-24.04-arm" must not suppress an error about
+		// the unknown label "ubuntu-24.04-arm64").
+		const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const quotedLabelPattern = new RegExp(`"${escapedLabel}"`, "i");
+		if (quotedLabelPattern.test(message)) {
 			return true;
 		}
 	}
@@ -39,7 +49,25 @@ function shouldSuppressRunnerLabelError(err) {
 
 for (const file of files.sort()) {
 	const content = await Bun.file(file).text();
-	const errors = lint(content, file).filter((err) => !shouldSuppressRunnerLabelError(err));
+	let lintResults;
+	try {
+		lintResults = lint(content, file);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`${file}:0:0 [internal] actionlint failed unexpectedly: ${message}`);
+		hasErrors = true;
+		continue;
+	}
+
+	if (!Array.isArray(lintResults)) {
+		console.error(
+			`${file}:0:0 [internal] actionlint returned an unexpected result format`,
+		);
+		hasErrors = true;
+		continue;
+	}
+
+	const errors = lintResults.filter((err) => !shouldSuppressRunnerLabelError(err));
 	for (const err of errors) {
 		console.error(`${err.file}:${err.line}:${err.column} [${err.kind}] ${err.message}`);
 		hasErrors = true;

@@ -241,7 +241,7 @@ export class NativeRouterOSClient implements IRouterOSClient {
 
   /** Returns reconnect diagnostics accumulated during this session.
    *  A non-zero count means the TCP connection dropped at least once.
-   *  The next write() call after a drop auto-reconnects (RosAPI.write recontects
+   *  The next write() call after a drop auto-reconnects (RosAPI.write reconnects
    *  when !connected), so enrichment continues — but missed completions and
    *  slowdown are side-effects worth tracking and reporting. */
   getReconnectStats(): { count: number; firstPaths: string[] } {
@@ -336,7 +336,11 @@ export function completionsToObject(completions: InspectCompletionResponse[]): R
   for (const c of completions) {
     const entry: CompletionEntry = { style: c.style || "none" };
     if (c.preference !== undefined) {
-      entry.preference = typeof c.preference === "string" ? Number(c.preference) : c.preference;
+      const parsedPreference =
+        typeof c.preference === "string" ? Number(c.preference) : c.preference;
+      if (Number.isFinite(parsedPreference)) {
+        entry.preference = parsedPreference;
+      }
     }
     const description = c.desc || c.text;
     if (description) entry.desc = description;
@@ -1079,6 +1083,27 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     throw new Error(`--arch must be x86 or arm64; got "${archRaw}"`);
   }
 
+  const apiPortRaw = values["api-port"] ?? "8728";
+  if (!/^\d+$/.test(apiPortRaw)) {
+    throw new Error(`--api-port must be a valid integer between 1 and 65535; got "${apiPortRaw}"`);
+  }
+  const apiPort = Number(apiPortRaw);
+  if (!Number.isInteger(apiPort) || apiPort < 1 || apiPort > 65535) {
+    throw new Error(`--api-port must be a valid integer between 1 and 65535; got "${apiPortRaw}"`);
+  }
+
+  const requestTimeoutRaw = values["request-timeout"];
+  if (requestTimeoutRaw !== undefined && !/^\d+$/.test(requestTimeoutRaw)) {
+    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
+  }
+  const requestTimeoutParsed = requestTimeoutRaw !== undefined ? Number(requestTimeoutRaw) : undefined;
+  if (
+    requestTimeoutRaw !== undefined &&
+    (!Number.isInteger(requestTimeoutParsed) || (requestTimeoutParsed as number) < 1)
+  ) {
+    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
+  }
+
   const [, , ...pathArgs] = positionals;
 
   return {
@@ -1096,8 +1121,8 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       help: values.help ?? false,
       transport: transportRaw,
       apiHost: values["api-host"],
-      apiPort: parseInt(values["api-port"] ?? "8728", 10),
-      requestTimeout: values["request-timeout"] ? parseInt(values["request-timeout"], 10) : undefined,
+      apiPort,
+      requestTimeout: requestTimeoutParsed,
     },
     pathArgs,
   };

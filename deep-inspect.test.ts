@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -148,6 +148,20 @@ describe("completionsToObject", () => {
       { completion: "action", show: true, style: "none", desc: "canonical", text: "raw" },
     ]);
     expect(result.action.desc).toBe("canonical");
+  });
+
+  test("omits preference when string is not a valid number (e.g. 'foo')", () => {
+    const result = completionsToObject([
+      { completion: "bad", show: true, style: "none", preference: "foo" },
+    ]);
+    expect("preference" in result.bad).toBe(false);
+  });
+
+  test("omits preference when value produces NaN", () => {
+    const result = completionsToObject([
+      { completion: "nan", show: true, style: "none", preference: Number.NaN },
+    ]);
+    expect("preference" in result.nan).toBe(false);
   });
 
   test("handles empty input", () => {
@@ -690,5 +704,89 @@ describe("CLI: --arch + --output-suffix contract", () => {
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ── CLI: --api-port and --request-timeout validation ──────────────────────
+
+describe("CLI: --api-port validation", () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-")); });
+  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+
+  const baseArgs = [
+    "--inspect-file", "fixtures/sample-inspect.json",
+    "--skip-completion", "--skip-openapi", "--version",
+  ];
+
+  test("rejects non-numeric value", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "abc"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("rejects partial number like '8080abc'", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8080abc"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("rejects port 0 (out of range)", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "0"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("rejects port 65536 (out of range)", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65536"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("accepts valid port 8728 (default)", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8728"], tmpDir);
+    expect(exitCode).toBe(0);
+  });
+
+  test("accepts port boundary 1", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "1"], tmpDir);
+    expect(exitCode).toBe(0);
+  });
+
+  test("accepts port boundary 65535", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65535"], tmpDir);
+    expect(exitCode).toBe(0);
+  });
+});
+
+describe("CLI: --request-timeout validation", () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-")); });
+  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+
+  const baseArgs = [
+    "--inspect-file", "fixtures/sample-inspect.json",
+    "--skip-completion", "--skip-openapi", "--version",
+  ];
+
+  test("rejects non-numeric value", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "abc"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("rejects partial number like '120000ms'", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "120000ms"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("rejects timeout 0 (must be > 0)", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "0"], tmpDir);
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("accepts valid timeout 30000", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "30000"], tmpDir);
+    expect(exitCode).toBe(0);
+  });
+
+  test("accepts timeout of 1", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "1"], tmpDir);
+    expect(exitCode).toBe(0);
   });
 });
