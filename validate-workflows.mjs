@@ -23,7 +23,7 @@ if (await Bun.file(actionlintConfigPath).exists()) {
 	}
 }
 
-function isAllowedRunnerLabelError(err) {
+function shouldSuppressRunnerLabelError(err) {
 	if (err.kind !== "runner-label") {
 		return false;
 	}
@@ -39,7 +39,7 @@ function isAllowedRunnerLabelError(err) {
 
 for (const file of files.sort()) {
 	const content = await Bun.file(file).text();
-	const errors = lint(content, file).filter((err) => !isAllowedRunnerLabelError(err));
+	const errors = lint(content, file).filter((err) => !shouldSuppressRunnerLabelError(err));
 	for (const err of errors) {
 		console.error(`${err.file}:${err.line}:${err.column} [${err.kind}] ${err.message}`);
 		hasErrors = true;
