@@ -140,7 +140,7 @@ jobs:
         fi
 
     - name: Setup Bun Runtime
-      uses: oven-sh/setup-bun@v2
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       with:
         bun-version: 'latest'
 
@@ -178,8 +178,11 @@ jobs:
       #   Part 2 — fetches all built-in /app YAMLs from CHR and validates each against the schema
       # Exit code 0: all passed; 1: schema meta-validation failed; 2: /app YAML validation failed
       id: validate
+      env:
+        APP_YAML_FAILURES_FILE: ${{ runner.temp }}/app-yaml-failures.txt
       run: |
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        rm -f "$APP_YAML_FAILURES_FILE"
         set +e
         bun appyamlvalidate.js "$ROSVER"
         EXIT_CODE=$?
@@ -199,14 +202,17 @@ jobs:
       # Lists each failing built-in app so developers know which apps expose schema gaps.
       if: steps.validate.outputs.exit_code == '2'
       uses: actions/github-script@v9
+      env:
+        APP_YAML_FAILURES_FILE: ${{ runner.temp }}/app-yaml-failures.txt
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs')
           const rosver = '${{ steps.connection-check.outputs.rosver }}'
+          const failuresPath = process.env.APP_YAML_FAILURES_FILE
           let failureDetails = '(no details file found)'
           try {
-            failureDetails = fs.readFileSync('/tmp/app-yaml-failures.txt', 'utf8')
+            failureDetails = fs.readFileSync(failuresPath, 'utf8')
           } catch (e) {}
 
           const body = [

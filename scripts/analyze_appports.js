@@ -194,7 +194,7 @@ function parsePortString(raw) {
   if (!raw) return null
 
   // Object (long-form) mapping
-  if (typeof raw === "object" && raw !== null) {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const host = Number(raw.published)
     const container = Number(raw.target)
     if (Number.isNaN(host) || Number.isNaN(container)) return null

@@ -133,9 +133,9 @@ jobs:
           -d '{"value-name":"level"}' | jq -r '.ret'
 
     - name: Setup Bun Runtime
-      uses: oven-sh/setup-bun@v2
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       with:
-        bun-version: 'latest' 
+        bun-version: 'latest'
     
     - name: Setup NodeJS 
       uses: actions/setup-node@v6

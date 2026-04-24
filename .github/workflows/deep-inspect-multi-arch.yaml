@@ -181,7 +181,7 @@ jobs:
           echo "✓ $PKG_COUNT packages installed"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
       - name: Run deep-inspect (x86, live crawl + enrichment)
         run: |
@@ -440,7 +440,7 @@ jobs:
           echo "✓ $PKG_COUNT packages installed"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
       - name: Run deep-inspect (arm64, live crawl + enrichment)
         # TCG per-request timeout: 120s (generous margin over measured ~70ms;
@@ -494,7 +494,7 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
       - name: Download x86 deep-inspect artifact
         uses: actions/download-artifact@v8

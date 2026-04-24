@@ -16,22 +16,80 @@
 //   2 - One or more built-in /app YAML entries failed schema validation
 
 const fs = require("fs")
+const path = require("path")
 const YAML = require("js-yaml")
 const Ajv = require("ajv")
 const addFormats = require("ajv-formats")
 
 const SINGLE_SCHEMA_PATH = process.env.APP_YAML_SCHEMA || "docs/routeros-app-yaml-schema.latest.json"
 const STORE_SCHEMA_PATH = "docs/routeros-app-yaml-store-schema.latest.json"
-const FAILURES_FILE = "/tmp/app-yaml-failures.txt"
+const FAILURES_FILE = process.env.APP_YAML_FAILURES_FILE || "app-yaml-failures.txt"
+const VERSION_SEGMENT_RE = /^[0-9A-Za-z][0-9A-Za-z._-]*$/
+
+function assertSafeVersion(version) {
+  if (!VERSION_SEGMENT_RE.test(version)) {
+    throw new Error(
+      `Invalid version '${version}'. Only letters, numbers, dot, underscore, and dash are allowed.`
+    )
+  }
+  return version
+}
+
+function resolveDocsPath(version, fileName) {
+  const docsRoot = path.resolve("docs")
+  const versionRoot = path.resolve(docsRoot, version)
+  const targetPath = fileName ? path.resolve(versionRoot, fileName) : versionRoot
+  const docsPrefix = `${docsRoot}${path.sep}`
+
+  if (targetPath !== docsRoot && !targetPath.startsWith(docsPrefix)) {
+    throw new Error(`Refusing to write outside docs/: ${targetPath}`)
+  }
+
+  return targetPath
+}
+
+function writeJsonFile(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+function writeTextFile(filePath, contents) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, contents)
+}
+
+function sanitizeFailureField(value) {
+  const withoutControls = Array.from(String(value), (char) => {
+    const code = char.charCodeAt(0)
+    return code < 32 || code === 127 ? " " : char
+  }).join("")
+  return withoutControls.replace(/\s+/g, " ").trim()
+}
+
+function assertAppList(value) {
+  if (!Array.isArray(value)) {
+    throw new Error("Expected GET /rest/app to return an array")
+  }
+
+  for (const [index, app] of value.entries()) {
+    if (!app || typeof app !== "object" || Array.isArray(app)) {
+      throw new Error(`Expected app entry ${index} to be an object`)
+    }
+  }
+
+  return value
+}
 
 async function main() {
   const args = Bun.argv.slice(2)
-  const version = args[0]
+  const versionArg = args[0]
 
-  if (!version) {
+  if (!versionArg) {
     console.error("Usage: bun appyamlvalidate.js <version>")
     process.exit(1)
   }
+
+  const version = assertSafeVersion(versionArg)
 
   // --- Load base schemas ---
   const singleSchema = JSON.parse(fs.readFileSync(SINGLE_SCHEMA_PATH, "utf8"))
@@ -54,18 +112,12 @@ async function main() {
   }
 
   // --- Write per-version schemas to docs/<version>/ ---
-  const docsPath = `docs/${version}`
+  const docsPath = resolveDocsPath(version)
   fs.mkdirSync(docsPath, { recursive: true })
-  const singleOutputPath = `${docsPath}/routeros-app-yaml-schema.json`
-  const storeOutputPath = `${docsPath}/routeros-app-yaml-store-schema.json`
-  fs.writeFileSync(
-    singleOutputPath,
-    JSON.stringify(versionedSingleSchema, null, 2)
-  )
-  fs.writeFileSync(
-    storeOutputPath,
-    JSON.stringify(versionedStoreSchema, null, 2)
-  )
+  const singleOutputPath = resolveDocsPath(version, "routeros-app-yaml-schema.json")
+  const storeOutputPath = resolveDocsPath(version, "routeros-app-yaml-store-schema.json")
+  writeJsonFile(singleOutputPath, versionedSingleSchema)
+  writeJsonFile(storeOutputPath, versionedStoreSchema)
   console.log(`Written: ${singleOutputPath}`)
   console.log(`Written: ${storeOutputPath}`)
 
@@ -139,12 +191,12 @@ async function main() {
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
     }
-    apps = await resp.json()
+    apps = assertAppList(await resp.json())
     console.log(`Fetched ${apps.length} built-in /app entries from router`)
 
     // Save raw /app JSON to docs/<version>/app.json for reference and debugging
-    const appJsonPath = `${docsPath}/app.json`
-    fs.writeFileSync(appJsonPath, JSON.stringify(apps, null, 2))
+    const appJsonPath = resolveDocsPath(version, "app.json")
+    writeJsonFile(appJsonPath, apps)
     console.log(`Written: ${appJsonPath}`)
   } catch (err) {
     console.error(`::warning::Failed to fetch /app list: ${err.message}`)
@@ -194,9 +246,14 @@ async function main() {
     }
     // Write failure details to a file for GitHub issue creation in the workflow
     const failureLines = failures
-      .map((f) => `- \`${f.name}\`: ${f.summary}`)
+      .map(
+        (f) =>
+          `- \`${sanitizeFailureField(f.name)}\`: ${sanitizeFailureField(f.summary)}`
+      )
       .join("\n")
-    fs.writeFileSync(FAILURES_FILE, failureLines)
+    const failureFilePath = path.resolve(FAILURES_FILE)
+    writeTextFile(failureFilePath, `${failureLines}\n`)
+    console.error(`Failure details written to ${failureFilePath}`)
     process.exit(2)
   }
 
