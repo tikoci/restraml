@@ -1,9 +1,12 @@
 name: restraml CodeQL configuration
 
-paths:
-  - .
-
 paths-ignore:
   # Versioned docs content is generated output. Keep scanning the maintained
   # top-level docs/*.html pages while skipping published snapshots.
   - docs/*/**
+
+# security-and-quality covers all of security-extended plus code-quality
+# queries. Specifying it here (not in the workflow step) avoids the
+# ambiguous + prefix that caused "is not a .ql file" fatal errors with v3.
+queries:
+  - uses: security-and-quality
