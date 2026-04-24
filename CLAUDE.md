@@ -355,6 +355,7 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 | `get_routeros_changelog` | `index.html` | Fetch & parse MikroTik CHANGELOG into structured entries |
 | `get_tikapp_editor_content` | `tikapp.html` | Read the current Monaco editor buffer and metadata |
 | `set_tikapp_editor_content` | `tikapp.html` | Replace the current Monaco editor buffer and return validation results |
+| `get_routeros_app_yaml_schema_outline` | `tikapp.html` | Get a concise outline of allowed /app YAML keys and service properties |
 | `validate_routeros_app_yaml` | `tikapp.html` | Validate /app YAML against JSON Schema |
 | `list_builtin_apps` | `tikapp.html` | List built-in /app container applications |
 | `get_openapi_schema_url` | `openapi.html` | Get OpenAPI 3.0 schema download URL + availability |
@@ -389,8 +390,9 @@ Every registered tool sets a `ToolAnnotations` object (added to the WebMCP spec 
   - `get_tikapp_editor_content`, `set_tikapp_editor_content` — expose and mutate user/editor
     content, which is untrusted from the page author's perspective.
   - `validate_routeros_app_yaml` — echoes user-supplied YAML in error messages.
-- The only tool with `untrustedContentHint: false` is **`get_openapi_schema_url`**, which returns
-  only a URL string we construct from a known template (no third-party content in the response).
+- Tools with **`untrustedContentHint: false`** currently are:
+  - `get_openapi_schema_url` — returns only a URL string we construct from a known template.
+  - `get_routeros_app_yaml_schema_outline` — summarizes the locally published schema files we author in this repo.
 
 When **adding** or **modifying** a WebMCP tool, decide the hint based on this rule:
 *if any string in the response originates outside this repo's source code, set

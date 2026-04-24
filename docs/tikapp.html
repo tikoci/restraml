@@ -1491,15 +1491,63 @@
             }
 
             fn(parsed)
-            const errors = fn.errors
-                ? fn.errors.map(err => ({
-                    path: err.dataPath || err.instancePath || '',
-                    message: err.message,
-                    line: findLineForPath(yamlContent, err.dataPath || err.instancePath || ''),
-                }))
-                : []
+            const errors = normalizeValidationErrors(fn.errors, yamlContent)
 
             return { valid: !errors.length, errors, schemaVersion: ver }
+        }
+
+        function normalizeValidationErrors(errors, content) {
+            if (!Array.isArray(errors) || errors.length === 0) return []
+            return errors.map(err => {
+                const basePath = err.dataPath || err.instancePath || ''
+                let lookupPath = basePath
+                let message
+
+                if (err.keyword === 'additionalProperties' && err.params?.additionalProperty) {
+                    const badKey = err.params.additionalProperty
+                    lookupPath = basePath ? `${basePath}/${badKey}` : `/${badKey}`
+                    message = `${lookupPath}: unknown property '${badKey}'`
+                } else if (err.keyword === 'required' && err.params?.missingProperty) {
+                    const missingKey = String(err.params.missingProperty).replace(/^\./, '')
+                    lookupPath = basePath ? `${basePath}/${missingKey}` : `/${missingKey}`
+                    message = `${lookupPath}: missing required property '${missingKey}'`
+                } else {
+                    message = basePath ? `${basePath}: ${err.message}` : err.message
+                }
+
+                return {
+                    path: lookupPath || basePath || '',
+                    message,
+                    line: findLineForPath(content, lookupPath || basePath || ''),
+                }
+            })
+        }
+
+        function summarizeSchemaType(schema) {
+            if (!schema || typeof schema !== 'object') return ''
+            if (Array.isArray(schema.type)) return schema.type.join('|')
+            if (typeof schema.type === 'string') return schema.type
+            if (Array.isArray(schema.oneOf)) {
+                return schema.oneOf.map(summarizeSchemaType).filter(Boolean).join(' | ')
+            }
+            if (Array.isArray(schema.anyOf)) {
+                return schema.anyOf.map(summarizeSchemaType).filter(Boolean).join(' | ')
+            }
+            if (schema.properties || schema.patternProperties) return 'object'
+            return ''
+        }
+
+        function summarizeSchemaProperties(properties = {}, required = []) {
+            return Object.entries(properties).map(([name, schema]) => {
+                const summary = {
+                    name,
+                    type: summarizeSchemaType(schema) || 'object',
+                    required: required.includes(name),
+                    description: schema.description || '',
+                }
+                if (Array.isArray(schema.enum)) summary.enum = schema.enum
+                return summary
+            })
         }
 
         function runValidation() {
@@ -1530,27 +1578,13 @@
                     fn(parsed)
                     if (fn.errors) {
                         const contentLines = content.split('\n')
-                        for (const err of fn.errors) {
-                            const basePath = err.dataPath || err.instancePath || ''
-                            // For additionalProperties errors, AJV points to the parent object —
-                            // drill down to the actual offending key for better line positioning
-                            let lookupPath = basePath
-                            let msg
-                            if (err.keyword === 'additionalProperties' && err.params?.additionalProperty) {
-                                const badKey = err.params.additionalProperty
-                                lookupPath = basePath ? `${basePath}/${badKey}` : `/${badKey}`
-                                msg = `${lookupPath}: unknown property '${badKey}'`
-                            } else {
-                                msg = basePath ? `${basePath}: ${err.message}` : err.message
-                            }
-                            // Approximate line via path lookup; fall back to no line marker
-                            const line = findLineForPath(content, lookupPath)
-                            validationErrors.push({ line, col: 1, message: msg, severity: 'error' })
-                            if (line) {
-                                const lineLen = contentLines[line - 1]?.length ?? 999
+                        for (const err of normalizeValidationErrors(fn.errors, content)) {
+                            validationErrors.push({ line: err.line, col: 1, message: err.message, severity: 'error' })
+                            if (err.line) {
+                                const lineLen = contentLines[err.line - 1]?.length ?? 999
                                 markers.push({
-                                    startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: lineLen + 1,
-                                    message: msg, severity: monaco.MarkerSeverity.Error
+                                    startLineNumber: err.line, startColumn: 1, endLineNumber: err.line, endColumn: lineLen + 1,
+                                    message: err.message, severity: monaco.MarkerSeverity.Error
                                 })
                             }
                         }
@@ -2296,7 +2330,7 @@
         })
         _wmcp.register({
             name: 'set_tikapp_editor_content',
-            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor, then immediately validate it against the current schema selection. Returns valid/errors so an agent can iterate until the YAML is valid.',
+            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor, then immediately validate it against the current schema selection. This call is only fully successful when ok=true and valid=true. If ok=false, read errors and call this tool again with corrected YAML.',
             annotations: { readOnlyHint: false, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
@@ -2323,14 +2357,25 @@
                     if (!info) return JSON.stringify({ error: 'Editor updated, but state could not be read back.' })
                     const validation = await validateYamlForTool(content, info.version, info.storeMode)
                     runValidation()
+                    const isValid = validation.error ? false : validation.valid === true
+                    const status = validation.error ? 'validation-unavailable' : isValid ? 'valid' : 'invalid'
                     plausible?.('WebMCP Editor Write', {
                         props: {
                             storeMode: info.storeMode ? 'store' : 'app',
                             dirtyExample: info.dirtyExample ? 'yes' : 'no',
+                            status,
                         },
                     })
                     return JSON.stringify({
-                        ok: true,
+                        ok: isValid,
+                        updated: true,
+                        status,
+                        message: validation.error
+                            ? `Editor updated, but validation could not run: ${validation.error}`
+                            : isValid
+                                ? 'Editor updated and YAML is valid.'
+                                : `Editor updated, but YAML is invalid with ${validation.errors.length} error${validation.errors.length === 1 ? '' : 's'}.`,
+                        errorCount: validation.error ? null : validation.errors.length,
                         characterCount: info.characterCount,
                         lineCount: info.lineCount,
                         version: info.version,
@@ -2341,6 +2386,72 @@
                         errors: validation.error ? [] : validation.errors,
                         schemaVersion: validation.schemaVersion || null,
                         validationError: validation.error || null,
+                    })
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
+        _wmcp.register({
+            name: 'get_routeros_app_yaml_schema_outline',
+            description: 'Get a concise outline of the RouterOS /app YAML schema for the current or requested version. Use this before writing a new /app from scratch or when validation reports unknown properties or a missing top-level services key.',
+            annotations: { readOnlyHint: true, untrustedContentHint: false },
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS version or schema alias like latest/editor (default: current page selection)',
+                    },
+                    storeMode: {
+                        type: 'boolean',
+                        description: 'Return the app-store-urls schema outline instead of the single /app schema (default: current page selection)',
+                    },
+                },
+            },
+            execute: async ({ version, storeMode }) => {
+                try {
+                    if (version !== undefined && typeof version !== 'string') {
+                        return JSON.stringify({ error: 'version must be a string when provided.' })
+                    }
+                    if (storeMode !== undefined && typeof storeMode !== 'boolean') {
+                        return JSON.stringify({ error: 'storeMode must be a boolean when provided.' })
+                    }
+                    const requestedVersion = version || (verSelect?.value || latestStableVer)
+                    const requestedStoreMode = storeMode === undefined ? useStoreSchema : storeMode
+                    if (!requestedVersion) return JSON.stringify({ error: 'No schema version available. Load the page first.' })
+
+                    if (!validateSingle || !validateStore || loadedSchemaVersion !== requestedVersion) {
+                        await loadSchemas(requestedVersion)
+                    }
+
+                    const schema = requestedStoreMode ? _storeSchemaObj : singleSchemaObj
+                    if (!schema) return JSON.stringify({ error: `Failed to load schema for version ${requestedVersion}` })
+
+                    const serviceSchema = schema?.properties?.services?.patternProperties
+                        ? Object.values(schema.properties.services.patternProperties)[0]
+                        : null
+
+                    return JSON.stringify({
+                        schemaVersion: requestedVersion,
+                        storeMode: requestedStoreMode,
+                        title: schema.title || '',
+                        description: schema.description || '',
+                        required: Array.isArray(schema.required) ? schema.required : [],
+                        additionalProperties: schema.additionalProperties !== false,
+                        topLevelProperties: summarizeSchemaProperties(schema.properties || {}, schema.required || []),
+                        serviceRequired: Array.isArray(serviceSchema?.required) ? serviceSchema.required : [],
+                        serviceProperties: summarizeSchemaProperties(serviceSchema?.properties || {}, serviceSchema?.required || []),
+                        writingHints: requestedStoreMode
+                            ? [
+                                'Store mode expects an array of /app documents, not a single app object.',
+                            ]
+                            : [
+                                'Single /app YAML is one object, not an apps map or array.',
+                                'The required top-level key is services.',
+                                'Inline file contents belong under top-level configs, then a service configs entry maps source to target.',
+                                'Per-service file placement uses configs or volumes, not files or mounts keys.',
+                            ],
                     })
                 } catch (e) {
                     return JSON.stringify({ error: e.message })
