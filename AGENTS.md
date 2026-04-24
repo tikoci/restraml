@@ -167,7 +167,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 ### Create a custom docs page (from a GitHub Issue)
 1. Read the issue for the desired feature/view.
 2. Create `docs/{custom-name}.html` following the web page conventions above.
-3. Include `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`) and `<script src="restraml-shared.js"></script>`. Call `initThemeSwitcher()` and optionally `initShareModal({...})`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns.
+3. Include `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`) and `<script src="restraml-shared.js"></script>`. Call `initThemeSwitcher()`. For sharing, use the inline "Copied!" button pattern — call `navigator.clipboard.writeText()` and swap button text; see `lookup.html`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns.
 4. Add the shared **Tools nav dropdown** to the new page (see `CLAUDE.md` → "Tools Nav Dropdown").
 5. Also add the new page to the dropdown list in `index.html`, `lookup.html`, and `diff.html`.
 6. Keep all JS in the single HTML file.

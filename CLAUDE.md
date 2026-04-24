@@ -479,14 +479,14 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
     `testing` (true), `extra` (true)
 - **Share button — two patterns exist**:
-  - **Preferred: inline "Copied!" button** (`lookup.html`, `tikapp.html`): A `<button>` that
+  - **Preferred: inline "Copied!" button** (`lookup.html`, `tikapp.html`, `diff.html`): A `<button>` that
     calls `writeQueryParams()`, copies the URL via `navigator.clipboard.writeText()`, and swaps
     its text to "✓ Copied!" for 1.8 seconds. No modal, no dialog. Place it right-aligned on the
-    same line as the Results heading. New pages should use this pattern.
-  - **Legacy: `<dialog>` modal** (`diff.html`): A "Share" link opens a `<dialog class="share-modal">`
-    with URL input and "Copy to clipboard" button, wired via `initShareModal()` from
-    `restraml-shared.js`. Styling in `restraml-shared.css`. This pattern still works but new
-    pages should prefer the inline button.
+    same line as the Results heading. All pages use this pattern.
+  - **Legacy: `<dialog>` modal (`initShareModal`)**: `restraml-shared.js` exports `initShareModal()`
+    wiring a `<dialog class="share-modal">` with URL input and "Copy to clipboard" button.
+    No page currently uses it — all have migrated to the inline button. Styling in `restraml-shared.css`.
+    Kept in the shared library for potential future use; new pages should prefer the inline button.
 
 ### docs/index.html — Architecture Reference
 
@@ -536,8 +536,8 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
   before any page-specific `<style>` block. This provides fonts, logo swap, theme switcher,
   page-guide, share-modal, and utility classes — no need to duplicate these in page styles.
 - Include `<script src="restraml-shared.js"></script>` before page-specific scripts. Call
-  `initThemeSwitcher()`. For sharing, prefer the inline "Copied!" button pattern (see Share
-  button section above); `initShareModal({...})` is still available as a legacy option. Use
+  `initThemeSwitcher()`. For sharing, use the inline "Copied!" button pattern (see Share
+  button section above). Use
   `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities.
 - Keep JavaScript in the single `.html` file (no separate `.js` files unless there is a very
   strong reason for separation).

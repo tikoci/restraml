@@ -5,7 +5,7 @@
 // Page-specific logic stays inline in each HTML file.
 // When adding a new docs/*.html page, include this via:
 //   <script src="restraml-shared.js"></script>
-// Then call initThemeSwitcher() and optionally initShareModal({...}).
+// Then call initThemeSwitcher() and use the public API exported at the bottom.
 //
 // When modifying shared behavior, change THIS file — not inline copies.
 // If you find duplicated logic inline in an HTML file, extract it here.
@@ -574,38 +574,6 @@ function escapeHtml(str) {
 }
 
 
-// --- GitHub repos dropdown -------------------------------------------
-// Lazily populates a <ul> with the most recently active tikoci repos.
-// Synced with tikoci.github.io shared.js.
-
-/**
- * Fetch repos with 3+ stars and populate a dropdown list, sorted by stars.
- * Falls back gracefully to the static link if the API is unavailable.
- *
- * @param {string} listId - ID of the <ul> element to populate
- */
-function initGitHubDropdown(listId) {
-    const el = document.getElementById(listId)
-    if (!el || el.dataset.loaded) return
-    el.dataset.loaded = '1'
-    const allUrl = `https://github.com/orgs/${RESTRAML.owner}/repositories`
-    fetch(`https://api.github.com/search/repositories?q=org:${RESTRAML.owner}+stars:>=3&sort=stars&order=desc&per_page=30`)
-        .then(r => {
-            if (!r.ok) throw new Error(r.status)
-            return r.json()
-        })
-        .then(data => {
-            const repos = data.items
-            if (!Array.isArray(repos)) return
-            el.innerHTML = repos.map(r =>
-                `<li><a href="${escapeHtml(r.html_url)}" target="_blank" rel="noopener">${escapeHtml(r.name)}</a></li>`
-            ).join('') +
-            `<li><a href="${allUrl}" target="_blank" rel="noopener"><strong>All repositories &rarr;</strong></a></li>`
-        })
-        .catch(() => { /* keep static fallback */ })
-}
-
-
 // --- WebMCP: expose structured tools to AI agents --------------------
 // Progressive enhancement — only registers tools when the browser
 // supports navigator.modelContext (Chrome 146+ with flag enabled).
@@ -684,3 +652,27 @@ function registerWebMCPTools(sharedRegisterOptions = {}) {
         },
     }
 }
+
+
+// --- Public API -------------------------------------------------------
+// All functions called by HTML pages that include this file via
+// <script src="restraml-shared.js"> are listed here. Explicit window
+// assignment makes the public API visible to static analysis tools
+// (Biome, CodeQL) that analyze this file without seeing HTML consumers.
+Object.assign(window, {
+    RESTRAML,
+    parseVersion,
+    compareVersions,
+    isPreRelease,
+    rebuildSelect,
+    fetchVersionList,
+    initThemeSwitcher,
+    renderChangelogEntryHtml,
+    parseChangelogSections,
+    renderChangelogContent,
+    initChangelogModal,
+    initShareModal,
+    escapeHtml,
+    webMCPAvailable,
+    registerWebMCPTools,
+})

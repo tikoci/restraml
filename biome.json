@@ -39,16 +39,6 @@
     },
     "overrides": [
         {
-            "includes": ["docs/restraml-shared.js"],
-            "linter": {
-                "rules": {
-                    "correctness": {
-                        "noUnusedVariables": "off"
-                    }
-                }
-            }
-        },
-        {
             "includes": ["docs/*.html"],
             "linter": {
                 "rules": {
