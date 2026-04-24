@@ -354,7 +354,7 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 | `diff_routeros_versions` | `diff.html` | Compare two versions — delta stats + added/removed paths |
 | `get_routeros_changelog` | `index.html` | Fetch & parse MikroTik CHANGELOG into structured entries |
 | `get_tikapp_editor_content` | `tikapp.html` | Read the current Monaco editor buffer and metadata |
-| `set_tikapp_editor_content` | `tikapp.html` | Replace the current Monaco editor buffer |
+| `set_tikapp_editor_content` | `tikapp.html` | Replace the current Monaco editor buffer and return validation results |
 | `validate_routeros_app_yaml` | `tikapp.html` | Validate /app YAML against JSON Schema |
 | `list_builtin_apps` | `tikapp.html` | List built-in /app container applications |
 | `get_openapi_schema_url` | `openapi.html` | Get OpenAPI 3.0 schema download URL + availability |

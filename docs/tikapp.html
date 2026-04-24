@@ -1464,6 +1464,44 @@
             return lastFoundLine !== null ? lastFoundLine + 1 : null
         }
 
+        async function validateYamlForTool(yamlContent, version, storeMode = false) {
+            const ver = version || latestStableVer
+            if (!ver) return { error: 'No schema version available. Load the page first.' }
+
+            if (!validateSingle || !validateStore || loadedSchemaVersion !== ver) {
+                await loadSchemas(ver)
+            }
+            const fn = storeMode === true ? validateStore : validateSingle
+            if (!fn) return { error: `Failed to load schema for version ${ver}` }
+
+            let parsed
+            try {
+                parsed = jsyaml.load(yamlContent)
+            } catch (e) {
+                const mark = e.mark || {}
+                return {
+                    valid: false,
+                    errors: [{
+                        path: '',
+                        message: `YAML syntax error: ${e.reason || e.message}`,
+                        line: (mark.line || 0) + 1,
+                    }],
+                    schemaVersion: ver,
+                }
+            }
+
+            fn(parsed)
+            const errors = fn.errors
+                ? fn.errors.map(err => ({
+                    path: err.dataPath || err.instancePath || '',
+                    message: err.message,
+                    line: findLineForPath(yamlContent, err.dataPath || err.instancePath || ''),
+                }))
+                : []
+
+            return { valid: !errors.length, errors, schemaVersion: ver }
+        }
+
         function runValidation() {
             if (!editor || !monacoReady) return
             const content = editor.getValue()
@@ -2258,7 +2296,7 @@
         })
         _wmcp.register({
             name: 'set_tikapp_editor_content',
-            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor. Pass the complete YAML text you want to leave in the editor for the user.',
+            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor, then immediately validate it against the current schema selection. Returns valid/errors so an agent can iterate until the YAML is valid.',
             annotations: { readOnlyHint: false, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
@@ -2283,6 +2321,8 @@
                     }
                     const info = getEditorBufferInfo()
                     if (!info) return JSON.stringify({ error: 'Editor updated, but state could not be read back.' })
+                    const validation = await validateYamlForTool(content, info.version, info.storeMode)
+                    runValidation()
                     plausible?.('WebMCP Editor Write', {
                         props: {
                             storeMode: info.storeMode ? 'store' : 'app',
@@ -2297,6 +2337,10 @@
                         storeMode: info.storeMode,
                         currentExample: info.currentExample,
                         dirtyExample: info.dirtyExample,
+                        valid: validation.error ? null : validation.valid,
+                        errors: validation.error ? [] : validation.errors,
+                        schemaVersion: validation.schemaVersion || null,
+                        validationError: validation.error || null,
                     })
                 } catch (e) {
                     return JSON.stringify({ error: e.message })
@@ -2336,39 +2380,7 @@
                     if (storeMode !== undefined && typeof storeMode !== 'boolean') {
                         return JSON.stringify({ error: 'storeMode must be a boolean when provided.' })
                     }
-                    const ver = version || latestStableVer
-                    if (!ver) return JSON.stringify({ error: 'No schema version available. Load the page first.' })
-
-                    // Ensure schemas are loaded for the requested version, not
-                    // just whichever version the page most recently compiled.
-                    if (!validateSingle || !validateStore || loadedSchemaVersion !== ver) {
-                        await loadSchemas(ver)
-                    }
-                    const fn = storeMode === true ? validateStore : validateSingle
-                    if (!fn) return JSON.stringify({ error: `Failed to load schema for version ${ver}` })
-
-                    let parsed
-                    try {
-                        parsed = jsyaml.load(yamlContent)
-                    } catch (e) {
-                        const mark = e.mark || {}
-                        return JSON.stringify({
-                            valid: false,
-                            errors: [{ path: '', message: `YAML syntax error: ${e.reason || e.message}`, line: (mark.line || 0) + 1 }],
-                            schemaVersion: ver,
-                        })
-                    }
-
-                    fn(parsed)
-                    const errors = fn.errors
-                        ? fn.errors.map(err => ({
-                            path: err.dataPath || err.instancePath || '',
-                            message: err.message,
-                            line: findLineForPath(yamlContent, err.dataPath || err.instancePath || ''),
-                        }))
-                        : []
-
-                    return JSON.stringify({ valid: !errors.length, errors, schemaVersion: ver })
+                    return JSON.stringify(await validateYamlForTool(yamlContent, version, storeMode))
                 } catch (e) {
                     return JSON.stringify({ error: e.message })
                 }
