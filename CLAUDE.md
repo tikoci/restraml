@@ -341,7 +341,9 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 
 - `webMCPAvailable()` — returns `true` if `navigator.modelContext.registerTool` exists
 - `registerWebMCPTools()` — registers the shared `list_routeros_versions` tool, returns
-  `{ register(toolDef) }` helper for page-specific tools. Called once per page.
+  `{ register(toolDef, registerOptions) }` helper for page-specific tools. The helper forwards
+  the native `registerTool()` options bag (for example `{ signal }`) so pages can dynamically
+  unregister tools with `AbortController`. Called once per page.
 
 ### Registered Tools by Page
 
@@ -364,6 +366,8 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 - Large data is summarized (diff returns stats + capped path lists, not full unified patch)
 - Version parameters default to latest stable when omitted
 - `list_routeros_versions` should be called first to discover valid version strings
+- Validate strictly in code even when `inputSchema` already constrains the type — schemas help
+  the agent, but runtime checks and descriptive errors are what let the agent recover and retry
 - **All tools include `annotations: { readOnlyHint, untrustedContentHint }`** — see next section
 
 ### Tool Annotations — `readOnlyHint` and `untrustedContentHint`
@@ -406,10 +410,22 @@ When **adding** or **modifying** a WebMCP tool, decide the hint based on this ru
 
 The WebMCP spec (Mar 27, 2026 update) removed `unregisterTool()` in favor of an `AbortSignal`
 passed via the second arg: `navigator.modelContext.registerTool(tool, { signal: ctrl.signal })`,
-then `ctrl.abort()` to remove. We currently register all tools once at page load and never
-unregister, so `registerWebMCPTools()` does not expose the signal option. If a future page
-needs page-state-dependent tools (e.g. only register `submit_app` after the YAML is valid),
-extend the shared helper to accept and forward an `AbortSignal`.
+then `ctrl.abort()` to remove. `registerWebMCPTools()` now forwards the native options bag for
+both the shared tool and page-specific tools, so pages can opt into state-driven lifecycle
+management without bypassing the helper. We currently register all tools once at page load,
+but for future page-state-dependent tools (for example only exposing `submit_app` after the
+YAML is valid), create an `AbortController`, pass `{ signal: ctrl.signal }`, and abort when
+the tool no longer makes sense for the current UI state.
+
+### Testing with the Tool Inspector
+
+The WebMCP early preview expects developers to test tools directly, not only through an LLM:
+
+1. Enable Chrome 146+ flag `chrome://flags/#enable-webmcp-testing`
+2. Install the **Model Context Tool Inspector** extension
+3. Use the extension to confirm the tool list, descriptions, and JSON schemas exposed by the page
+4. Manually execute each tool with representative arguments before relying on agent-driven tests
+5. Prefer fixing descriptions and runtime error messages when the agent picks the wrong tool or retries poorly
 
 
 ---

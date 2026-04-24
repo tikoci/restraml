@@ -630,11 +630,16 @@ function webMCPAvailable() {
  *
  * Call once per page after DOMContentLoaded, e.g.:
  *   const wmcp = registerWebMCPTools()
- *   wmcp.register({ name: 'my_tool', ... })
+ *   wmcp.register({ name: 'my_tool', ... }, { signal: ctrl.signal })
  *
- * @returns {{ register: function(toolDef: object): void }}
+ * Both the shared tool and page-specific registrations accept the native
+ * registerTool() options bag (for example { signal }) so pages can
+ * dynamically register/unregister tools as UI state changes.
+ *
+ * @param {object} [sharedRegisterOptions]
+ * @returns {{ register: function(toolDef: object, registerOptions?: object): void }}
  */
-function registerWebMCPTools() {
+function registerWebMCPTools(sharedRegisterOptions = {}) {
     const noop = { register() {} }
     if (!webMCPAvailable()) return noop
 
@@ -669,12 +674,12 @@ function registerWebMCPTools() {
                 return JSON.stringify({ error: e.message })
             }
         },
-    })
+    }, sharedRegisterOptions)
 
     return {
-        register(toolDef) {
+        register(toolDef, registerOptions = {}) {
             if (webMCPAvailable()) {
-                navigator.modelContext.registerTool(toolDef)
+                navigator.modelContext.registerTool(toolDef, registerOptions)
             }
         },
     }

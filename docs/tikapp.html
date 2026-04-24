@@ -401,6 +401,7 @@
         let filteredApps = []
         let useStoreSchema = false
         let latestStableVer = null
+        let loadedSchemaVersion = null
         let schemaVersions = []
         let validationErrors = []
         let suppressChangeEvent = false
@@ -1240,11 +1241,13 @@
                 ajvInst.addSchema(schema, schema.$id || schemaUrl)
                 validateSingle = ajvInst.compile(schema)
                 validateStore = ajvInst.compile(storeSchema)
+                loadedSchemaVersion = version
                 registerYamlCompletions()
             } catch (e) {
                 showError(`Failed to load schema for ${version}: ${e.message}`)
                 validateSingle = null; validateStore = null
                 singleSchemaObj = null; _storeSchemaObj = null
+                loadedSchemaVersion = null
             }
         }
 
@@ -2269,6 +2272,9 @@
             },
             execute: async ({ content }) => {
                 try {
+                    if (typeof content !== 'string') {
+                        return JSON.stringify({ error: 'content must be a string containing the full YAML buffer.' })
+                    }
                     if (!editor || !monacoReady) {
                         return JSON.stringify({ error: 'Editor not ready yet. Wait for Monaco to finish loading.' })
                     }
@@ -2321,14 +2327,24 @@
             },
             execute: async ({ yaml: yamlContent, version, storeMode }) => {
                 try {
+                    if (typeof yamlContent !== 'string') {
+                        return JSON.stringify({ error: 'yaml must be a string containing RouterOS /app YAML.' })
+                    }
+                    if (version !== undefined && typeof version !== 'string') {
+                        return JSON.stringify({ error: 'version must be a string when provided.' })
+                    }
+                    if (storeMode !== undefined && typeof storeMode !== 'boolean') {
+                        return JSON.stringify({ error: 'storeMode must be a boolean when provided.' })
+                    }
                     const ver = version || latestStableVer
                     if (!ver) return JSON.stringify({ error: 'No schema version available. Load the page first.' })
 
-                    // Ensure schemas are loaded for the requested version
-                    if (!validateSingle || !validateStore) {
+                    // Ensure schemas are loaded for the requested version, not
+                    // just whichever version the page most recently compiled.
+                    if (!validateSingle || !validateStore || loadedSchemaVersion !== ver) {
                         await loadSchemas(ver)
                     }
-                    const fn = storeMode ? validateStore : validateSingle
+                    const fn = storeMode === true ? validateStore : validateSingle
                     if (!fn) return JSON.stringify({ error: `Failed to load schema for version ${ver}` })
 
                     let parsed
