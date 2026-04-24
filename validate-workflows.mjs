@@ -34,11 +34,12 @@ function shouldSuppressRunnerLabelError(err) {
 	}
 
 	for (const label of allowedRunnerLabels) {
-		const normalizedLabel = label.toLowerCase();
-		if (
-			message.includes(normalizedLabel) &&
-			(message.includes("label") || message.includes("runner"))
-		) {
+		// Match the label surrounded by quotes to avoid false positives from prefix
+		// matches (e.g. allowed "ubuntu-24.04-arm" must not suppress an error about
+		// the unknown label "ubuntu-24.04-arm64").
+		const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const quotedLabelPattern = new RegExp(`"${escapedLabel}"`, "i");
+		if (quotedLabelPattern.test(message)) {
 			return true;
 		}
 	}

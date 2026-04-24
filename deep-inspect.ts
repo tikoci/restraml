@@ -1093,10 +1093,15 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
   }
 
   const requestTimeoutRaw = values["request-timeout"];
-  const requestTimeoutParsed =
-    requestTimeoutRaw !== undefined ? parseInt(requestTimeoutRaw, 10) : undefined;
-  if (requestTimeoutRaw !== undefined && Number.isNaN(requestTimeoutParsed)) {
-    throw new Error(`--request-timeout must be a valid integer; got "${requestTimeoutRaw}"`);
+  if (requestTimeoutRaw !== undefined && !/^\d+$/.test(requestTimeoutRaw)) {
+    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
+  }
+  const requestTimeoutParsed = requestTimeoutRaw !== undefined ? Number(requestTimeoutRaw) : undefined;
+  if (
+    requestTimeoutRaw !== undefined &&
+    (!Number.isInteger(requestTimeoutParsed) || (requestTimeoutParsed as number) < 1)
+  ) {
+    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
   }
 
   const [, , ...pathArgs] = positionals;
