@@ -33,7 +33,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Configure git for automated commits
       run: |
@@ -198,7 +198,7 @@ jobs:
       # Only triggered when exit code 2 (/app YAML validation failures found).
       # Lists each failing built-in app so developers know which apps expose schema gaps.
       if: steps.validate.outputs.exit_code == '2'
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
@@ -309,7 +309,7 @@ jobs:
         fi
 
     - name: Save validation artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: app-yaml-schema-results-${{ github.event.inputs.rosver }}

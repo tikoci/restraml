@@ -45,7 +45,7 @@ jobs:
       skipped_versions: ${{ steps.needs-builds.outputs.skipped_versions }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get RouterOS "stable" channel version
         id: get-stable
@@ -252,7 +252,7 @@ jobs:
     name: "Trigger base build: ${{ matrix.version }}"
     steps:
       - name: Dispatch base schema build for ${{ matrix.version }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -285,7 +285,7 @@ jobs:
     name: "Trigger extra-packages build: ${{ matrix.version }}"
     steps:
       - name: Dispatch extra-packages schema build for ${{ matrix.version }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -317,7 +317,7 @@ jobs:
     name: "Trigger /app YAML schema build: ${{ matrix.version }}"
     steps:
       - name: Dispatch /app YAML schema build for ${{ matrix.version }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -350,7 +350,7 @@ jobs:
     name: "Trigger deep-inspect build: ${{ matrix.version }}"
     steps:
       - name: Dispatch deep-inspect multi-arch build for ${{ matrix.version }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
