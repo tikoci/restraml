@@ -19,7 +19,9 @@ on:
         required: true
         default: "7.22"
 
-permissions: write-all
+permissions:
+  contents: write
+  issues: write
 
 jobs:
   validate-app-yaml-schemas:

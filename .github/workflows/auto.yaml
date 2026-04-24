@@ -31,12 +31,12 @@ on:
   schedule:
     - cron: "0 4 * * *"
 
-permissions: write-all
-
 jobs:
   check:
     runs-on: ubuntu-latest
     name: Check for New RouterOS Versions
+    permissions:
+      contents: read
     outputs:
       base_versions: ${{ steps.needs-builds.outputs.base_versions }}
       extra_versions: ${{ steps.needs-builds.outputs.extra_versions }}
@@ -241,6 +241,9 @@ jobs:
   build-base:
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     if: ${{ fromJSON(needs.check.outputs.base_versions)[0] != null }}
     strategy:
       matrix:
@@ -268,6 +271,9 @@ jobs:
   build-extra:
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     # Runs independently of build-base — checks its own list of versions missing
     # docs/{version}/extra/schema.raml. This means a failed extra build can be
     # retried by re-running auto.yaml without re-running the base build.
@@ -298,6 +304,9 @@ jobs:
   build-app-yaml-schemas:
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     # Runs independently — checks its own list of versions missing
     # docs/{version}/routeros-app-yaml-schema.json.
     if: ${{ fromJSON(needs.check.outputs.app_schema_versions)[0] != null }}
@@ -327,6 +336,9 @@ jobs:
   build-deep-inspect:
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     # Runs independently — checks its own list of versions missing
     # docs/{version}/extra/deep-inspect.x86.json, deep-inspect.arm64.json,
     # or diff-deep-inspect.json.

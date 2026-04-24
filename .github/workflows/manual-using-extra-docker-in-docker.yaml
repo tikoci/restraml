@@ -11,6 +11,9 @@ on:
         description: 'Starting path (space separated, leave empty for full schema)'
         required: false
 
+permissions:
+  contents: write
+
 jobs:
   job-using-extra-docker-in-docker:
     runs-on: ubuntu-latest
