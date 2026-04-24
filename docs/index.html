@@ -707,6 +707,7 @@
         _wmcp.register({
             name: 'get_routeros_changelog',
             description: 'Fetch and parse RouterOS release notes (CHANGELOG) for a version. Returns structured entries with subsystem, description, and importance flag. Optionally filter by keyword.',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
                 properties: {

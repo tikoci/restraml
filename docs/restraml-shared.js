@@ -639,9 +639,13 @@ function registerWebMCPTools() {
     if (!webMCPAvailable()) return noop
 
     // Shared tool: list_routeros_versions
+    // annotations: read-only (no state change) and untrusted content
+    // (version list is derived from GitHub repo contents, which we don't
+    // author — agent should treat strings as data, not instructions).
     navigator.modelContext.registerTool({
         name: 'list_routeros_versions',
         description: 'List all published RouterOS schema versions with metadata. Call this first to discover available versions before using other tools.',
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
         inputSchema: {
             type: 'object',
             properties: {

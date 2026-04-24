@@ -785,6 +785,7 @@
         _wmcp.register({
             name: 'lookup_routeros_command',
             description: 'Look up a RouterOS CLI command or attribute in the inspect schema. Returns whether the path exists, its type (dir/cmd/arg), and child commands or attributes. Use list_routeros_versions first to find available versions.',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
                 properties: {

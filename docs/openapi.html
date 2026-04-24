@@ -687,6 +687,7 @@
         _wmcp.register({
             name: 'get_openapi_schema_url',
             description: 'Get the download URL for a RouterOS OpenAPI 3.0 schema. Available for versions 7.22.1 and newer. Returns the URL and availability status.',
+            annotations: { readOnlyHint: true, untrustedContentHint: false },
             inputSchema: {
                 type: 'object',
                 properties: {

@@ -550,6 +550,31 @@
             editor.setValue(value)
             suppressChangeEvent = false
         }
+        function getEditorBufferInfo() {
+            if (!editor) return null
+            const model = editor.getModel()
+            const content = editor.getValue()
+            return {
+                content,
+                characterCount: content.length,
+                lineCount: model ? model.getLineCount() : 0,
+                version: verSelect.value || '',
+                storeMode: useStoreSchema,
+                currentExample: currentExampleName,
+                dirtyExample: isDirty(),
+            }
+        }
+        function replaceEditorBuffer(value, source = 'programmatic', resumeDelay = 1200) {
+            if (!editor) return false
+            if (editor.getValue() === value) return true
+            const model = editor.getModel()
+            if (!model) return false
+            pauseAutoSuggest(resumeDelay)
+            editor.pushUndoStop()
+            editor.executeEdits(source, [{ range: model.getFullModelRange(), text: value }])
+            editor.pushUndoStop()
+            return true
+        }
 
         // --- Monaco theme sync -------------------------------------------
         function getMonacoTheme() {
@@ -2205,11 +2230,77 @@
 
         initMonaco()
 
-        // --- WebMCP: validate_routeros_app_yaml + list_builtin_apps ---
+        // --- WebMCP: tikapp editor + validation + built-in apps -----------
         const _wmcp = registerWebMCPTools()
+        _wmcp.register({
+            name: 'get_tikapp_editor_content',
+            description: 'Read the current Monaco editor buffer from the RouterOS /app YAML editor. Returns the full YAML text plus basic editor metadata so an agent can inspect or transform the user draft.',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
+            inputSchema: {
+                type: 'object',
+                properties: {},
+            },
+            execute: async () => {
+                try {
+                    const info = getEditorBufferInfo()
+                    if (!info) return JSON.stringify({ error: 'Editor not ready yet. Wait for Monaco to finish loading.' })
+                    plausible?.('WebMCP Editor Read', {
+                        props: { storeMode: info.storeMode ? 'store' : 'app' },
+                    })
+                    return JSON.stringify(info)
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
+        _wmcp.register({
+            name: 'set_tikapp_editor_content',
+            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor. Pass the complete YAML text you want to leave in the editor for the user.',
+            annotations: { readOnlyHint: false, untrustedContentHint: true },
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    content: {
+                        type: 'string',
+                        description: 'The complete YAML text that should replace the current editor buffer',
+                    },
+                },
+                required: ['content'],
+            },
+            execute: async ({ content }) => {
+                try {
+                    if (!editor || !monacoReady) {
+                        return JSON.stringify({ error: 'Editor not ready yet. Wait for Monaco to finish loading.' })
+                    }
+                    if (!replaceEditorBuffer(content, 'webmcp')) {
+                        return JSON.stringify({ error: 'Failed to update editor buffer.' })
+                    }
+                    const info = getEditorBufferInfo()
+                    if (!info) return JSON.stringify({ error: 'Editor updated, but state could not be read back.' })
+                    plausible?.('WebMCP Editor Write', {
+                        props: {
+                            storeMode: info.storeMode ? 'store' : 'app',
+                            dirtyExample: info.dirtyExample ? 'yes' : 'no',
+                        },
+                    })
+                    return JSON.stringify({
+                        ok: true,
+                        characterCount: info.characterCount,
+                        lineCount: info.lineCount,
+                        version: info.version,
+                        storeMode: info.storeMode,
+                        currentExample: info.currentExample,
+                        dirtyExample: info.dirtyExample,
+                    })
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
         _wmcp.register({
             name: 'validate_routeros_app_yaml',
             description: 'Validate a RouterOS /app YAML string against the JSON Schema. Returns validation result with errors and line numbers. The YAML format is RouterOS-specific (docker-compose-like but not identical).',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -2270,6 +2361,7 @@
         _wmcp.register({
             name: 'list_builtin_apps',
             description: 'List built-in RouterOS /app container applications for a version. Returns app names, categories, and descriptions.',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
                 properties: {

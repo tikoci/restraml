@@ -1180,6 +1180,7 @@
         _wmcp.register({
             name: 'diff_routeros_versions',
             description: 'Compare two RouterOS versions and return a structured summary of added/removed commands and attributes. Returns delta statistics and lists of changed paths (capped at 200). Use list_routeros_versions first to find available versions.',
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
                 properties: {

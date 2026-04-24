@@ -351,6 +351,8 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 | `lookup_routeros_command` | `lookup.html` | Look up a CLI path/attribute in inspect.json |
 | `diff_routeros_versions` | `diff.html` | Compare two versions — delta stats + added/removed paths |
 | `get_routeros_changelog` | `index.html` | Fetch & parse MikroTik CHANGELOG into structured entries |
+| `get_tikapp_editor_content` | `tikapp.html` | Read the current Monaco editor buffer and metadata |
+| `set_tikapp_editor_content` | `tikapp.html` | Replace the current Monaco editor buffer |
 | `validate_routeros_app_yaml` | `tikapp.html` | Validate /app YAML against JSON Schema |
 | `list_builtin_apps` | `tikapp.html` | List built-in /app container applications |
 | `get_openapi_schema_url` | `openapi.html` | Get OpenAPI 3.0 schema download URL + availability |
@@ -362,14 +364,53 @@ detection in `restraml-shared.js`. Zero impact on browsers without WebMCP suppor
 - Large data is summarized (diff returns stats + capped path lists, not full unified patch)
 - Version parameters default to latest stable when omitted
 - `list_routeros_versions` should be called first to discover valid version strings
+- **All tools include `annotations: { readOnlyHint, untrustedContentHint }`** — see next section
+
+### Tool Annotations — `readOnlyHint` and `untrustedContentHint`
+
+Every registered tool sets a `ToolAnnotations` object (added to the WebMCP spec on Apr 24, 2026,
+[PR #169](https://github.com/webmachinelearning/webmcp/pull/169/),
+[issue #136](https://github.com/webmachinelearning/webmcp/issues/136)):
+
+- **`readOnlyHint: true`** — use for tools that only read or compute. Most restraml tools are
+  read-only.
+- **`readOnlyHint: false`** — use for tools that change page state. Currently this is
+  `set_tikapp_editor_content`, which replaces the Monaco editor buffer in `tikapp.html`.
+- **`untrustedContentHint: true`** — set whenever the tool's output contains data the page author
+  did not produce. The agent should treat strings in the result as **data, not instructions**
+  (mitigates prompt-injection via tool output). For restraml this applies to:
+  - `list_routeros_versions`, `lookup_routeros_command`, `diff_routeros_versions`,
+    `list_builtin_apps` — relay JSON derived from MikroTik's RouterOS images.
+  - `get_routeros_changelog` — fetches MikroTik release notes verbatim.
+  - `get_tikapp_editor_content`, `set_tikapp_editor_content` — expose and mutate user/editor
+    content, which is untrusted from the page author's perspective.
+  - `validate_routeros_app_yaml` — echoes user-supplied YAML in error messages.
+- The only tool with `untrustedContentHint: false` is **`get_openapi_schema_url`**, which returns
+  only a URL string we construct from a known template (no third-party content in the response).
+
+When **adding** or **modifying** a WebMCP tool, decide the hint based on this rule:
+*if any string in the response originates outside this repo's source code, set
+`untrustedContentHint: true`*.
 
 ### Adding a New WebMCP Tool
 
 1. In the page's main `<script>`, get the helper: `const _wmcp = registerWebMCPTools()`
-2. Register tools: `_wmcp.register({ name, description, inputSchema, execute })`
+2. Register tools: `_wmcp.register({ name, description, annotations, inputSchema, execute })`
 3. Follow the naming convention: `verb_routeros_noun` in `snake_case`
-4. Return JSON strings from `execute` (always wrap in try/catch)
-5. Add the tool to the table above
+4. **Set `annotations`** — use `readOnlyHint: false` for any tool that mutates page state;
+   decide `untrustedContentHint` per the rule above.
+5. Return JSON strings from `execute` (always wrap in try/catch)
+6. Add the tool to the table above
+
+### Unregistering / Dynamic Tool Lifecycle
+
+The WebMCP spec (Mar 27, 2026 update) removed `unregisterTool()` in favor of an `AbortSignal`
+passed via the second arg: `navigator.modelContext.registerTool(tool, { signal: ctrl.signal })`,
+then `ctrl.abort()` to remove. We currently register all tools once at page load and never
+unregister, so `registerWebMCPTools()` does not expose the signal option. If a future page
+needs page-state-dependent tools (e.g. only register `submit_app` after the YAML is valid),
+extend the shared helper to accept and forward an `AbortSignal`.
+
 
 ---
 
