@@ -229,5 +229,11 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `docs/restraml-shared.js` | Shared JS utilities for all tool pages (version parsing, theme, share modal) |
 | `docs/restraml-shared.css` | Shared CSS for all tool pages (fonts, logo, theme, guide, modal, utilities) |
+| `.github/workflows/codeql.yml` | Repository-managed CodeQL analysis for JavaScript/TypeScript and GitHub Actions |
+| `.github/workflows/dependency-review.yml` | Pull request dependency review using GitHub's dependency review action |
+| `.github/dependabot.yml` | Dependabot updates for GitHub Actions and package manifests |
+| `.github/codeql/codeql-config.yml` | CodeQL path configuration; excludes generated versioned docs artifacts from scans |
+| `.github/actionlint.yaml` | actionlint runner-label configuration for `ubuntu-24.04-arm` |
+| `SECURITY.md` | GitHub security policy / private vulnerability reporting guidance |
 | `CLAUDE.md` | Full architecture guide for AI agents |
 | `AGENTS.md` | This file — Copilot agent-specific instructions |

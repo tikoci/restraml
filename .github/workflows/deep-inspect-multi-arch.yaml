@@ -25,6 +25,8 @@ jobs:
     name: "x86: ${{ inputs.rosver }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -227,6 +229,8 @@ jobs:
     name: "arm64: ${{ inputs.rosver }}"
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
+    permissions:
+      contents: read
     env:
       URLBASE: http://localhost:9180/rest
       BASICAUTH: "admin:"
@@ -478,6 +482,8 @@ jobs:
     needs: [deep-inspect-x86, deep-inspect-arm64]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

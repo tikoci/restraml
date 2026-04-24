@@ -877,6 +877,8 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
 | `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (TCG) CHRs with extra packages in parallel, runs live deep-inspect crawl on each, diffs results, publishes `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/` |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
+| `codeql.yml` | Push + PR + weekly schedule | Runs repository-managed CodeQL for JavaScript/TypeScript and GitHub Actions, using repo path ignores for generated versioned docs artifacts |
+| `dependency-review.yml` | Pull requests | Uses GitHub dependency review to block new high-severity vulnerable dependency changes |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
@@ -1068,5 +1070,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
 | `qemu-utils` | CI workflows (apt) | Provides `qemu-img` for VDI→qcow2 disk conversion |
 | `qemu-system-x86_64` | `Dockerfile.chr-qemu` (Alpine apk) | Runs RouterOS CHR VM in local Docker |
 | `qemu-img` | `Dockerfile.chr-qemu` (Alpine apk) | Provides `qemu-img` for VDI→qcow2 conversion |
+| `github/codeql-action` | `codeql.yml` | GitHub code scanning for JavaScript/TypeScript and Actions |
+| `actions/dependency-review-action` | `dependency-review.yml` | GitHub dependency review on pull requests |
 | `restraml-shared.js` | `docs/*.html` pages | Shared JS: version parsing, theme switcher, share modal, GitHub API fetch |
 | `restraml-shared.css` | `docs/*.html` pages | Shared CSS: fonts, logo swap, theme icon, page-guide, share-modal, utility classes |

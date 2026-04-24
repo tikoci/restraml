@@ -1,0 +1,9 @@
+name: restraml CodeQL configuration
+
+paths:
+  - .
+
+paths-ignore:
+  # Versioned docs content is generated output. Keep scanning the maintained
+  # top-level docs/*.html pages while skipping published snapshots.
+  - docs/*/**
