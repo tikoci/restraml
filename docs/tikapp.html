@@ -2330,7 +2330,7 @@
         })
         _wmcp.register({
             name: 'set_tikapp_editor_content',
-            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor, then immediately validate it against the current schema selection. This call is only fully successful when ok=true and valid=true. If ok=false, read errors and call this tool again with corrected YAML.',
+            description: 'Replace the full Monaco editor buffer in the RouterOS /app YAML editor, then immediately validate it against the current schema selection. This call is only fully successful when ok=true and valid=true. If ok=false, read errors and call this tool again with corrected YAML. If the schema mode needs to change (single /app vs app-store-urls= array), call set_editor_mode first.',
             annotations: { readOnlyHint: false, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
@@ -2426,25 +2426,31 @@
                     }
 
                     const schema = requestedStoreMode ? _storeSchemaObj : singleSchemaObj
-                    if (!schema) return JSON.stringify({ error: `Failed to load schema for version ${requestedVersion}` })
+                    const itemSchemaObj = requestedStoreMode ? singleSchemaObj : null
+                    const effectiveSchema = itemSchemaObj || schema
+                    if (!schema || !effectiveSchema) return JSON.stringify({ error: `Failed to load schema for version ${requestedVersion}` })
 
-                    const serviceSchema = schema?.properties?.services?.patternProperties
-                        ? Object.values(schema.properties.services.patternProperties)[0]
+                    const serviceSchema = effectiveSchema?.properties?.services?.patternProperties
+                        ? Object.values(effectiveSchema.properties.services.patternProperties)[0]
                         : null
 
-                    return JSON.stringify({
+                    const result = {
                         schemaVersion: requestedVersion,
                         storeMode: requestedStoreMode,
+                        schemaType: summarizeSchemaType(schema) || (requestedStoreMode ? 'array' : 'object'),
                         title: schema.title || '',
                         description: schema.description || '',
-                        required: Array.isArray(schema.required) ? schema.required : [],
-                        additionalProperties: schema.additionalProperties !== false,
-                        topLevelProperties: summarizeSchemaProperties(schema.properties || {}, schema.required || []),
+                        required: Array.isArray(effectiveSchema.required) ? effectiveSchema.required : [],
+                        additionalProperties: effectiveSchema.additionalProperties !== false,
+                        topLevelProperties: summarizeSchemaProperties(effectiveSchema.properties || {}, effectiveSchema.required || []),
                         serviceRequired: Array.isArray(serviceSchema?.required) ? serviceSchema.required : [],
                         serviceProperties: summarizeSchemaProperties(serviceSchema?.properties || {}, serviceSchema?.required || []),
                         writingHints: requestedStoreMode
                             ? [
-                                'Store mode expects an array of /app documents, not a single app object.',
+                                'Store mode expects a YAML array — each element is a complete single /app object.',
+                                'Each array item has the same schema as a single /app YAML — see itemSchema below.',
+                                'The editor must be in app-store-urls= mode before calling set_tikapp_editor_content with array content. Call set_editor_mode({ storeMode: true }) first.',
+                                'Inline file contents belong under top-level configs within each array item.',
                             ]
                             : [
                                 'Single /app YAML is one object, not an apps map or array.',
@@ -2452,7 +2458,24 @@
                                 'Inline file contents belong under top-level configs, then a service configs entry maps source to target.',
                                 'Per-service file placement uses configs or volumes, not files or mounts keys.',
                             ],
-                    })
+                    }
+
+                    // For store mode, also include the per-item schema so the agent knows what each array element looks like
+                    if (requestedStoreMode && itemSchemaObj) {
+                        const itemSvcSchema = itemSchemaObj?.properties?.services?.patternProperties
+                            ? Object.values(itemSchemaObj.properties.services.patternProperties)[0]
+                            : null
+                        result.itemSchema = {
+                            schemaType: summarizeSchemaType(itemSchemaObj) || 'object',
+                            required: Array.isArray(itemSchemaObj.required) ? itemSchemaObj.required : [],
+                            additionalProperties: itemSchemaObj.additionalProperties !== false,
+                            topLevelProperties: summarizeSchemaProperties(itemSchemaObj.properties || {}, itemSchemaObj.required || []),
+                            serviceRequired: Array.isArray(itemSvcSchema?.required) ? itemSvcSchema.required : [],
+                            serviceProperties: summarizeSchemaProperties(itemSvcSchema?.properties || {}, itemSvcSchema?.required || []),
+                        }
+                    }
+
+                    return JSON.stringify(result)
                 } catch (e) {
                     return JSON.stringify({ error: e.message })
                 }
@@ -2520,6 +2543,84 @@
                         category: a.category || '',
                         descr: a.descr || '',
                     })))
+                } catch (e) {
+                    return JSON.stringify({ error: e.message })
+                }
+            },
+        })
+        _wmcp.register({
+            name: 'set_editor_mode',
+            description: 'Switch the editor schema mode (single /app vs app-store-urls= array) and/or change the schema version. Call this BEFORE set_tikapp_editor_content when converting between formats — set_tikapp_editor_content validates against whatever mode is currently active. The editor content is NOT modified by this call.',
+            annotations: { readOnlyHint: false, untrustedContentHint: false },
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    storeMode: {
+                        type: 'boolean',
+                        description: 'true = switch to app-store-urls= array schema; false = switch to single /app schema.',
+                    },
+                    version: {
+                        type: 'string',
+                        description: 'RouterOS schema version to activate (e.g. "7.22.1" or "latest"). Default: keep current.',
+                    },
+                },
+            },
+            execute: async ({ storeMode, version }) => {
+                try {
+                    if (storeMode !== undefined && typeof storeMode !== 'boolean') {
+                        return JSON.stringify({ error: 'storeMode must be a boolean when provided.' })
+                    }
+                    if (version !== undefined && typeof version !== 'string') {
+                        return JSON.stringify({ error: 'version must be a string when provided.' })
+                    }
+                    if (storeMode === undefined && version === undefined) {
+                        const info = getEditorBufferInfo()
+                        return JSON.stringify({ ok: true, changed: false, storeMode: useStoreSchema, version: info?.version || '', message: 'No change requested — pass storeMode and/or version.' })
+                    }
+                    let changed = false
+
+                    // Switch version if requested
+                    if (version !== undefined) {
+                        if (!verSelect || verSelect.options.length === 0) {
+                            return JSON.stringify({ error: 'Version selector not ready yet. Wait for page initialization to finish.' })
+                        }
+                        if (verSelect.value !== version) {
+                            if ([...verSelect.options].some(o => o.value === version)) {
+                                verSelect.value = version
+                                await onVersionChanged()
+                                writeQueryParams()
+                                changed = true
+                            } else {
+                                return JSON.stringify({ error: `Version "${version}" not found. Call list_routeros_versions to see valid values.` })
+                            }
+                        }
+                    }
+
+                    // Switch store mode if requested (direct — no confirmation dialog)
+                    if (storeMode !== undefined && storeMode !== useStoreSchema) {
+                        useStoreSchema = storeMode
+                        setStoreToggle(storeMode)
+                        registerYamlCompletions()
+                        runValidation()
+                        writeQueryParams()
+                        updateCopyCmdBtn()
+                        setStatus(storeMode ? 'app-store-urls= schema enabled.' : 'Single /app schema enabled.', true)
+                        changed = true
+                    }
+
+                    const info = getEditorBufferInfo()
+                    plausible?.('WebMCP Mode Switch', {
+                        props: { storeMode: useStoreSchema ? 'store' : 'app' },
+                    })
+                    return JSON.stringify({
+                        ok: true,
+                        changed,
+                        storeMode: useStoreSchema,
+                        version: info?.version || verSelect?.value || '',
+                        message: changed
+                            ? `Editor mode set to ${useStoreSchema ? 'app-store-urls= array' : 'single /app'} schema.`
+                            : 'No change needed — mode already matches request.',
+                    })
                 } catch (e) {
                     return JSON.stringify({ error: e.message })
                 }
