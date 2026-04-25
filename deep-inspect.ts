@@ -101,23 +101,39 @@ interface InspectCompletionResponse {
 
 /** RouterOS scripting keyword paths that may crash the REST server.
  *
- *  Investigation against live routers (April 2026) found:
+ *  Tracked upstream as MikroTik support case SUP-127641 (originally filed 2023-09; reopened
+ *  2026-04 against 7.20.8 long-term).
+ *
+ *  Investigation against live routers (April 2026, CHR with 256 MB RAM) found:
  *  - RouterOS 7.20.8 (long-term): `POST /rest/console/inspect {"request":"syntax","path":"do"}`
  *    hangs the entire HTTP server for ~30 seconds with no response. The same hang occurs with
  *    `request=completion`. Only `"do"` causes the hang; the others (where, else, rule, command,
  *    on-error) are safe on 7.20.8 — they just return an empty array [] instantly.
  *    Crucially: since testCrashPaths probes sequentially, any path tested AFTER "do" appears
  *    to crash too (the server is already hung). This was the cause of false CI failures on 7.20.8.
- *  - RouterOS 7.22 and 7.23beta5: all paths return HTTP 200 immediately — the bug is fixed.
- *    (7.21 not tested; fix likely landed in 7.21 or 7.22 based on successful 7.22 builds.)
+ *  - RouterOS 7.21.4, 7.22.1, 7.22.2, 7.23beta5, 7.23rc2: all 6 paths return HTTP 200 immediately
+ *    — the bug is fixed. Fix landed between 7.20.8 and 7.21.4 (confirmed by per-version
+ *    `crashPathsCrashed` data in `docs/<version>/deep-inspect.json`).
  *  - `"do"` with `request=child` is safe on all tested versions — returns its args immediately.
  *  - Nested paths (e.g. ["do","command"]) with any request type are safe on all versions.
+ *
+ *  RAM is NOT the cause of the "do" hang (confirmed April 2026): tested at both 128 MB and
+ *  512 MB on 7.20.8 — the hang reproduces identically at both sizes (~63 s total wall time
+ *  each, including 5 s timeout + server recovery). This is a pure code-level deadlock in
+ *  RouterOS ≤7.20.8, not memory pressure.
+ *  Reproducer: `bun scripts/test-crash-path-memory.ts --version 7.20.8`
+ *
+ *  Separate RAM observation: with 17 extra packages on 256 MB CHR, general /console/inspect
+ *  REST calls inflate from ~70ms to >10s and the server eventually stops responding. This is a
+ *  different, memory-pressure symptom resolved by 1024 MB (see deep-inspect-multi-arch.yaml,
+ *  commit 7052106). MikroTik support case SUP-127641 initially suggested a RAM connection, but
+ *  these are confirmed to be distinct issues.
  *
  *  These paths are skipped by crawlInspectTree (and rest2raml.js parseChildren) by default.
  *  testCrashPaths() probes them with fetchSyntax and waits for server recovery between probes.
  *
  *  MikroTik bug: /console/inspect with request=syntax or request=completion at bare path "do"
- *  deadlocks the REST scripting engine on RouterOS ≤7.21 (exact fix version unconfirmed).
+ *  deadlocks the REST scripting engine on RouterOS ≤7.20.8 (fixed by 7.21.4).
  */
 // ── Client interface ──────────────────────────────────────────────────────
 

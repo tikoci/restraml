@@ -1034,6 +1034,11 @@ These rules apply to **all agents working on CI workflows** in this repository:
 6. **Give QEMU enough RAM.** 256 MB is fine for base RouterOS under KVM, but with 17 extra
    packages under TCG, it causes memory pressure that inflates REST calls from ~70ms to ~10s+.
    Use 1024 MB for any job that installs extra packages (matches quickchr's default).
+   This RAM/REST-stall behaviour is a **separate issue** from the `/console/inspect path=do`
+   hang tracked as MikroTik **SUP-127641**. The `do`-path hang on 7.20.8 reproduces identically
+   at 128 MB **and** 512 MB (confirmed April 2026 via `bun scripts/test-crash-path-memory.ts`) —
+   it is a pure code-level deadlock, not memory pressure. These are two distinct bugs.
+   See `deep-inspect.ts` `CRASH_PATHS` comment block for the full per-version crash-path table.
 
 7. **ARM64 QEMU boot timing reference:**
    | Host → Guest | Accelerator | Boot time |

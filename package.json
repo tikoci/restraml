@@ -20,7 +20,8 @@
     "lint": "bun run lint:bun && bun run lint:workflows",
     "lint:bun": "bunx @biomejs/biome check . && bunx tsc --noEmit",
     "lint:fix": "bunx @biomejs/biome check --write .",
-    "lint:workflows": "bun validate-workflows.mjs"
+    "lint:workflows": "bun validate-workflows.mjs",
+    "test:crash-path-memory": "bun scripts/test-crash-path-memory.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
