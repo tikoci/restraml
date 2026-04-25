@@ -28,6 +28,7 @@
 const fs = require("fs")
 const path = require("path")
 const YAML = require("js-yaml")
+const IS_BUN = typeof Bun !== "undefined"
 
 // ─── IANA Service Data ───────────────────────────────────────────────────────
 // Source: IANA Service Name and Transport Protocol Port Number Registry
@@ -694,14 +695,15 @@ function ghNotice(msg) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const args = (typeof Bun !== "undefined" ? Bun.argv : process.argv).slice(2)
+  const args = (IS_BUN ? Bun.argv : process.argv).slice(2)
 
   if (args.includes("--help") || args.includes("-h")) {
     printHelp()
     process.exit(0)
   }
 
-  const docsDir = path.resolve(path.join(import.meta.dir, "..", "docs"))
+  const baseDir = IS_BUN ? import.meta.dir : __dirname
+  const docsDir = path.resolve(path.join(baseDir, "..", "docs"))
 
   const versionIdx = args.indexOf("--version")
   const formatIdx = args.indexOf("--format")

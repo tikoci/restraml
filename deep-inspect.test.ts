@@ -539,7 +539,7 @@ describe("deep-inspect.json output structure", () => {
 // no live router is needed. They lock down the per-arch filename and _meta
 // contract consumed by rosetta's extract-commands.ts and auto.yaml.
 
-async function runDeepInspect(args: string[], _outDir: string): Promise<{
+async function runDeepInspect(args: string[]): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
@@ -577,7 +577,6 @@ describe("CLI: --arch + --output-suffix contract", () => {
           "--output-suffix", "x86",
           "--output-dir", tmpDir,
         ],
-        tmpDir,
       );
       expect(exitCode).toBe(0);
 
@@ -617,7 +616,6 @@ describe("CLI: --arch + --output-suffix contract", () => {
           "--output-suffix", "arm64",
           "--output-dir", tmpDir,
         ],
-        tmpDir,
       );
       expect(exitCode).toBe(0);
 
@@ -641,7 +639,6 @@ describe("CLI: --arch + --output-suffix contract", () => {
           "--skip-openapi",
           "--output-dir", tmpDir,
         ],
-        tmpDir,
       );
       expect(exitCode).toBe(0);
 
@@ -667,7 +664,6 @@ describe("CLI: --arch + --output-suffix contract", () => {
           "--arch", "mips",
           "--output-dir", tmpDir,
         ],
-        tmpDir,
       );
       expect(exitCode).not.toBe(0);
     } finally {
@@ -692,7 +688,6 @@ describe("CLI: --arch + --output-suffix contract", () => {
             "--output-suffix", arch,
             "--output-dir", tmpDir,
           ],
-          tmpDir,
         );
         expect(exitCode).toBe(0);
         const filename = `deep-inspect.${arch}.json`;
@@ -716,41 +711,41 @@ describe("CLI: --api-port validation", () => {
 
   const baseArgs = [
     "--inspect-file", "fixtures/sample-inspect.json",
-    "--skip-completion", "--skip-openapi", "--version",
+    "--skip-completion", "--skip-openapi", "--help",
   ];
 
   test("rejects non-numeric value", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "abc"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "abc"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("rejects partial number like '8080abc'", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8080abc"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8080abc"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("rejects port 0 (out of range)", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "0"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "0"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("rejects port 65536 (out of range)", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65536"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65536"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("accepts valid port 8728 (default)", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8728"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "8728"]);
     expect(exitCode).toBe(0);
   });
 
   test("accepts port boundary 1", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "1"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "1"]);
     expect(exitCode).toBe(0);
   });
 
   test("accepts port boundary 65535", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65535"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--api-port", "65535"]);
     expect(exitCode).toBe(0);
   });
 });
@@ -762,31 +757,31 @@ describe("CLI: --request-timeout validation", () => {
 
   const baseArgs = [
     "--inspect-file", "fixtures/sample-inspect.json",
-    "--skip-completion", "--skip-openapi", "--version",
+    "--skip-completion", "--skip-openapi", "--help",
   ];
 
   test("rejects non-numeric value", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "abc"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "abc"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("rejects partial number like '120000ms'", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "120000ms"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "120000ms"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("rejects timeout 0 (must be > 0)", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "0"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "0"]);
     expect(exitCode).not.toBe(0);
   });
 
   test("accepts valid timeout 30000", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "30000"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "30000"]);
     expect(exitCode).toBe(0);
   });
 
   test("accepts timeout of 1", async () => {
-    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "1"], tmpDir);
+    const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "1"]);
     expect(exitCode).toBe(0);
   });
 });

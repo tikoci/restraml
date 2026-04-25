@@ -37,7 +37,7 @@ function shouldSuppressRunnerLabelError(err) {
 		// Match the label surrounded by quotes to avoid false positives from prefix
 		// matches (e.g. allowed "ubuntu-24.04-arm" must not suppress an error about
 		// the unknown label "ubuntu-24.04-arm64").
-		const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const escapedLabel = label.replace(/[.*+?^${}()|[\\\]]/g, "\\$&");
 		const quotedLabelPattern = new RegExp(`"${escapedLabel}"`, "i");
 		if (quotedLabelPattern.test(message)) {
 			return true;

@@ -1083,26 +1083,35 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
     throw new Error(`--arch must be x86 or arm64; got "${archRaw}"`);
   }
 
-  const apiPortRaw = values["api-port"] ?? "8728";
-  if (!/^\d+$/.test(apiPortRaw)) {
-    throw new Error(`--api-port must be a valid integer between 1 and 65535; got "${apiPortRaw}"`);
-  }
-  const apiPort = Number(apiPortRaw);
-  if (!Number.isInteger(apiPort) || apiPort < 1 || apiPort > 65535) {
-    throw new Error(`--api-port must be a valid integer between 1 and 65535; got "${apiPortRaw}"`);
-  }
+  const validatePositiveInteger = (
+    rawValue: string | undefined,
+    optionName: string,
+    min: number,
+    max?: number,
+  ): number | undefined => {
+    if (rawValue === undefined) {
+      return undefined;
+    }
+    if (!/^\d+$/.test(rawValue)) {
+      if (max !== undefined) {
+        throw new Error(`--${optionName} must be a valid integer between ${min} and ${max}; got "${rawValue}"`);
+      }
+      throw new Error(`--${optionName} must be a valid integer greater than 0; got "${rawValue}"`);
+    }
+    const parsed = Number(rawValue);
+    if (!Number.isInteger(parsed) || parsed < min || (max !== undefined && parsed > max)) {
+      if (max !== undefined) {
+        throw new Error(`--${optionName} must be a valid integer between ${min} and ${max}; got "${rawValue}"`);
+      }
+      throw new Error(`--${optionName} must be a valid integer greater than 0; got "${rawValue}"`);
+    }
+    return parsed;
+  };
 
-  const requestTimeoutRaw = values["request-timeout"];
-  if (requestTimeoutRaw !== undefined && !/^\d+$/.test(requestTimeoutRaw)) {
-    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
-  }
-  const requestTimeoutParsed = requestTimeoutRaw !== undefined ? Number(requestTimeoutRaw) : undefined;
-  if (
-    requestTimeoutRaw !== undefined &&
-    (!Number.isInteger(requestTimeoutParsed) || (requestTimeoutParsed as number) < 1)
-  ) {
-    throw new Error(`--request-timeout must be a valid integer greater than 0; got "${requestTimeoutRaw}"`);
-  }
+  const apiPortRaw = values["api-port"] ?? "8728";
+  const apiPort = validatePositiveInteger(apiPortRaw, "api-port", 1, 65535) as number;
+
+  const requestTimeoutParsed = validatePositiveInteger(values["request-timeout"], "request-timeout", 1);
 
   const [, , ...pathArgs] = positionals;
 

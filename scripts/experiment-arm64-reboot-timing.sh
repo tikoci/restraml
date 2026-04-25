@@ -93,7 +93,7 @@ done
 SCRIPT_START_TS="$(date +%s)"
 
 if [[ -z "$WORKDIR" ]]; then
-  WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/restraml-arm64-exp.XXXXXX")"
+  WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/routeros-arm64-exp.XXXXXX")"
 fi
 
 QEMU_PID=""
