@@ -302,7 +302,7 @@
 
             <div class="toolbar-group">
                 <button id="load-example-btn" type="button" class="outline secondary toolbar-btn" disabled title="Browse built-in MikroTik /app examples">
-                    <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
+                    <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="">
                     Examples</button>
                 <button id="recall-stash-btn" type="button" class="outline secondary toolbar-btn" disabled>
                     Recall Stash</button>
@@ -359,14 +359,14 @@
             <button id="copy-btn" type="button" class="outline secondary" title="Copy YAML to clipboard" disabled>📋 Copy</button>
             <button id="copy-cmd-btn" type="button" class="outline secondary"
                 title="Copy as RouterOS /app add command" disabled>
-                <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="MikroTik">
+                <img class="mt-symbol" src="https://mikrotik.com/logo/library/logo/SVG/MT_Symbol_Black.svg" alt="">
                 Copy /app/add
             </button>
             <button id="share-btn" type="button" class="outline secondary" title="Copy shareable URL to clipboard" disabled>🔗 Share</button>
             <span style="flex:1"></span>
             <small style="color:var(--pico-muted-color);font-size:0.72rem;align-self:center">
             <small> 
-                From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1b</kbd></small>
+                From <a href="https://tikoci.github.io">TIKOCI</a>. Not affiliated with <a href="https://mikrotik.com">MikroTik</a>. <kbd>v1.0-beta</kbd></small>
             </small>
         </div>
 
@@ -718,10 +718,12 @@
             }
         }
 
+        const INDENT_SIZE = 2
+
         function toSnippetScaffold(text) {
             if (!text) return `\${1}`
             if (text.includes('""')) return text.replace('""', `\${1}`)
-            return `${text}\n${' '.repeat(2)}$0`
+            return `${text}\n${' '.repeat(INDENT_SIZE)}$0`
         }
 
         function buildDynamicKeySuggestions(root, merged, pathKeys, indent, range) {
@@ -731,7 +733,7 @@
 
             if (merged?.patternProperties && Object.keys(merged.patternProperties).length > 0) {
                 const firstSchema = resolveRef(root, Object.values(merged.patternProperties)[0])
-                const inner = firstSchema ? scaffoldObject(root, firstSchema, indent + 2) : ''
+                const inner = firstSchema ? scaffoldObject(root, firstSchema, indent + INDENT_SIZE) : ''
                 suggestions.push({
                     label: { label: placeholder, description: 'named entry' },
                     kind: monaco.languages.CompletionItemKind.Snippet,
