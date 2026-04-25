@@ -57,7 +57,7 @@ function parseVersion(str) {
         minor: parseInt(m[2], 10),
         patch: parseInt(m[3] || '0', 10),
         pre: m[4] || '',
-        preNum: m[5] ? parseInt(m[5], 10) : (m[4] ? 0 : Infinity)
+        preNum: m[4] ? parseInt(m[5], 10) : Infinity
     }
 }
 
