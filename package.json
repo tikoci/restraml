@@ -21,7 +21,9 @@
     "lint:bun": "bunx @biomejs/biome check . && bunx tsc --noEmit",
     "lint:fix": "bunx @biomejs/biome check --write .",
     "lint:workflows": "bun validate-workflows.mjs",
-    "test:crash-path-memory": "bun scripts/test-crash-path-memory.ts"
+    "test:crash-path-memory": "bun scripts/test-crash-path-memory.ts",
+    "test:native-api-tags": "bun scripts/test-native-api-tags.ts",
+    "test:native-api-drops": "bun scripts/test-native-api-drops.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
