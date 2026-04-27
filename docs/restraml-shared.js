@@ -16,7 +16,7 @@ const RESTRAML = Object.freeze({
     owner: 'tikoci',
     repo: 'restraml',
     pagesUrl: 'https://tikoci.github.io/restraml',
-    apiContentsUrl: 'https://api.github.com/repos/tikoci/restraml/contents/docs',
+    docsIndexUrl: 'https://tikoci.github.io/restraml/docs-index.json',
 })
 
 // --- Brand gradient (random MikroTik-inspired gradient per page load) -
@@ -105,25 +105,25 @@ function rebuildSelect(sel, versions, showAll) {
     }
 }
 
-// --- GitHub API: fetch version directory listing ---------------------
-// Cached in localStorage to minimise GitHub API calls (60/hour unauth).
-// All docs/*.html pages share this cache via the same origin.
-// On 403 (rate limited), falls back to stale cache if available.
+// --- Published docs inventory: fetch version directory listing --------
+// docs/docs-index.json is generated from the repository's docs/ tree and
+// published via GitHub Pages. All docs/*.html pages share this cache via
+// the same origin. If the fresh fetch fails, we fall back to stale cache.
 
-const _VER_CACHE_KEY = 'restraml_versions'
+const _VER_CACHE_KEY = 'restraml_docs_index_v1'
 const _VER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 /** In-memory promise so concurrent calls within the same page share one request. */
 let _verListPromise = null
 
 /**
- * Fetch the list of built versions from the GitHub API.
- * Returns a promise resolving to an array of GitHub content objects,
- * sorted newest-first by version. Each has { name, path, type, ... }.
+ * Fetch the list of built versions from the published docs index.
+ * Returns a promise resolving to an array of directory objects,
+ * sorted newest-first by version. Each has { name, path, type, files, dirs }.
  *
- * Results are cached in localStorage for 5 minutes to reduce API calls
+ * Results are cached in localStorage for 5 minutes to reduce fetches
  * across page navigations (all docs pages share the same GH Pages origin).
- * On 403 (rate limited), falls back to stale cache regardless of TTL.
+ * On fetch failure, falls back to stale cache regardless of TTL.
  */
 function fetchVersionList() {
     if (_verListPromise) return _verListPromise
@@ -139,33 +139,38 @@ function _fetchVersionListInner() {
         const raw = localStorage.getItem(_VER_CACHE_KEY)
         if (raw) {
             const cached = JSON.parse(raw)
-            if (cached?.ts && Date.now() - cached.ts < _VER_CACHE_TTL) {
+            if (cached?.ts && Date.now() - cached.ts < _VER_CACHE_TTL && Array.isArray(cached.data)) {
                 return Promise.resolve(cached.data)
             }
         }
     } catch { /* ignore corrupted cache */ }
 
-    return fetch(RESTRAML.apiContentsUrl)
+    return fetch(RESTRAML.docsIndexUrl)
         .then(r => {
-            if (r.status === 403) {
-                // Rate limited — try stale cache regardless of TTL
+            if (!r.ok) {
                 const stale = _readStaleVersionCache()
                 if (stale) return stale
-                throw new Error(`GitHub API returned 403 (rate limited) — no cached version list available`)
+                throw new Error(`Published docs index returned ${r.status} ${r.statusText}`)
             }
-            if (!r.ok) throw new Error(`GitHub API returned ${r.status} ${r.statusText}`)
             return r.json()
         })
         .then(data => {
-            if (!Array.isArray(data)) throw new Error('Unexpected GitHub API response')
-            const versions = data
-                .filter(f => f.type === 'dir' && f.name !== 'extra')
+            if (!data || !Array.isArray(data.versions)) {
+                throw new Error('Unexpected docs index response')
+            }
+            const versions = data.versions
+                .filter(f => f.type === 'dir')
                 .sort((a, b) => compareVersions(a.name, b.name))
             // Persist to localStorage
             try {
                 localStorage.setItem(_VER_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: versions }))
             } catch { /* storage full or unavailable */ }
             return versions
+        })
+        .catch(err => {
+            const stale = _readStaleVersionCache()
+            if (stale) return stale
+            throw err
         })
 }
 

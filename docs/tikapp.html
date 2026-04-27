@@ -1117,38 +1117,28 @@
             })
         }
 
+        function hasIndexedFile(dirEntry, fileName) {
+            return !!dirEntry?.files?.some(file => file.name === fileName)
+        }
+
+        function hasAppAssets(dirEntry) {
+            return (
+                hasIndexedFile(dirEntry, 'routeros-app-yaml-schema.json') &&
+                hasIndexedFile(dirEntry, 'routeros-app-yaml-store-schema.json') &&
+                hasIndexedFile(dirEntry, 'app.json')
+            )
+        }
+
         // --- Version list: only include versions with both schemas + app.json --
         async function loadSchemaVersions() {
-            let allVersions
-            try { allVersions = await fetchVersionList() }
+            try {
+                return (await fetchVersionList()).filter(hasAppAssets)
+            }
             catch (e) {
                 const msg = e.message || String(e)
-                showError(msg.includes('403')
-                    ? 'GitHub API rate limit exceeded — version list unavailable.'
-                    : `Failed to load version list: ${msg}`)
+                showError(`Failed to load published docs index: ${msg}`)
                 return []
             }
-
-            // /app schemas only exist from RouterOS 7.22+ — skip older versions
-            const candidates = allVersions.filter(v => {
-                const p = parseVersion(v.name)
-                return p && (p.major > 7 || (p.major === 7 && p.minor >= 22))
-            })
-
-            const results = await Promise.allSettled(
-                candidates.map(async v => {
-                    try {
-                        const [schemaR, storeR, appR] = await Promise.all([
-                            fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-schema.json`, { method: 'HEAD' }),
-                            fetch(`${RESTRAML.pagesUrl}/${v.name}/routeros-app-yaml-store-schema.json`, { method: 'HEAD' }),
-                            fetch(`${RESTRAML.pagesUrl}/${v.name}/app.json`, { method: 'HEAD' })
-                        ])
-                        if ([schemaR, storeR, appR].some(r => r.status === 403)) showError('GitHub Pages rate limit hit — some versions may be missing.')
-                        return (schemaR.ok && storeR.ok && appR.ok) ? v : null
-                    } catch (_) { return null }
-                })
-            )
-            return results.filter(r => r.status === 'fulfilled' && r.value !== null).map(r => r.value)
         }
 
         // --- Version dropdown --------------------------------------------
@@ -1162,7 +1152,7 @@
                 return
             }
 
-            latestStableVer = schemaVersions[0].name
+            latestStableVer = schemaVersions.find(v => !isPreRelease(v.name))?.name || schemaVersions[0].name
             verSelect.innerHTML = ''
             verSelect.appendChild(new Option('latest', 'latest'))
             verSelect.appendChild(new Option('editor (loose)', 'editor'))

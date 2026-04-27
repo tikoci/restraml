@@ -1,0 +1,2610 @@
+{
+  "format": "restraml-docs-index@1",
+  "generatedAt": "2026-04-27T18:30:13.834Z",
+  "rootPath": "docs",
+  "latestVersion": "7.23beta5",
+  "latestStableVersion": "7.22.2",
+  "files": [
+    {
+      "name": "diff.html",
+      "path": "docs/diff.html",
+      "type": "file"
+    },
+    {
+      "name": "docs-index.json",
+      "path": "docs/docs-index.json",
+      "type": "file"
+    },
+    {
+      "name": "favicon.ico",
+      "path": "docs/favicon.ico",
+      "type": "file"
+    },
+    {
+      "name": "google3dcbe3f2ff5c3295.html",
+      "path": "docs/google3dcbe3f2ff5c3295.html",
+      "type": "file"
+    },
+    {
+      "name": "index.html",
+      "path": "docs/index.html",
+      "type": "file"
+    },
+    {
+      "name": "lookup.html",
+      "path": "docs/lookup.html",
+      "type": "file"
+    },
+    {
+      "name": "mikrotik-bug-native-api-inspect.md",
+      "path": "docs/mikrotik-bug-native-api-inspect.md",
+      "type": "file"
+    },
+    {
+      "name": "openapi.html",
+      "path": "docs/openapi.html",
+      "type": "file"
+    },
+    {
+      "name": "restraml-shared.css",
+      "path": "docs/restraml-shared.css",
+      "type": "file"
+    },
+    {
+      "name": "restraml-shared.js",
+      "path": "docs/restraml-shared.js",
+      "type": "file"
+    },
+    {
+      "name": "routeros-app-yaml-schema.editor.json",
+      "path": "docs/routeros-app-yaml-schema.editor.json",
+      "type": "file"
+    },
+    {
+      "name": "routeros-app-yaml-schema.latest.json",
+      "path": "docs/routeros-app-yaml-schema.latest.json",
+      "type": "file"
+    },
+    {
+      "name": "routeros-app-yaml-store-schema.editor.json",
+      "path": "docs/routeros-app-yaml-store-schema.editor.json",
+      "type": "file"
+    },
+    {
+      "name": "routeros-app-yaml-store-schema.latest.json",
+      "path": "docs/routeros-app-yaml-store-schema.latest.json",
+      "type": "file"
+    },
+    {
+      "name": "screen-diff-dark.png",
+      "path": "docs/screen-diff-dark.png",
+      "type": "file"
+    },
+    {
+      "name": "tikapp-manual.html",
+      "path": "docs/tikapp-manual.html",
+      "type": "file"
+    },
+    {
+      "name": "tikapp.html",
+      "path": "docs/tikapp.html",
+      "type": "file"
+    }
+  ],
+  "versions": [
+    {
+      "name": "7.23beta5",
+      "path": "docs/7.23beta5",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23beta5/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.23beta5/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.23beta5/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.23beta5/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.23beta5/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23beta5/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.23beta5/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23beta5/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.23beta5/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.23beta5/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23beta5/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23beta5/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23beta5/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.23beta4",
+      "path": "docs/7.23beta4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23beta4/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.23beta4/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.23beta4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.23beta4/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.23beta4/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.23beta4/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.23beta4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23beta4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23beta4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23beta4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23beta4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23beta4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.23rc2",
+      "path": "docs/7.23rc2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23rc2/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.23rc2/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.23rc2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.23rc2/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.23rc2/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.23rc2/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.23rc2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23rc2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.23rc2/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23rc2/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.23rc2/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.23rc2/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23rc2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23rc2/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23rc2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.23beta2",
+      "path": "docs/7.23beta2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23beta2/app.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.23beta2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.23beta2/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.23beta2/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.23beta2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23beta2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23beta2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23beta2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.23rc1",
+      "path": "docs/7.23rc1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23rc1/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.23rc1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.23rc1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.23rc1/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.23rc1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23rc1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.23rc1/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23rc1/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.23rc1/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.23rc1/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23rc1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23rc1/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23rc1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.22.2",
+      "path": "docs/7.22.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.22.2/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.22.2/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.22.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.22.2/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.22.2/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.22.2/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.22.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.22.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.22.2/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.22.2/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.22.2/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.22.2/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.22.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.22.2/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.22.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.22.1",
+      "path": "docs/7.22.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.22.1/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.22.1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.22.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.22.1/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.22.1/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.22.1/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.22.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.22.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.22.1/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.22.1/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.22.1/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.22.1/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.22.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.22.1/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.22.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.22",
+      "path": "docs/7.22",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.22/app.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.22/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.22/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.22/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.22/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.22/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.22/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.22/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.22/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.22/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.22rc4",
+      "path": "docs/7.22rc4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.22rc4/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.22rc4/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.22rc4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.22rc4/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.22rc4/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.22rc4/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.22rc4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.22rc4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.22rc4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.22rc4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.22rc4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.22rc4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.21.4",
+      "path": "docs/7.21.4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.21.4/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.21.4/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.21.4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.21.4/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.21.4/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.21.4/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.21.4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.21.4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.21.4/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.21.4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.21.4/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.21.4/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.21.4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.21.4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.21.4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.21.3",
+      "path": "docs/7.21.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.21.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.21.3/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.21.3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.21.3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.21.3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.21.3/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.21.3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.21.2",
+      "path": "docs/7.21.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.21.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.21.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.21.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.21.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.21.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.21.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.21.1",
+      "path": "docs/7.21.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.21.1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.21.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.21.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.21.1/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.21.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.21.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.21.1/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.21.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.21.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.21.1/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.21.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.21",
+      "path": "docs/7.21",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.21/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.21/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.21/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.21/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.21/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.21/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.21/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.8",
+      "path": "docs/7.20.8",
+      "type": "dir",
+      "files": [
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.20.8/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.8/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.8/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.20.8/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.20.8/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.20.8/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.8/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.8/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.20.8/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.20.8/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.20.8/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.20.8/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.8/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.8/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.20.8/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.8/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.7",
+      "path": "docs/7.20.7",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.7/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.7/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.7/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.7/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.7/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.7/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.7/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.6",
+      "path": "docs/7.20.6",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.6/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.6/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.6/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.6/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.6/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.6/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.6/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.5",
+      "path": "docs/7.20.5",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.5/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.5/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.5/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.5/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.5/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.5/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.5/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.4",
+      "path": "docs/7.20.4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.4/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.4/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.2",
+      "path": "docs/7.20.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.2/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20.1",
+      "path": "docs/7.20.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.20",
+      "path": "docs/7.20",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.20/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.20/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.20/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.20/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.20/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.20/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.20/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19.6",
+      "path": "docs/7.19.6",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19.6/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.19.6/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19.6/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19.6/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19.6/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19.6/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19.6/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19.4",
+      "path": "docs/7.19.4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19.4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19.4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19.4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19.4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19.4/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19.4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19.3",
+      "path": "docs/7.19.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19.3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19.3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19.3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19.3/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19.3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19.2",
+      "path": "docs/7.19.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.19.2/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19.1",
+      "path": "docs/7.19.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.19.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.19",
+      "path": "docs/7.19",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.19/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.19/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.19/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.19/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.19/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.19/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.19/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.18.2",
+      "path": "docs/7.18.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.18.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.18.2/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.18.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.18.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.18.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.18.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.18.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.18.1",
+      "path": "docs/7.18.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.18.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.18.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.18.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.18.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.18.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.18.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.18.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.18",
+      "path": "docs/7.18",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.18/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.18/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.18/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.18/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.18/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.18/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.18/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.17.1",
+      "path": "docs/7.17.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.17.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.17.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.17.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.17.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.17.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.17.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.17.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.17",
+      "path": "docs/7.17",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.17/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.17/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.17/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.17/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.17/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.17/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.17/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.16.2",
+      "path": "docs/7.16.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.16.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.16.2/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.16.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.16.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.16.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.16.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.16.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.16.1",
+      "path": "docs/7.16.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.16.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.16.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.16.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.16.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.16.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.16.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.16.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.16",
+      "path": "docs/7.16",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.16/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.16/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.16/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.16/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.16/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.16/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.16/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.15.3",
+      "path": "docs/7.15.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.15.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.15.3/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.15.3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.15.3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.15.3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.15.3/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.15.3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.15.2",
+      "path": "docs/7.15.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.15.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.15.2/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.15.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.15.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.15.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.15.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.15.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.15.1",
+      "path": "docs/7.15.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.15.1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.15.1/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.15.1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.15.1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.15.1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.15.1/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.15.1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.15",
+      "path": "docs/7.15",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.15/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "oas2.json",
+          "path": "docs/7.15/oas2.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.15/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.15/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.15/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.15/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.15/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.14.3",
+      "path": "docs/7.14.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.14.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.14.3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.14.3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.14.3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.14.3/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.14.3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.13.5",
+      "path": "docs/7.13.5",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.13.5/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.13.5/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.13.5/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.13.5/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.13.5/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.13.5/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.12.2",
+      "path": "docs/7.12.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.12.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.12.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.12.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.12.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.12.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.12.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.11.3",
+      "path": "docs/7.11.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.11.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.11.3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.11.3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.11.3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.11.3/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.11.3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.10.2",
+      "path": "docs/7.10.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.10.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.10.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.10.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.10.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.10.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.10.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.9.2",
+      "path": "docs/7.9.2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.9.2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.9.2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.9.2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.9.2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.9.2/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.9.2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.9",
+      "path": "docs/7.9",
+      "type": "dir",
+      "files": [
+        {
+          "name": "inspect.json",
+          "path": "docs/7.9/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.9/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.9/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "inspect.json",
+              "path": "docs/7.9/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "oas2.json",
+              "path": "docs/7.9/extra/oas2.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.9/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    }
+  ]
+}

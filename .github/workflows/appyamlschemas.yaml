@@ -249,9 +249,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        bun run docs:index -- \
+          --exclude "docs/${ROSVER}/routeros-app-yaml-schema.json" \
+          --exclude "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
         if [ -f "docs/${ROSVER}/app.json" ]; then
           echo "Committing app.json (raw /app data from CHR)"
-          git add "docs/${ROSVER}/app.json"
+          git add "docs/${ROSVER}/app.json" docs/docs-index.json
           if git diff --cached --quiet; then
             echo "No changes to app.json — already up to date"
           else
@@ -286,12 +289,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        bun run docs:index
         echo "Per-version schemas written to docs/${ROSVER}/ by appyamlvalidate.js"
         ls -lh "docs/${ROSVER}/routeros-app-yaml-schema.json" \
                 "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
         
         git add "docs/${ROSVER}/routeros-app-yaml-schema.json" \
-                "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+                "docs/${ROSVER}/routeros-app-yaml-store-schema.json" \
+                docs/docs-index.json
         
         if git diff --cached --quiet; then
           echo "No schema changes to commit — already up to date"

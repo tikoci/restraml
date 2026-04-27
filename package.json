@@ -6,6 +6,7 @@
   "scripts": {
     "schema": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js [path...]'",
     "schema:version": "echo 'Usage: URLBASE=http://<router>/rest BASICAUTH=admin: bun rest2raml.js --version'",
+    "docs:index": "bun scripts/build-docs-index.mjs",
     "deep-inspect": "bun deep-inspect.ts",
     "deep-inspect:multi-arch": "bun scripts/deep-inspect-multi-arch.ts",
     "deep-inspect:diff": "bun scripts/diff-deep-inspect.ts",

@@ -561,12 +561,15 @@ jobs:
           echo "Published to: $DOCS_PATH"
           ls -lh "$DOCS_PATH"/deep-inspect.*.json "$DOCS_PATH"/diff-deep-inspect.json
 
+      - name: Rebuild published docs index
+        run: bun run docs:index
+
       - name: Commit and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VER="${{ inputs.rosver }}"
-          git add "docs/${VER}/extra/"
+          git add "docs/${VER}/extra/" docs/docs-index.json
           # Only commit if there are changes (handles re-runs gracefully)
           if git diff --cached --quiet; then
             echo "No changes to commit — files already match."
