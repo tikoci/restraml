@@ -1,17 +1,17 @@
 # RouterOS API Schema Tools
 
-> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml)** — schema downloads, side-by-side version diffs, an interactive API explorer, a command lookup tool, and a browser-based `/app` YAML editor for the MikroTik RouterOS REST API. No install needed, runs in your browser.
+> **[tikoci.github.io/restraml](https://tikoci.github.io/restraml/)** — schema downloads, side-by-side version diffs, an interactive API explorer, a command lookup tool, and a browser-based `/app` YAML editor for the MikroTik RouterOS REST API. No install needed, runs in your browser.
 >
 > For RouterOS 7.22+: JSON Schema files for `/app` container YAML are also published there, ready to plug into VSCode — [setup details below](#using-the-app-yaml-schema-in-vscode).
 
 Auto-generated API schemas for the [MikroTik RouterOS](https://mikrotik.com/) REST API, built automatically by [GitHub Actions](https://github.com/tikoci/restraml/actions) — you can watch the sausage being made.
 
-[![RouterOS diff tool screenshot](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml)
+[![RouterOS diff tool screenshot](docs/screen-diff-dark.png)](https://tikoci.github.io/restraml/)
 
 ## Download Schemas
 
 Pre-built schema files for the RouterOS REST API are available at
-<https://tikoci.github.io/restraml>
+<https://tikoci.github.io/restraml/>
 
 > [!TIP]
 > Missing a version? Need a feature? Spot a bug? [Open an issue](https://github.com/tikoci/restraml/issues/new/choose) — builds run automatically for new RouterOS releases via [GitHub Actions](https://github.com/tikoci/restraml/actions), and requests are welcome.
@@ -34,7 +34,7 @@ An **interactive API explorer** at [tikoci.github.io/restraml/openapi.html](http
 
 ### `diff` RouterOS Commands
 
-The [project website](https://tikoci.github.io/restraml) includes a **diff tool** that compares the `/console/inspect` output between any two RouterOS versions — useful for tracking new commands, removed attributes, and API changes across releases.
+The [project website](https://tikoci.github.io/restraml/) includes a **diff tool** that compares the `/console/inspect` output between any two RouterOS versions — useful for tracking new commands, removed attributes, and API changes across releases.
 
 ### `lookup` RouterOS Commands
 
