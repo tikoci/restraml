@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="canonical" href="https://tikoci.github.io/restraml/lookup.html">
     <title>RouterOS Command Lookup</title>
-    <meta name="description" content="Look up any MikroTik RouterOS CLI command, path, or property by version. Browse the command tree, find arguments and their defaults — powered by the restraml inspect schema.">
+    <meta name="description" content="Look up any MikroTik RouterOS CLI command, path, or property by version. Browse the command tree, find arguments, and when published see completion values from restraml deep-inspect data.">
     <meta property="og:title" content="RouterOS Command Lookup">
-    <meta property="og:description" content="Look up any MikroTik RouterOS CLI command, path, or property by version. Browse the command tree, find arguments and their defaults.">
+    <meta property="og:description" content="Look up any MikroTik RouterOS CLI command, path, or property by version. Browse the command tree and, when published, see completion values for attributes.">
     <meta property="og:url" content="https://tikoci.github.io/restraml/lookup.html">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
@@ -59,6 +59,16 @@
 
         #results-table td:last-child small {
             word-break: break-word;
+            display: block;
+            line-height: 1.45;
+        }
+
+        .detail-line + .detail-line {
+            margin-top: 0.25rem;
+        }
+
+        .completion-values code {
+            white-space: nowrap;
         }
 
         /* Lighten text-input placeholders so they're clearly distinct from typed values */
@@ -120,7 +130,8 @@
         <!-- Intro -->
         <section>
             <p>Check which RouterOS versions include a specific command or attribute by searching the
-                <code>/console/inspect</code> data.</p>
+                published <code>/console/inspect</code> schema. When enriched
+                <code>deep-inspect.json</code> data exists, attribute lookups also show completion values.</p>
         </section>
 
         <!-- Search Form -->
@@ -261,6 +272,9 @@
                         introspection endpoint behind WinBox&rsquo;s sidebar tree. A real
                         RouterOS CHR boots in CI for each release, every API branch is walked
                         via REST, and the result is published as <code>inspect.json</code>.
+                        When completion enrichment is available, this page prefers
+                        <code>deep-inspect.json</code> so attribute lookups can also show
+                        completion values.
                         &nbsp;&middot;&nbsp;
                         <a href="https://github.com/tikoci/restraml/blob/main/README.md"><code>README.md</code></a>
                         for <a href="https://github.com/tikoci/restraml">tikoci/restraml</a>
@@ -328,8 +342,11 @@
         // All discovered version names, newest first
         let allVersions = []
 
-        // Cache of fetched inspect.json data keyed by version string
-        const inspectCache = {}
+        // Published docs index entries keyed by version name
+        const versionEntriesByName = new Map()
+
+        // Cache of fetched lookup schema data keyed by version + flavor + file name
+        const lookupSchemaCache = {}
 
         // Cancellation counter — incremented on each new lookup run
         let runLookupId = 0
@@ -385,6 +402,30 @@
             }
         }
 
+        function setVersionEntries(entries) {
+            versionEntriesByName.clear()
+            entries.forEach(entry => versionEntriesByName.set(entry.name, entry))
+            allVersions = entries.map(entry => entry.name)
+        }
+
+        function getPublishedVersionFiles(ver, useExtra) {
+            const versionEntry = versionEntriesByName.get(ver)
+            if (!versionEntry) return []
+            if (!useExtra) return Array.isArray(versionEntry.files) ? versionEntry.files : []
+            const extraDir = Array.isArray(versionEntry.dirs)
+                ? versionEntry.dirs.find(dir => dir.name === 'extra')
+                : null
+            return Array.isArray(extraDir?.files) ? extraDir.files : []
+        }
+
+        function chooseLookupDataFile(ver, useExtra) {
+            const files = getPublishedVersionFiles(ver, useExtra)
+            if (files.some(file => file.name === 'deep-inspect.json')) {
+                return 'deep-inspect.json'
+            }
+            return 'inspect.json'
+        }
+
         // -----------------------------------------------------------------
         // Parse a combined RouterOS path+cmd string into segments
         // Handles: "/ip/address/set", "ip address set", "/ip address/set"
@@ -394,15 +435,35 @@
         }
 
         // -----------------------------------------------------------------
-        // Navigate inspect.json to find a combined path+cmd+attr
-        // Returns { found: bool, detail: string, error?: string }
+        // Navigate the published inspect/deep-inspect tree to find a
+        // combined path+cmd+attr. Returns a lightweight result object for
+        // both the table UI and the WebMCP tool.
         //
         // Behavior based on terminal node _type:
         //   "cmd"  + no attr  → comma-sep list of arg children
-        //   "cmd"  + attr     → desc of that arg (empty string if no desc)
+        //   "cmd"  + attr     → description + completion entries (if present)
         //   "dir"/"path"      → comma-sep list of child cmd names
         //   not found         → found:false with detail explaining why
         // -----------------------------------------------------------------
+        function normalizeCompletionEntries(argNode) {
+            if (!argNode || typeof argNode !== 'object' ||
+                !argNode._completion || typeof argNode._completion !== 'object') {
+                return []
+            }
+            return Object.entries(argNode._completion).map(([value, meta]) => ({
+                value,
+                desc: meta && typeof meta === 'object' && typeof meta.desc === 'string'
+                    ? meta.desc
+                    : '',
+                style: meta && typeof meta === 'object' && typeof meta.style === 'string'
+                    ? meta.style
+                    : '',
+                preference: meta && typeof meta === 'object' && Number.isFinite(meta.preference)
+                    ? meta.preference
+                    : null,
+            }))
+        }
+
         function lookupInInspect(json, segments, attr) {
             if (!segments || segments.length === 0) {
                 return { found: false, detail: 'no path entered' }
@@ -431,7 +492,14 @@
                     const desc = (argNode && typeof argNode === 'object' && argNode.desc)
                         ? String(argNode.desc)
                         : ''
-                    return { found: true, detail: desc, nodeType }
+                    const completionEntries = normalizeCompletionEntries(argNode)
+                    return {
+                        found: true,
+                        detail: desc,
+                        nodeType,
+                        argType: argNode && typeof argNode === 'object' ? argNode._type || null : null,
+                        completionEntries,
+                    }
                 }
                 return { found: true, detail: args.join(', '), nodeType }
             }
@@ -454,22 +522,95 @@
         }
 
         // -----------------------------------------------------------------
-        // Fetch (and cache) inspect.json for a version
-        // Uses extra-packages variant when useExtra is true.
+        // Fetch (and cache) the lookup schema for a version.
+        // Prefers deep-inspect.json when published; falls back to inspect.json.
         // -----------------------------------------------------------------
-        function loadInspectJson(ver, useExtra) {
+        function fetchLookupSchemaFile(ver, useExtra, fileName) {
             const subdir = useExtra ? '/extra' : ''
-            const key = ver + (useExtra ? '::extra' : '')
-            if (inspectCache[key]) return Promise.resolve(inspectCache[key])
-            return fetch(`${pagesUrl}/${ver}${subdir}/inspect.json`)
+            const key = `${ver}${useExtra ? '::extra' : '::base'}::${fileName}`
+            if (lookupSchemaCache[key]) return Promise.resolve(lookupSchemaCache[key])
+            return fetch(`${pagesUrl}/${ver}${subdir}/${fileName}`)
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`)
                     return r.json()
                 })
                 .then(data => {
-                    inspectCache[key] = data
-                    return data
+                    const result = { data, fileName }
+                    lookupSchemaCache[key] = result
+                    return result
                 })
+        }
+
+        function loadLookupSchema(ver, useExtra) {
+            const preferredFile = chooseLookupDataFile(ver, useExtra)
+            return fetchLookupSchemaFile(ver, useExtra, preferredFile).catch(err => {
+                if (preferredFile === 'inspect.json') throw err
+                console.warn(`Falling back to inspect.json for ${ver}: ${err}`)
+                return fetchLookupSchemaFile(ver, useExtra, 'inspect.json')
+            })
+        }
+
+        function renderResultDetail(result) {
+            const small = document.createElement('small')
+
+            if (result.error) {
+                const em = document.createElement('em')
+                em.textContent = result.error
+                small.appendChild(em)
+                return small
+            }
+
+            if (!result.found) {
+                const em = document.createElement('em')
+                em.textContent = result.detail
+                small.appendChild(em)
+                return small
+            }
+
+            if (Array.isArray(result.completionEntries) && result.completionEntries.length > 0) {
+                if (result.detail) {
+                    const desc = document.createElement('div')
+                    desc.className = 'detail-line'
+                    desc.textContent = result.detail
+                    small.appendChild(desc)
+                }
+
+                const completionLine = document.createElement('div')
+                completionLine.className = 'detail-line completion-values'
+                const prefix = document.createElement('span')
+                prefix.textContent = `Completion${result.completionEntries.length === 1 ? '' : 's'} (${result.completionEntries.length}): `
+                completionLine.appendChild(prefix)
+
+                const sample = result.completionEntries.slice(0, 12)
+                sample.forEach((entry, index) => {
+                    if (index > 0) {
+                        completionLine.appendChild(document.createTextNode(', '))
+                    }
+                    const code = document.createElement('code')
+                    code.textContent = entry.value
+                    if (entry.desc) {
+                        code.title = entry.desc
+                    }
+                    completionLine.appendChild(code)
+                })
+                if (result.completionEntries.length > sample.length) {
+                    completionLine.appendChild(
+                        document.createTextNode(`, +${result.completionEntries.length - sample.length} more`)
+                    )
+                }
+                small.appendChild(completionLine)
+                return small
+            }
+
+            if (result.detail) {
+                small.textContent = result.detail
+                return small
+            }
+
+            const em = document.createElement('em')
+            em.textContent = 'attribute exists'
+            small.appendChild(em)
+            return small
         }
 
         // -----------------------------------------------------------------
@@ -485,6 +626,9 @@
             link.href = `https://download.mikrotik.com/routeros/${ver}/CHANGELOG`
             link.textContent = ver
             link.dataset.changelogVersion = ver
+            if (result.sourceFile) {
+                link.title = `Lookup used ${result.sourceFile}`
+            }
             tdVer.appendChild(link)
             tr.appendChild(tdVer)
 
@@ -504,13 +648,7 @@
 
             // Detail cell — errors and not-found in italics; found detail plain
             const tdDetail = document.createElement('td')
-            if (result.error) {
-                tdDetail.innerHTML = `<small><em>${result.error}</em></small>`
-            } else if (!result.found) {
-                tdDetail.innerHTML = `<small><em>${result.detail}</em></small>`
-            } else if (result.detail) {
-                tdDetail.innerHTML = `<small>${result.detail}</small>`
-            }
+            tdDetail.appendChild(renderResultDetail(result))
             tr.appendChild(tdDetail)
 
             resultsBody.appendChild(tr)
@@ -571,21 +709,28 @@
             let foundCount = 0
             let checkedCount = 0
             let lastNodeType = null
+            let enrichedCount = 0
 
             for (const ver of versionsToCheck) {
                 if (thisId !== runLookupId) return // cancelled by a newer run
 
                 let result
                 try {
-                    const json = await loadInspectJson(ver, useExtra)
+                    const { data, fileName } = await loadLookupSchema(ver, useExtra)
                     if (thisId !== runLookupId) return // cancelled after fetch
-                    result = lookupInInspect(json, segments, attrStr)
+                    result = {
+                        ...lookupInInspect(data, segments, attrStr),
+                        sourceFile: fileName,
+                    }
                 } catch (err) {
                     result = { found: false, error: String(err), detail: '' }
                 }
                 if (result.found) {
                     foundCount++
                     if (result.nodeType) lastNodeType = result.nodeType
+                }
+                if (result.sourceFile === 'deep-inspect.json') {
+                    enrichedCount++
                 }
                 checkedCount++
                 appendResultRow(ver, result)
@@ -618,6 +763,9 @@
                     : `${checkedCount} version${checkedCount !== 1 ? 's' : ''}`
                 summary = `<p>Found in <strong>${foundCount}</strong> of ${scopeLabel}${testingNote} ` +
                     `(${schemaLabel} schema) &mdash; <code>${normalizedPath}</code>${attrPart}</p>`
+            }
+            if (attrStr && enrichedCount > 0) {
+                summary += `<p><small>Attribute details use <code>deep-inspect.json</code> where published and fall back to <code>inspect.json</code> elsewhere.</small></p>`
             }
             resultsSummary.innerHTML = summary
 
@@ -689,7 +837,7 @@
         // -----------------------------------------------------------------
         fetchVersionList()
             .then(data => {
-                allVersions = data.map(f => f.name)
+                setVersionEntries(data)
                 // Apply query params before rebuilding select (so testing flag is set)
                 const qVersion = applyQueryParams()
                 rebuildVersionSelect()
@@ -784,7 +932,7 @@
         const _wmcp = registerWebMCPTools()
         _wmcp.register({
             name: 'lookup_routeros_command',
-            description: 'Look up a RouterOS CLI command or attribute in the inspect schema. Returns whether the path exists, its type (dir/cmd/arg), and child commands or attributes. Use list_routeros_versions first to find available versions.',
+            description: 'Look up a RouterOS CLI command or attribute in the published schema. Returns whether the path exists, its type (dir/cmd/arg), and child commands or attributes. When deep-inspect.json is available it also returns completion values for attributes. Use list_routeros_versions first to find available versions.',
             annotations: { readOnlyHint: true, untrustedContentHint: true },
             inputSchema: {
                 type: 'object',
@@ -819,6 +967,7 @@
                     if (segments.length === 0) return JSON.stringify({ error: 'path is required' })
 
                     const vers = await fetchVersionList()
+                    setVersionEntries(vers)
                     const stableVersions = vers.map(v => v.name).filter(v => !isPreRelease(v))
 
                     let versionsToSearch
@@ -833,8 +982,9 @@
                     const results = []
                     for (const ver of versionsToSearch) {
                         try {
-                            const json = await loadInspectJson(ver, useExtra)
-                            const result = lookupInInspect(json, segments, attribute || '')
+                            const { data, fileName } = await loadLookupSchema(ver, useExtra)
+                            const result = lookupInInspect(data, segments, attribute || '')
+                            result.sourceFile = fileName
                             results.push({ version: ver, ...result })
                         } catch (e) {
                             results.push({ version: ver, found: false, error: e.message })
