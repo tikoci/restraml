@@ -50,14 +50,14 @@ const _BRAND_GRADIENTS = [
  *           "7.15.3" -> {major:7, minor:15, patch:3, pre:"", preNum:Infinity}
  */
 function parseVersion(str) {
-    const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
+    const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(?:(beta|rc)(\d+))?$/)
     if (!m) return null
     return {
         major: parseInt(m[1], 10),
         minor: parseInt(m[2], 10),
         patch: parseInt(m[3] || '0', 10),
         pre: m[4] || '',
-        preNum: m[5] ? parseInt(m[5], 10) : (m[4] ? 0 : Infinity)
+        preNum: m[4] ? parseInt(m[5], 10) : Infinity
     }
 }
 
@@ -213,9 +213,7 @@ function initThemeSwitcher(id) {
     const el = document.getElementById(id)
     let state = 'auto'
 
-    document.addEventListener('DOMContentLoaded', () => {
-        el.innerHTML = _THEME_ICONS.osDefault
-    })
+    el.innerHTML = _THEME_ICONS.osDefault
 
     el.addEventListener('click', e => {
         e.preventDefault()
@@ -427,6 +425,16 @@ function renderChangelogContent(rawText, targetVersion, query, contentEl, itemCo
  * @param {string}               [opts.diffPage]    - Relative URL of the diff page (default: 'diff.html')
  * @returns {{ showChangelog: function(version: string): void }}
  */
+const _clHeaderRegexCache = new Map()
+function _clGetHeaderRegex(version) {
+    let re = _clHeaderRegexCache.get(version)
+    if (!re) {
+        re = new RegExp(`What's new in ${_clEscapeRegex(version)} \\(([^)]+)\\)`, 'i')
+        _clHeaderRegexCache.set(version, re)
+    }
+    return re
+}
+
 function initChangelogModal(opts) {
     const modal = document.getElementById('changelog-modal')
     if (!modal) return { showChangelog: () => {} }
@@ -503,7 +511,7 @@ function initChangelogModal(opts) {
             _rawText = text
 
             // Extract release date for the subtitle
-            const headerMatch = text.match(new RegExp(`What's new in ${_clEscapeRegex(version)} \\(([^)]+)\\)`, 'i'))
+            const headerMatch = text.match(_clGetHeaderRegex(version))
             if (headerMatch) subtitleEl.textContent = headerMatch[1]
 
             renderChangelogContent(text, version, '', contentEl, itemCountEl)
