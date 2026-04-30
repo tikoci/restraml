@@ -232,7 +232,7 @@ export class RouterOSClient implements IRouterOSClient {
  * returns non-deterministic results: ~20-30% of entries are randomly dropped per call.
  * REST is 100% deterministic. Use `--transport rest` (the default) for all production work.
  * This code is retained for potential future use if MikroTik fixes the bug.
- * See BACKLOG.md Phase 2.9 and docs/mikrotik-bug-native-api-inspect.md.
+ * See docs/mikrotik-bug-native-api-inspect.md and docs/deep-inspect.md.
  */
 export class NativeRouterOSClient implements IRouterOSClient {
   private api: RosAPI;
@@ -1161,7 +1161,7 @@ Usage:
   bun deep-inspect.ts [options] [path...]
 
 Options:
-  --inspect-file <path>   Input inspect.json file (offline enrichment, dev only — see BACKLOG.md principle 2)
+  --inspect-file <path>   Input inspect.json file (offline enrichment, dev only — see docs/deep-inspect.md "Deep-inspect production builds run their own crawl")
   --ros-version <ver>     Override RouterOS version (e.g. 7.23beta4)
   --live                  Query live router (URLBASE/BASICAUTH env vars)
   --arch <x86|arm64>      Record architecture in _meta.architecture (set by orchestrator)
@@ -1361,7 +1361,7 @@ async function main() {
   };
 
   // Attach native API reconnect diagnostics when present.
-  // A non-zero count signals potential RouterOS or Bun TCP bug — see BACKLOG.md.
+  // A non-zero count signals potential RouterOS or Bun TCP bug — see docs/mikrotik-bug-native-api-inspect.md.
   if (activeTransport === "native" && client instanceof NativeRouterOSClient) {
     const rcStats = client.getReconnectStats();
     if (rcStats.count > 0) {

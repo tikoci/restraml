@@ -3,7 +3,8 @@ name: "Build: Deep-Inspect Multi-Arch"
 # Produces per-architecture deep-inspect files by booting x86 and arm64 CHRs
 # with all extra packages, running a live /console/inspect crawl + completion
 # enrichment on each, and diffing the results. Each architecture does its own
-# independent crawl (BACKLOG.md principle 2). Output files:
+# independent crawl (see docs/deep-inspect.md "Deep-inspect production builds run their
+# own crawl"). Output files:
 #
 #   docs/{version}/extra/deep-inspect.x86.json
 #   docs/{version}/extra/deep-inspect.arm64.json

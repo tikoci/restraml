@@ -11,9 +11,9 @@
  * No merging, no cross-arch fallback. Each file is a self-contained view of
  * its arch, suitable for diffing via `scripts/diff-deep-inspect.ts`.
  *
- * This script is the answer to BACKLOG.md Phase 3 "how do we iterate locally"
- * question. It is NOT intended for CI — CI is Phase 3.5 and will be a
- * separate workflow job.
+ * This script is the local-iteration counterpart to the per-arch deep-inspect
+ * pipeline; the CI equivalent lives in .github/workflows/deep-inspect-multi-arch.yaml.
+ * See docs/deep-inspect.md for the design rules and shipped Phase 3 history.
  *
  * Usage:
  *   bun scripts/deep-inspect-multi-arch.ts                    # both arches, stable channel
@@ -111,7 +111,7 @@ Output files (one per arch):
   <output-dir>/deep-inspect.<arch>.json
   <output-dir>/openapi.<arch>.json
 
-Failure policy (BACKLOG.md principle 3):
+Failure policy (see docs/deep-inspect.md "Crashes and missing paths are signals"):
   Nonzero crashPathsCrashed or argsFailed → exit 2 with full path list.
   Do not add to any skip list without confirming repro + filing upstream.
 
@@ -195,7 +195,7 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
 
   // Post-crawl load snapshot (best-effort) — informational, not load-bearing.
   // Proof-of-life for queryLoad(); the real retry/load correlation work wants
-  // in-crawl sampling and is tracked in BACKLOG.md Phase 3.5.
+  // in-crawl sampling — a future improvement, not yet scheduled.
   const load = await chr.queryLoad();
   if (load) {
     console.log(`  post-crawl load: cpu=${load.cpuPercent}% mem=${load.memUsedMb}MB`);
@@ -273,8 +273,8 @@ function summarize(results: ArchResult[]): void {
 }
 
 function checkAnomalies(results: ArchResult[]): boolean {
-  // Per BACKLOG.md principle 3: any crash or failed arg is a signal worth
-  // investigating, not a thing to silently tolerate.
+  // Per docs/deep-inspect.md "Crashes and missing paths are signals": any crash
+  // or failed arg is a signal worth investigating, not a thing to silently tolerate.
   let anomalies = false;
   for (const r of results) {
     if (r.crashPathsCrashed.length > 0) {

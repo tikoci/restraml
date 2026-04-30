@@ -5,8 +5,8 @@
 // NOTE: This file is retained for potential future use. CI currently uses REST-only transport
 // because RouterOS native API `/console/inspect` with request=completion is non-deterministic
 // (~20-30% random entry drops per call). REST is 100% deterministic. This protocol is fully
-// functional for `request=child` and `request=syntax` work, and may be useful for Phase 3
-// ARM64 tree crawl or if MikroTik fixes the completion bug. See BACKLOG.md Phase 2.9.
+// functional for `request=child` and `request=syntax` work, and may be useful for ARM64
+// tree crawl or if MikroTik fixes the completion bug. See docs/mikrotik-bug-native-api-inspect.md.
 //
 // Wire protocol: length-prefixed UTF-8 words, grouped into sentences (null terminator).
 // Multiplexing: each command gets a unique .tag, router echoes it back in replies.
