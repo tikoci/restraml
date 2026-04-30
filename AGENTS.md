@@ -47,22 +47,6 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
   in CI using the same QEMU+CHR+KVM infrastructure already used by the build workflows.
   **Do not rely on local machine paths in new code; contribute CI jobs instead.**
 
-### Testing
-
-- `bun test` runs all `*.test.ts` files — **no router or QEMU needed**, runs in CI.
-  After modifying `.ts` files, run `bun test` to confirm all unit tests pass.
-- Integration + stress tests require a local [mikropkl](https://github.com/tikoci/mikropkl) CHR machine:
-  - `bun run test:ros-api` (`scripts/test-ros-api.sh`) — wire protocol unit + integration + 50-concurrent
-    cancel stress test against live RouterOS CHR. The post-batch probe is the regression canary for the
-    ghost-command bug (unissued `/cancel` → 60 s queue stall).
-  - `bun run test:qemu` (`scripts/test-with-qemu.sh`) — `deep-inspect` integration tests.
-  - `bun run test:benchmark` (`scripts/benchmark-qemu.sh`) — REST vs native API timing benchmark.
-- **Short-term limitation**: Integration scripts resolve mikropkl machines from
-  `~/Lab/mikropkl/Machines/` or `~/GitHub/mikropkl/Machines/` (or `MIKROPKL_DIR`).
-  This is a local convenience — the long-term goal is for `test:ros-api` and `test:qemu` to run
-  in CI using the same QEMU+CHR+KVM infrastructure already used by the build workflows.
-  **Do not rely on local machine paths in new code; contribute CI jobs instead.**
-
 ### Linting
 
 - **Biome** (v2.x) is the linter for all `.js` and `docs/*.html` files. Run `bun run lint` after
@@ -121,10 +105,13 @@ The `appyamlschemas.yaml` workflow generates and validates them using `appyamlva
 ### Web Pages (`docs/`)
 All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 
-> **Dark mode, diff2html gotchas, Tools nav dropdown, shareable URL, and Share modal patterns are documented in `CLAUDE.md`**
+> **Dark mode, diff2html gotchas, Tools nav dropdown, shareable URL, and share button patterns are documented in `CLAUDE.md`**
 > under the relevant sections. Read those sections before touching dark mode logic, adding diff rendering,
 > adding query string support, or creating new pages.
-- **Pico CSS** (`@picocss/pico@2`) — only CSS framework allowed.
+- **Pico CSS** (`@picocss/pico@2`) — only CSS framework allowed. Exception:
+  `docs/openapi.html` intentionally avoids Pico because Pico's global element styles conflict
+  with Scalar's generated API-reference DOM; it defines the small `--pico-*` variable subset
+  needed by shared styles instead.
 - **JetBrains Mono + Manrope** — required fonts for all pages. Both must be loaded via Google Fonts.
 - **Semantic HTML** — use proper elements (`<header>`, `<main>`, `<section>`, etc.).
 - **No web frameworks** — no React, Vue, Svelte, etc. Vanilla JavaScript only.
@@ -135,10 +122,11 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **Prefer published docs inventory for version discovery** — `docs/docs-index.json` is the static source-of-truth for published versions/files on GitHub Pages. Use GitHub API/GraphQL only when the data is not already published there.
 - **Single `.html` file** — keep JS inline unless there is a very strong reason for separation.
 - **`restraml-shared.css`** — all pages load shared CSS (fonts, logo swap, theme icon, page-guide,
-  share-modal, utility classes) via `<link rel="stylesheet" href="restraml-shared.css">` after
-  Pico CSS and before page `<style>`. Shared visual patterns go here, not inline.
+  legacy share-modal, utility classes) via `<link rel="stylesheet" href="restraml-shared.css">`
+  after Pico CSS and before page `<style>` (except `openapi.html`, which has no Pico). Shared
+  visual patterns go here, not inline.
 - **`restraml-shared.js`** — all pages load shared utilities (version parsing, theme switcher,
-  share modal, GitHub API fetch) via `<script src="restraml-shared.js"></script>`. Modify shared
+  share modal, published docs-index fetch) via `<script src="restraml-shared.js"></script>`. Modify shared
   behavior in this file, not inline. New pages must include this script.
 - **Minimal CDN dependencies** — only add libraries that meaningfully solve a problem.
 - **Tools nav dropdown** — every page must include the shared Tools `<details class="dropdown">` in the nav.
@@ -146,8 +134,9 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 - **Shareable URLs** — use `history.replaceState()` to keep the URL current as the user interacts.
   Read query params after the async version list loads (so `<select>` options exist). See `CLAUDE.md`
   for the full parameter list per page.
-- **Share modal** — use `<dialog>` with `showModal()` / `close()`. Show URL + copy button.
-  See `diff.html` or `lookup.html` for the canonical implementation.
+- **Share button** — prefer the inline "Copied!" button pattern. Call `writeQueryParams()`,
+  copy `location.href` with `navigator.clipboard.writeText()`, and temporarily swap the button
+  text to `✓ Copied!`. See `diff.html`, `lookup.html`, or `openapi.html` for canonical examples.
 
 ---
 
@@ -168,7 +157,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 ### Create a custom docs page (from a GitHub Issue)
 1. Read the issue for the desired feature/view.
 2. Create `docs/{custom-name}.html` following the web page conventions above.
-3. Include `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`) and `<script src="restraml-shared.js"></script>`. Call `initThemeSwitcher()`. For sharing, use the inline "Copied!" button pattern — call `navigator.clipboard.writeText()` and swap button text; see `lookup.html`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns.
+3. Include `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`) and `<script src="restraml-shared.js"></script>`. Call `initThemeSwitcher()`. For sharing, use the inline "Copied!" button pattern — call `navigator.clipboard.writeText()` and swap button text; see `lookup.html`. Use `fetchVersionList()` and `RESTRAML.pagesUrl` from the shared utilities. See `docs/index.html` as a reference for page-specific patterns. Only follow the `openapi.html` no-Pico exception when integrating a third-party component whose generated DOM conflicts with Pico globals.
 4. Add the shared **Tools nav dropdown** to the new page (see `CLAUDE.md` → "Tools Nav Dropdown").
 5. Also add the new page to the dropdown list in `index.html`, `lookup.html`, and `diff.html`.
 6. Keep all JS in the single HTML file.

@@ -52,6 +52,24 @@
             --font-size: 1rem;
             --contrast: #1b2832;
         }
+        :root[data-theme=dark] {
+            --pico-color: #c2c8cc;
+            --pico-muted-color: #8892a0;
+            --pico-primary: #44aece;
+            --pico-form-element-border-color: #3a4249;
+            --pico-form-element-background-color: #1e272e;
+            --pico-muted-border-color: #3a4249;
+            --contrast: #e0e0e0;
+        }
+        :root[data-theme=light] {
+            --pico-color: #1b2832;
+            --pico-muted-color: #73828c;
+            --pico-primary: #1095c1;
+            --pico-form-element-border-color: #cfd5db;
+            --pico-form-element-background-color: #f5f7f9;
+            --pico-muted-border-color: #e0e3e6;
+            --contrast: #1b2832;
+        }
         /* Sync with Scalar's .dark-mode class on body */
         body.dark-mode {
             --pico-color: #c2c8cc;
@@ -64,7 +82,7 @@
         }
         /* Also honor OS preference before Scalar initializes */
         @media (prefers-color-scheme: dark) {
-            :root {
+            :root:not([data-theme=light]) {
                 --pico-color: #c2c8cc;
                 --pico-muted-color: #8892a0;
                 --pico-primary: #44aece;
@@ -388,6 +406,7 @@
                         <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/></svg>
                     </a>
                 </li>
+                <li><a href="#" id="theme_switcher" aria-label="Toggle dark mode"></a></li>
 
             </ul>
         </nav>
@@ -480,18 +499,22 @@
         let currentUrl = null;
         let testRequestEnabled = true;
 
-        // --- Dark mode: let Scalar handle it; header follows OS preference initially ---
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // --- Dark mode: shared switcher controls header variables and Scalar config ---
+        const prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        let currentDarkMode = prefersDarkQuery.matches;
 
-        // --- Minimum version for OpenAPI (7.22.1+) ---
-        const MIN_VERSION = { major: 7, minor: 22, patch: 1 };
+        function selectedThemeIsDark() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            return theme === 'dark' || (theme !== 'light' && prefersDarkQuery.matches);
+        }
 
-        function meetsMinVersion(name) {
-            const v = parseVersion(name);
-            if (!v) return false;
-            if (v.major !== MIN_VERSION.major) return v.major > MIN_VERSION.major;
-            if (v.minor !== MIN_VERSION.minor) return v.minor > MIN_VERSION.minor;
-            return (v.patch || 0) >= MIN_VERSION.patch;
+        function syncThemeToScalar() {
+            currentDarkMode = selectedThemeIsDark();
+            document.body.classList.toggle('dark-mode', currentDarkMode);
+            document.body.classList.toggle('light-mode', !currentDarkMode);
+            if (scalarApp) {
+                scalarApp.updateConfiguration({ darkMode: currentDarkMode });
+            }
         }
 
         // --- URL helpers ---
@@ -531,16 +554,32 @@
             history.replaceState(null, '', url);
         }
 
-        // --- Version list (filtered to >= 7.22.1) ---
+        function hasNamedFile(items, name) {
+            return Array.isArray(items) && items.some(item => item.name === name && item.type === 'file');
+        }
+
+        function versionHasOpenApi(entry, extra) {
+            if (!entry) return false;
+            if (!extra) return hasNamedFile(entry.files, 'openapi.json');
+            const extraDir = Array.isArray(entry.dirs)
+                ? entry.dirs.find(dir => dir.name === 'extra' && dir.type === 'dir')
+                : null;
+            return hasNamedFile(extraDir?.files, 'openapi.json');
+        }
+
+        // --- Version list (filtered to published OpenAPI artifacts) ---
         function rebuildVersionSelect() {
             const filtered = allVersions
-                .map(v => v.name)
-                .filter(meetsMinVersion);
+                .filter(v => versionHasOpenApi(v, false) || versionHasOpenApi(v, true))
+                .map(v => v.name);
             rebuildSelect(versionSelect, filtered, testingCheck.checked);
         }
 
         // --- Check if openapi.json exists for a version+subdir ---
         async function checkOpenApiExists(version, extra) {
+            const entry = allVersions.find(v => v.name === version);
+            if (entry) return versionHasOpenApi(entry, extra);
+
             const url = getOpenApiUrl(version, extra);
             try {
                 const resp = await fetch(url, { method: 'HEAD' });
@@ -574,7 +613,7 @@
                 const altLabel = extra ? 'base schema (without extra-packages)' : 'extra-packages schema';
                 scalarStatus.innerHTML = `<p><strong>No OpenAPI schema found</strong> for
                     <code>${version}</code>${extra ? ' (extra-packages)' : ''}. OpenAPI generation
-                    was added in 7.22.1 &mdash; older versions have RAML only.
+                    is not published for every historical version.
                     Try the ${altLabel} or a different version.</p>`;
                 return;
             }
@@ -591,7 +630,7 @@
             } else {
                 scalarApp = Scalar.createApiReference('#scalar-ref', {
                     url: url,
-                    darkMode: prefersDark,
+                    darkMode: currentDarkMode,
                     theme: 'kepler',
                     withDefaultFonts: false,
                     hideDarkModeToggle: false,
@@ -656,6 +695,14 @@
         });
 
         // --- Init ---
+        initThemeSwitcher();
+        syncThemeToScalar();
+        new MutationObserver(syncThemeToScalar).observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme'],
+        });
+        prefersDarkQuery.addEventListener('change', syncThemeToScalar);
+
         // Close dropdown on outside click
         document.addEventListener('click', e => {
             for (const d of document.querySelectorAll('#app-header details.dropdown[open]')) {
@@ -686,14 +733,14 @@
         const _wmcp = registerWebMCPTools();
         _wmcp.register({
             name: 'get_openapi_schema_url',
-            description: 'Get the download URL for a RouterOS OpenAPI 3.0 schema. Available for versions 7.22.1 and newer. Returns the URL and availability status.',
+            description: 'Get the download URL for a RouterOS OpenAPI 3.0 schema. Availability is based on published openapi.json files in docs-index.json.',
             annotations: { readOnlyHint: true, untrustedContentHint: false },
             inputSchema: {
                 type: 'object',
                 properties: {
                     version: {
                         type: 'string',
-                        description: 'RouterOS version, e.g. "7.22.1". Must be 7.22.1 or newer.',
+                        description: 'RouterOS version, e.g. "7.22.1". Must have a published openapi.json artifact.',
                     },
                     extraPackages: {
                         type: 'boolean',
@@ -704,12 +751,13 @@
             execute: async ({ version, extraPackages }) => {
                 try {
                     const vers = await fetchVersionList();
-                    const stableVersions = vers.map(v => v.name).filter(v => !isPreRelease(v) && meetsMinVersion(v));
+                    const extra = !!extraPackages;
+                    const stableVersions = vers
+                        .filter(v => !isPreRelease(v.name) && versionHasOpenApi(v, extra))
+                        .map(v => v.name);
                     const ver = version || (stableVersions.length > 0 ? stableVersions[0] : null);
                     if (!ver) return JSON.stringify({ error: 'No OpenAPI-capable version available' });
-                    if (!meetsMinVersion(ver)) return JSON.stringify({ error: `Version ${ver} is below minimum 7.22.1 for OpenAPI schemas` });
 
-                    const extra = !!extraPackages;
                     const url = getOpenApiUrl(ver, extra);
                     const available = await checkOpenApiExists(ver, extra);
                     return JSON.stringify({ url, version: ver, available });

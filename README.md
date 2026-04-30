@@ -19,7 +19,7 @@ Pre-built schema files for the RouterOS REST API are available at
 Each RouterOS version includes:
 
 * **RAML** — RAML 1.0 schema, usable in [Postman](#usage-with-postman), MuleSoft, and other API tools
-* **OpenAPI 3** — OpenAPI 3.0 schema (7.21.1+), viewable in the [API Explorer](https://tikoci.github.io/restraml/openapi.html) with enriched descriptions from MikroTik documentation
+* **OpenAPI 3** — OpenAPI 3.0 schema where `openapi.json` has been generated, viewable in the [API Explorer](https://tikoci.github.io/restraml/openapi.html) with enriched descriptions from MikroTik documentation
 * **JSON** — raw `/console/inspect` output from RouterOS, useful for data analysis and diffs
 * **MIB** — link to the official MikroTik MIB for SNMP
 

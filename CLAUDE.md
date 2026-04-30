@@ -46,7 +46,7 @@ restraml/
 │   ├── index.html        # Main SPA: version list, diff tool, download links
 │   ├── lookup.html       # RouterOS command search tool (fully event-driven, no buttons)
 │   ├── diff.html         # Schema diff tool (side-by-side / line-by-line diff between versions)
-│   ├── openapi.html      # OpenAPI 3.0 API Explorer (Swagger UI)
+│   ├── openapi.html      # OpenAPI 3.0 API Explorer (Scalar)
 │   ├── tikapp.html       # /app YAML editor with Monaco + live validation
 │   ├── tikapp-manual.html # /app YAML documentation / manual reference
 │   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
@@ -59,7 +59,7 @@ restraml/
 │   ├── {version}/
 │   │   ├── schema.raml                          # RAML 1.0 schema (presence = "this version is built")
 │   │   ├── inspect.json                         # Raw /console/inspect output from RouterOS
-│   │   ├── openapi.json                         # OpenAPI 3.0 schema (7.21.1+)
+│   │   ├── openapi.json                         # OpenAPI 3.0 schema (when generated; see docs-index.json)
 │   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
 │   │   └── routeros-app-yaml-store-schema.json  # /app store schema for this version
@@ -462,7 +462,9 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 
 ### Tech Stack
 - **Pico CSS** (`@picocss/pico@2`) — the only CSS framework, loaded from CDN. No Bootstrap,
-  Tailwind, or other CSS frameworks.
+  Tailwind, or other CSS frameworks. Exception: `docs/openapi.html` intentionally does **not**
+  load Pico because Pico's global element styles conflict with Scalar's generated API-reference
+  DOM; it defines the small `--pico-*` variable subset needed by shared styles instead.
 - **JetBrains Mono** — the primary font for all pages. Use it creatively: monospace weight
   variation, italic, variable fonts, `letter-spacing`, `font-feature-settings` for ligatures, etc.
   The font can be used for fun visual effects — the constraint is the font choice, not how it's used.
@@ -471,11 +473,12 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
 - **No web frameworks** — no React, Vue, Angular, Svelte, etc. Vanilla JS only.
 - **No build tools** — no webpack, Vite, npm scripts for the HTML page itself. Single `.html` file.
 - **`restraml-shared.js`** — shared JS utilities (version parsing, theme switcher, share modal,
-  GitHub API fetch). All `docs/*.html` pages load this via `<script src="restraml-shared.js"></script>`.
+  published docs-index fetch). All `docs/*.html` pages load this via `<script src="restraml-shared.js"></script>`.
   When modifying shared behavior, change this file — not inline copies. When creating a new page,
   include this script before page-specific code.
 - **`restraml-shared.css`** — shared CSS loaded by all pages via
-  `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`).
+  `<link rel="stylesheet" href="restraml-shared.css">` (after Pico CSS, before page `<style>`;
+  `openapi.html` loads it without Pico as the Scalar exception).
   Contains: font overrides (JetBrains Mono + Manrope), inline code/kbd tightening (prevents
   line-height bloat in paragraphs), MikroTik logo dark/light swap, theme switcher icon sizing,
   Tools dropdown LTR fix, `.page-guide` pattern (collapsible help sections), `.share-modal`
@@ -487,8 +490,9 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   events for checkboxes and `<select>` elements. Cancellation tokens (incrementing counter compared
   before and after each `await`) prevent stale results from racing async fetches.
 - **Client-side SPA** — all logic runs in the browser. There is no backend. GitHub Pages serves
-  static files only. Use the **GitHub REST API** or **GitHub GraphQL API** for dynamic data
-  (version lists, file contents, etc.).
+  static files only. Prefer the published `docs/docs-index.json` inventory for version and file
+  availability; use the **GitHub REST API** or **GitHub GraphQL API** only for metadata that is not
+  already published there.
 - **Minimal dependencies** — only add a CDN library if it meaningfully solves a problem (e.g.,
   `json-diff`, `highlight.js`, `deep-diff`, `jsonpath`). Keep the CDN dependency count low.
 - **Shareable URLs — query string pattern**: All tool pages support query strings that populate
@@ -503,7 +507,7 @@ All HTML pages served from `docs/` (GitHub Pages) follow these non-negotiable co
   - `lookup.html`: `path` (without leading slash), `attr`, `version`, `allVersions` (true),
     `testing` (true), `extra` (true)
 - **Share button — two patterns exist**:
-  - **Preferred: inline "Copied!" button** (`lookup.html`, `tikapp.html`, `diff.html`): A `<button>` that
+  - **Preferred: inline "Copied!" button** (`lookup.html`, `tikapp.html`, `diff.html`, `openapi.html`): A `<button>` that
     calls `writeQueryParams()`, copies the URL via `navigator.clipboard.writeText()`, and swaps
     its text to "✓ Copied!" for 1.8 seconds. No modal, no dialog. Place it right-aligned on the
     same line as the Results heading. All pages use this pattern.
@@ -559,7 +563,8 @@ in `docs/` offering different views of the schema data. Pattern: `docs/custom-vi
 - No server-side code, no backend, no build step.
 - **Include the shared Tools nav dropdown** (see "Tools Nav Dropdown" section below) for consistent navigation.
 - Include `<link rel="stylesheet" href="restraml-shared.css">` after Pico CSS and Google Fonts,
-  before any page-specific `<style>` block. This provides fonts, logo swap, theme switcher,
+  before any page-specific `<style>` block (except `openapi.html`, which avoids Pico for Scalar
+  compatibility). This provides fonts, logo swap, theme switcher,
   page-guide, share-modal, and utility classes — no need to duplicate these in page styles.
 - Include `<script src="restraml-shared.js"></script>` before page-specific scripts. Call
   `initThemeSwitcher()`. For sharing, use the inline "Copied!" button pattern (see Share

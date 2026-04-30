@@ -213,9 +213,14 @@ function initThemeSwitcher(id) {
     const el = document.getElementById(id)
     let state = 'auto'
 
-    document.addEventListener('DOMContentLoaded', () => {
+    const setInitialIcon = () => {
         el.innerHTML = _THEME_ICONS.osDefault
-    })
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setInitialIcon)
+    } else {
+        setInitialIcon()
+    }
 
     el.addEventListener('click', e => {
         e.preventDefault()

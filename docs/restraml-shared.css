@@ -8,6 +8,8 @@
  * When adding a new docs/*.html page, include this stylesheet via:
  *   <link rel="stylesheet" href="restraml-shared.css">
  * Load it AFTER Pico CSS and Google Fonts, BEFORE page-specific <style>.
+ * Exception: openapi.html loads this without Pico because Scalar conflicts
+ * with Pico's global element styles.
  *
  * This file is organized into these sections:
  *   1. Font overrides (JetBrains Mono + Manrope over Pico defaults)
@@ -16,7 +18,7 @@
  *   4. Theme switcher icon sizing
  *   5. Tools nav dropdown LTR fix
  *   6. Page guide pattern (collapsible help sections)
- *   7. Share modal styling
+ *   7. Legacy share modal styling
  *   8. Utility classes (inline style="" replacements)
  *   9. Site footer
  * ===================================================================== */
@@ -118,9 +120,9 @@ details.dropdown ul li { direction: ltr; }
 
 
 /* -----------------------------------------------------------------
- * 7. Share modal styling
- *    Replaces inline style="" attributes on <dialog> and its children.
- *    Used by lookup.html and diff.html.
+ * 7. Legacy share modal styling
+ *    Kept for initShareModal() consumers. Current root tool pages use the
+ *    inline "Copied!" share button pattern instead of <dialog>.
  * ----------------------------------------------------------------- */
 dialog.share-modal {
     max-width: 36rem;

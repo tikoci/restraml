@@ -111,7 +111,8 @@ Diff outcome from the local run:
 - Completion enum drift: 1,137 args (real schema differences)
 - Zero type mismatches
 
-These files are preserved at `/tmp/multi-arch-dev/` for comparison.
+Use the checked-in workflow assertions and published `docs/{version}/extra/deep-inspect.*.json`
+artifacts for durable comparison. Local `/tmp` experiment directories are disposable.
 
 ### Tasks
 
@@ -135,7 +136,7 @@ See "What correct local output looks like" above. Numbers pass the sniff test.
 
 #### 3.5 — CI integration: `deep-inspect-multi-arch.yaml` ✅ RESOLVED
 
-**Fixed (June 2026):** The arm64 CI job now works under both KVM and TCG.
+**Fixed in commit 7052106:** The arm64 CI job now works under both KVM and TCG.
 
 **Root cause:** Insufficient RAM (256 MB) caused memory pressure with 17 extra packages
 under TCG emulation, inflating REST calls from ~70ms to ~10s+ and eventually crashing the
