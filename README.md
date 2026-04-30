@@ -156,6 +156,7 @@ restraml/
 ├── validate-openapi.ts       # OpenAPI 3.0 schema validator
 ├── *.test.ts                 # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu       # Local dev: RouterOS CHR in QEMU via Docker
+├── BACKLOG.md                # Actionable queue for future work
 ├── scripts/
 │   ├── entrypoint.sh         # QEMU launcher for local Docker use
 │   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local CHR
@@ -167,6 +168,7 @@ restraml/
 │   ├── lookup.html           # Command search tool
 │   ├── diff.html             # Schema diff tool
 │   ├── tikapp.html           # /app YAML editor (Monaco-based)
+│   ├── deep-inspect.md       # Deep-inspect design/history reference
 │   ├── routeros-app-yaml-schema.latest.json
 │   ├── routeros-app-yaml-store-schema.latest.json
 │   └── {version}/            # Per-version schemas (RAML, OpenAPI 3, inspect JSON)

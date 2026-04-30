@@ -49,6 +49,7 @@ restraml/
 │   ├── openapi.html      # OpenAPI 3.0 API Explorer (Scalar)
 │   ├── tikapp.html       # /app YAML editor with Monaco + live validation
 │   ├── tikapp-manual.html # /app YAML documentation / manual reference
+│   ├── deep-inspect.md   # Deep-inspect design/history reference
 │   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
 │   ├── restraml-shared.css # Shared CSS: fonts, logo, theme, guide, modal, utilities
 │   ├── docs-index.json     # Published JSON inventory of root docs assets and per-version files
@@ -268,7 +269,8 @@ confirmed RouterOS bug, not a client-side issue.
   if MikroTik fixes the bug; `benchmark.test.ts` and `native-api.test.ts` were removed (research artifacts)
 - `--transport rest` is now the explicit default in `deep-inspect.ts`
 - If MikroTik fixes the bug, the hybrid approach (REST crawl + native enrichment) becomes viable
-- See `BACKLOG.md` Phase 2.9 and `docs/mikrotik-bug-native-api-inspect.md` for full investigation details
+- See `docs/mikrotik-bug-native-api-inspect.md` for the full investigation
+  and `docs/deep-inspect.md` for deep-inspect pipeline context.
 
 ### Two Build Variants
 - **Base** (`manual-using-docker-in-docker.yaml`): base RouterOS only
@@ -871,15 +873,16 @@ via the `quickchr` library (`installAllPackages: true`), applies a p1 trial
 license if MikroTik web credentials are available (env vars for CI,
 Bun.secrets for local via `quickchr login`), runs `deep-inspect.ts --live`
 as a subprocess, and writes `deep-inspect.<arch>.json` / `openapi.<arch>.json`
-side-by-side. Exits nonzero per BACKLOG principle 3 if any arch has crash
-paths or failed args — anomalies are the point, not something to tolerate.
-See `BACKLOG.md` Phase 3 for the decision context and the first-run findings.
+side-by-side. Exits nonzero if any arch has crash paths or failed args —
+anomalies are the point, not something to tolerate. See
+`docs/deep-inspect.md` for design rules, Phase 3 history, and first-run
+findings.
 
 **Diff tool** (`deep-inspect:diff`) reports structural delta (paths only in
 one arch), completion enum drift (same arg, different `_completion` keysets —
 this is the bucket that surfaces real schema gaps), and a `_meta` side-by-side.
 Does not merge, does not decide who is right; always exits 0. The text report
-is the intended CI artifact once Phase 3.5 lands.
+is published by the multi-arch CI workflow as a diagnostic artifact.
 
 **Local CHR test scripts** (`test:ros-api`, `test:qemu`, `test:benchmark`) boot a RouterOS CHR
 VM using [mikropkl](https://github.com/tikoci/mikropkl) machine directories searched in this order:
@@ -1006,32 +1009,19 @@ unilaterally; flag them in code comments and issue discussions.
 
 ---
 
-## Things That Are Known-Broken or Incomplete
+## Reference Notes / Known-Broken or Incomplete
 
 ### `deep-inspect-multi-arch.yaml` — ARM64 CI (RESOLVED)
-The arm64 CI job now works under both KVM (when available) and TCG (software emulation).
-Previous failures were caused by **insufficient RAM** (256 MB), not TCG being inherently slow.
-
-**Root cause:** With 17 extra packages loaded, 256 MB caused severe memory pressure under TCG,
-inflating REST calls from ~70ms to ~10s+ and eventually crashing the REST server. Increasing
-to 1024 MB (matching quickchr's cross-arch default) resolved all failures.
-
-**Measured CI results (TCG, 1024 MB, run #24583323420):**
-- arm64 argsTotal: **35,594** (x86: 34,548) — full, genuine output
-- arm64 deep-inspect time: ~11 min (x86 with KVM: ~2 min)
-- Total arm64 job time: ~15 min (boot + packages + deep-inspect)
-
-**Key implementation details:**
-- KVM probed first (fast path); TCG fallback if unavailable
-- curl timeouts: 3s (KVM) / 15s (TCG) — TCG HTTP round-trips take 5-15s
-- `--request-timeout`: 30s (KVM) / 120s (TCG)
-- RAM: 1024 MB for both modes (extra memory never hurts)
-- Package install via REST `/execute` (no SCP — works under both KVM and TCG)
+The arm64 CI job now works under both KVM (when available) and TCG (software
+emulation). Previous failures were caused by **insufficient RAM** (256 MB), not
+TCG being inherently slow. Any workflow that installs all extra packages should
+use 1024 MB RAM. See `docs/deep-inspect.md` for the full postmortem, measured
+baselines, and implementation details.
 
 ### Native API `/console/inspect` Completion Non-Determinism
 RouterOS 7.22.1 (and likely all 7.x) returns non-deterministic results for `request=completion`
 queries via the native API binary protocol. ~20-30% of calls randomly drop entries. REST is
-unaffected. See `BACKLOG.md` Phase 2.9 and `docs/mikrotik-bug-native-api-inspect.md`.
+unaffected. See `docs/mikrotik-bug-native-api-inspect.md`.
 **Workaround:** All CI uses `--transport rest` (now the default). `NativeRouterOSClient` and
 `ros-api-protocol.ts` remain in the codebase for potential use if MikroTik fixes the bug.
 Research test files (`benchmark.test.ts`, `native-api.test.ts`) and the experimental CI
@@ -1045,7 +1035,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
 
 1. **Never increase a timeout without first understanding why the step is slow.** If a step
    takes 10× longer than the measured baseline, the timeout is not the problem. ARM64 TCG on
-   x86_64 boots in ~20s, not 600s. See `BACKLOG.md` for measured timing baselines.
+   x86_64 boots in ~20s, not 600s. See `docs/deep-inspect.md` for measured timing baselines.
 
 2. **Always verify extra packages are actually installed.** After any reboot step that activates
    packages, `GET /rest/system/package` must show >10 packages. If it shows only `["routeros"]`,
@@ -1054,8 +1044,8 @@ These rules apply to **all agents working on CI workflows** in this repository:
 3. **Check the output, not just the exit code.** A green CI badge means nothing if the arm64
    file has 577 args instead of 36,023. Add assertions for expected arg counts and diff ranges.
 
-4. **Do not violate BACKLOG.md guiding principles to work around bugs.** Both arches must do
-   their own live crawl (principle 2). Per-arch files before merge (principle 4). If the arm64
+4. **Do not violate deep-inspect design rules to work around bugs.** Both arches must do
+   their own live crawl, and per-arch files must be published before any merge. If the arm64
    crawl is "too slow", the fix is to debug why, not to skip it.
 
 5. **Verify locally before pushing to CI.** CI builds take 30–90 minutes per attempt. Use

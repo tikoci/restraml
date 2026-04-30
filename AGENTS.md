@@ -75,10 +75,11 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 All schema generation uses the REST API. The native API (`--transport native`) is NOT used in CI
 due to a RouterOS bug where `/console/inspect` with `request=completion` returns non-deterministic
 results via the native protocol (~20-30% of calls randomly drop entries). REST is 100% deterministic.
-**Do not change CI workflows to `--transport native`.** See `CLAUDE.md` and `BACKLOG.md` Phase 2.9
-for full details. `ros-api-protocol.ts` and `NativeRouterOSClient` remain for potential future use
-if MikroTik fixes the bug; `benchmark.test.ts` and `native-api.test.ts` were removed (research artifacts)
-and `test-transport-equivalence.yaml` was deleted (proven moot). `--transport rest` is the default.
+**Do not change CI workflows to `--transport native`.** See `CLAUDE.md` and
+`docs/mikrotik-bug-native-api-inspect.md` for full details. `ros-api-protocol.ts` and
+`NativeRouterOSClient` remain for potential future use if MikroTik fixes the bug;
+`benchmark.test.ts` and `native-api.test.ts` were removed (research artifacts), and
+`test-transport-equivalence.yaml` was deleted (proven moot). `--transport rest` is the default.
 
 ### /app YAML Schema Files (`docs/`)
 RouterOS 7.22+ includes `/app` — a `docker-compose`-lite YAML format for custom container apps.
@@ -147,7 +148,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 2. Identify the failing step and error message.
 3. Fix the workflow YAML or the referenced script.
 4. Validate YAML syntax locally if possible.
-5. **Read `BACKLOG.md` and `CLAUDE.md` → "CI Anti-Patterns" before changing timeouts or
+5. **Read `docs/deep-inspect.md` and `CLAUDE.md` → "CI Anti-Patterns" before changing timeouts or
    adding workarounds.** Never increase a timeout without first understanding why the step is
    slow. Never skip a crawl or enrichment step to make a build "pass".
 6. **For `deep-inspect-multi-arch.yaml`:** The ARM64 job now works under both KVM and TCG.
@@ -209,6 +210,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `scripts/diff-deep-inspect.ts` | Diff two deep-inspect.<arch>.json files (enum drift + path delta) |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
 | `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
+| `docs/deep-inspect.md` | Deep-inspect design/history reference; shipped Phase 3 and ARM64 CI postmortem |
 | `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |
 | `docs/routeros-app-yaml-store-schema.latest.json` | /app store schema — do not rename |
 | `docs/docs-index.json` | Published inventory of root docs files + per-version file listings |

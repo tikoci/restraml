@@ -21,6 +21,7 @@ the `/docs/` directory in this repository.
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
 - **`ros-api-protocol.ts`** — Vendored RouterOS native API wire protocol (kept for future use; NOT used in CI)
 - **`Dockerfile.chr-qemu`** — Alpine image that runs RouterOS CHR in QEMU
+- **`docs/deep-inspect.md`** — Deep-inspect design/history reference and ARM64 CI postmortem
 - **`docs/`** — Published schema files, one subdirectory per RouterOS version
 - **`docs/restraml-shared.js`** — Shared JS utilities for all docs/*.html pages (version parsing, theme switcher, share modal, GitHub API)
 - **`docs/restraml-shared.css`** — Shared CSS for all docs/*.html pages (fonts, logo swap, theme icon, page-guide, share-modal, utility classes)
@@ -40,7 +41,7 @@ the `/docs/` directory in this repository.
   publicly known URLs linked externally — **never rename or move these files**
 - **CI always uses `--transport rest`** for all schema generation — RouterOS native API has a non-determinism
   bug that randomly drops completion entries. Do not change transport to `native` or `auto` in CI workflows.
-  See `CLAUDE.md` → "Native API Transport Policy" and `BACKLOG.md` Phase 2.9.
+  See `CLAUDE.md` → "Native API Transport Policy" and `docs/mikrotik-bug-native-api-inspect.md`.
 
 ## /app YAML Schema System (7.22+)
 
