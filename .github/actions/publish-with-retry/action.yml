@@ -63,8 +63,12 @@ runs:
 
         # Do not add git clean -fd here; later upload-artifact steps rely on untracked build outputs.
         for attempt in {1..5}; do
-          if git push origin main; then
-            exit 0
+          push_output=$(git push origin main 2>&1) && exit 0
+          # Only retry non-fast-forward conflicts; auth/protection/etc. should fail fast,
+          # not burn four more fetch/reset/rebuild cycles before reporting.
+          if ! printf '%s' "$push_output" | grep -qE '\[rejected\].*(non-fast-forward|fetch first)'; then
+            echo "::error::Push failed for a non-retriable reason: $push_output"
+            exit 1
           fi
           if [ "$attempt" -eq 5 ]; then
             echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
