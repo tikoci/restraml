@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-07T16:46:00.435Z",
+  "generatedAt": "2026-05-07T16:47:23.889Z",
   "rootPath": "docs",
   "latestVersion": "7.23beta5",
   "latestStableVersion": "7.22.2",
@@ -257,21 +257,6 @@
           "type": "file"
         },
         {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc3/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc3/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc3/openapi.json",
-          "type": "file"
-        },
-        {
           "name": "routeros-app-yaml-schema.json",
           "path": "docs/7.23rc3/routeros-app-yaml-schema.json",
           "type": "file"
@@ -280,14 +265,38 @@
           "name": "routeros-app-yaml-store-schema.json",
           "path": "docs/7.23rc3/routeros-app-yaml-store-schema.json",
           "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc3/schema.raml",
-          "type": "file"
         }
       ],
-      "dirs": []
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.23rc3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23rc3/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23rc3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23rc3/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23rc3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
     },
     {
       "name": "7.23rc2",
