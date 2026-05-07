@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-04-30T22:24:48.694Z",
+  "generatedAt": "2026-05-07T11:15:08.744Z",
   "rootPath": "docs",
   "latestVersion": "7.23beta5",
   "latestStableVersion": "7.22.2",
@@ -245,6 +245,19 @@
           "dirs": []
         }
       ]
+    },
+    {
+      "name": "7.23rc3",
+      "path": "docs/7.23rc3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23rc3/app.json",
+          "type": "file"
+        }
+      ],
+      "dirs": []
     },
     {
       "name": "7.23rc2",
