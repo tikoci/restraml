@@ -1,0 +1,98 @@
+name: Publish with retry
+description: Commit published docs artifacts and retry pushes after rebuilding docs-index.json
+
+inputs:
+  publish-paths:
+    description: Newline-separated files or directories to stage initially and restore on retry.
+    required: true
+  commit-message:
+    description: Commit message for the publish commit.
+    required: true
+  docs-index-excludes:
+    description: Newline-separated docs paths to pass as --exclude when rebuilding docs-index.json.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Commit and push with retry
+      shell: bash
+      env:
+        PUBLISH_PATHS_INPUT: ${{ inputs.publish-paths }}
+        DOCS_INDEX_EXCLUDES_INPUT: ${{ inputs.docs-index-excludes }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+
+        mapfile -t PUBLISH_PATHS < <(printf '%s\n' "$PUBLISH_PATHS_INPUT" | sed '/^$/d')
+        mapfile -t DOCS_INDEX_EXCLUDES < <(printf '%s\n' "$DOCS_INDEX_EXCLUDES_INPUT" | sed '/^$/d')
+
+        if [ "${#PUBLISH_PATHS[@]}" -eq 0 ]; then
+          echo "::error::publish-paths input is empty"
+          exit 1
+        fi
+
+        run_docs_index() {
+          if [ "${#DOCS_INDEX_EXCLUDES[@]}" -eq 0 ]; then
+            bun run docs:index
+            return
+          fi
+
+          local index_args=()
+          local path
+          for path in "${DOCS_INDEX_EXCLUDES[@]}"; do
+            index_args+=(--exclude "$path")
+          done
+          bun run docs:index -- "${index_args[@]}"
+        }
+
+        if ! run_docs_index; then
+          echo "::error::docs:index failed before commit"
+          exit 1
+        fi
+
+        git add "${PUBLISH_PATHS[@]}" docs/docs-index.json
+        if git diff --cached --quiet; then
+          echo "No changes to commit — files already match."
+          exit 0
+        fi
+
+        git commit -m "$COMMIT_MESSAGE"
+        LOCAL_COMMIT=$(git rev-parse HEAD)
+
+        # Do not add git clean -fd here; later upload-artifact steps rely on untracked build outputs.
+        for attempt in {1..5}; do
+          push_output=$(git push origin main 2>&1) && exit 0
+          # Only retry non-fast-forward conflicts; auth/protection/etc. should fail fast,
+          # not burn four more fetch/reset/rebuild cycles before reporting.
+          if ! printf '%s' "$push_output" | grep -qE '\[rejected\].*(non-fast-forward|fetch first)'; then
+            echo "::error::Push failed for a non-retriable reason: $push_output"
+            exit 1
+          fi
+          if [ "$attempt" -eq 5 ]; then
+            echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
+            exit 1
+          fi
+
+          echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
+          git fetch origin main
+          git reset --hard origin/main
+          git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${PUBLISH_PATHS[@]}" || {
+            echo "::error::git restore failed for $LOCAL_COMMIT"
+            exit 1
+          }
+          if ! run_docs_index; then
+            echo "::error::docs:index failed on retry attempt $attempt"
+            exit 1
+          fi
+
+          git add "${PUBLISH_PATHS[@]}" docs/docs-index.json
+          if git diff --cached --quiet; then
+            echo "Remote already contains the publish changes after syncing."
+            exit 0
+          fi
+
+          git commit -m "$COMMIT_MESSAGE"
+          sleep $(( (2 ** attempt) + (RANDOM % 5) ))
+        done

@@ -321,34 +321,50 @@ docs/{rosver}/extra/{schema.raml,...}   # extra-packages build only
 
 ### Concurrent Build Push — Retry Pattern
 Multiple workflows (base + extra, multiple RouterOS versions) can run at the same time. All push
-to `main`, so a simple `git push` will fail if another job committed first. The fix used in all
-build workflows is to **commit first, then retry the push with `git pull --rebase`** on rejection:
+to `main`, so a simple `git push` will fail if another job committed first. Because every publish
+workflow also regenerates `docs/docs-index.json`, replaying a local publish commit with
+`git pull --rebase` can conflict in that generated file even when the version-specific docs trees
+do not overlap.
 
-```bash
-git add docs/${ROSVER}/
-git commit -m "Publish ${ROSVER} ..."
-# Retry up to 5 times with rebase on push rejection
-for attempt in {1..5}; do
-  if git push origin main; then
-    break
-  elif [ $attempt -eq 5 ]; then
-    echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
-    exit 1
-  fi
-  echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-  # Clean up unstaged changes left by bun install / npm install BEFORE rebase.
-  # Do NOT run this before artifact upload — run it only when a push fails.
-  git checkout -- .
-  git clean -fd
-  git pull --rebase
-  sleep $((RANDOM % 10 + 5))
-done
+All publish workflows now use the shared composite action
+`.github/actions/publish-with-retry`. It implements the required contract:
+
+- stage the publish paths plus `docs/docs-index.json`
+- skip empty commits cleanly on reruns / identical output
+- capture `LOCAL_COMMIT` **once** immediately after the initial publish commit
+- on push rejection, `git fetch` + `git reset --hard origin/main`, restore the original publish
+  paths from `LOCAL_COMMIT`, rebuild `docs/docs-index.json`, and retry
+- fail immediately if `git restore` or `bun run docs:index` fails
+- use exponential backoff with jitter between retries
+
+Typical usage:
+
+```yaml
+- uses: ./.github/actions/publish-with-retry
+  with:
+    publish-paths: |
+      docs/${{ steps.connection-check.outputs.rosver }}/
+    commit-message: Publish ${{ steps.connection-check.outputs.rosver }} [${{ github.workflow }}]
 ```
 
 This is safe because each build writes to its own `docs/{version}/` directory — there are no
-real file conflicts between concurrent jobs. **Do not revert to a simple `git pull` + `git push`
-pattern.** The `git checkout -- .` / `git clean -fd` are required because `bun install` /
-`npm install` modify tracked files (`package.json`, `bun.lock`) which would block `git pull --rebase`.
+real file conflicts between concurrent jobs, and `docs/docs-index.json` is always regenerated
+from the full post-sync tree before retrying. **Do not revert to a simple `git pull` + `git push`
+or `git pull --rebase` pattern**, and do not inline a separate retry loop when the shared action
+already fits the workflow.
+
+For the `/app` `app.json` publish step, pass the not-yet-published per-version schema files via
+the action's `docs-index-excludes` input so `docs-index.json` is rebuilt without prematurely
+advertising schema artifacts that were intentionally withheld after validation failures.
+
+**Do NOT add `git clean -fd` to the retry loop.** The previous rebase-based pattern needed it
+because `bun install` left modified tracked files (`package.json`, `bun.lock`) that would block
+`git pull --rebase`. The new `git reset --hard origin/main` silently overwrites tracked-file
+modifications, so the clean step is unnecessary — and it would delete the untracked build outputs
+at the repo root (`ros-rest*.raml`, `ros-inspect*.json`, `deep-inspect*.json`, `openapi.json`,
+`index.html`) that the subsequent "Save build artifacts" / "Upload all build artifacts" steps
+upload. The empty-commit guard (`git diff --cached --quiet` after the initial `git add`) is also
+required so re-runs and identical-output cases exit cleanly instead of failing on an empty commit.
 
 ---
 

@@ -208,36 +208,12 @@ jobs:
         if [ -f openapi.json ]; then cp openapi.json "$DOCS_PATH/"; fi
         echo "subpath=$ROS_FILTER" >> $GITHUB_OUTPUT
 
-    - name: Rebuild published docs index
-      run: bun run docs:index
-
     - name: Commit and push schema to repository
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git add docs/${{ steps.connection-check.outputs.rosver }}/ docs/docs-index.json
-        git commit -m "Publish ${{ steps.connection-check.outputs.rosver }} ${{ steps.publish-to-docs.outputs.subpath }} [${{ github.workflow }}]"
-        # Retry push with pull --rebase to handle concurrent build conflicts.
-        # Multiple builds (base + extra, multiple versions) can run simultaneously and all
-        # push to main. If another job commits first the push is rejected; rebasing our commit
-        # on top of the new remote state is safe because each build writes to its own
-        # docs/{version}/ directory — there are no real file conflicts to resolve.
-        for attempt in {1..5}; do
-          if git push origin main; then
-            break
-          elif [ $attempt -eq 5 ]; then
-            echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
-            exit 1
-          fi
-          echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-          # Clean up unstaged changes left by bun install / npm install so that
-          # git pull --rebase can proceed. Do this right before rebase, not before
-          # artifact upload (which happens after push succeeds or fails).
-          git checkout -- .
-          git clean -fd
-          git pull --rebase
-          sleep $((RANDOM % 10 + 5))
-        done
+      uses: ./.github/actions/publish-with-retry
+      with:
+        publish-paths: |
+          docs/${{ steps.connection-check.outputs.rosver }}/
+        commit-message: Publish ${{ steps.connection-check.outputs.rosver }} ${{ steps.publish-to-docs.outputs.subpath }} [${{ github.workflow }}]
 
     - name: Save build artifacts
       uses: actions/upload-artifact@v7

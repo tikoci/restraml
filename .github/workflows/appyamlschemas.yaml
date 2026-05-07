@@ -241,43 +241,33 @@ jobs:
           })
           console.log('Created GitHub issue for validation failures')
 
+    - name: Check app.json publish artifact
+      if: always() && steps.connection-check.outcome == 'success'
+      id: app-json-artifact
+      run: |
+        ROSVER="${{ steps.connection-check.outputs.rosver }}"
+        APP_JSON_PATH="docs/${ROSVER}/app.json"
+        if [ -f "$APP_JSON_PATH" ]; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          echo "path=$APP_JSON_PATH" >> "$GITHUB_OUTPUT"
+          echo "Found $APP_JSON_PATH"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "No app.json found — /app fetch may have been skipped or failed"
+        fi
+
     - name: Commit app.json (raw /app data) if fetch succeeded
       # app.json is valuable for debugging/review — commit it if we fetched it,
       # regardless of whether the schemas passed validation or not.
-      if: always() && steps.connection-check.outcome == 'success'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        ROSVER="${{ steps.connection-check.outputs.rosver }}"
-        bun run docs:index -- \
-          --exclude "docs/${ROSVER}/routeros-app-yaml-schema.json" \
-          --exclude "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
-        if [ -f "docs/${ROSVER}/app.json" ]; then
-          echo "Committing app.json (raw /app data from CHR)"
-          git add "docs/${ROSVER}/app.json" docs/docs-index.json
-          if git diff --cached --quiet; then
-            echo "No changes to app.json — already up to date"
-          else
-            git commit -m "Add ${ROSVER} app.json (raw /app data) [${{ github.workflow }}]"
-            # Retry push with pull --rebase to handle concurrent build conflicts.
-            for attempt in {1..5}; do
-              if git push origin main; then
-                break
-              elif [ $attempt -eq 5 ]; then
-                echo "::error::Failed to push app.json after 5 attempts"
-                exit 1
-              fi
-              echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-              # Clean up unstaged changes so rebase can proceed
-              git checkout -- .
-              git clean -fd
-              git pull --rebase
-              sleep $((RANDOM % 10 + 5))
-            done
-          fi
-        else
-          echo "No app.json found — /app fetch may have been skipped or failed"
-        fi
+      if: always() && steps.connection-check.outcome == 'success' && steps.app-json-artifact.outputs.exists == 'true'
+      uses: ./.github/actions/publish-with-retry
+      with:
+        publish-paths: |
+          ${{ steps.app-json-artifact.outputs.path }}
+        commit-message: Add ${{ steps.connection-check.outputs.rosver }} app.json (raw /app data) [${{ github.workflow }}]
+        docs-index-excludes: |
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-schema.json
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-store-schema.json
 
     - name: Publish and commit per-version /app YAML schemas
       # Only publish/commit schemas if validation passed completely (exit code 0).
@@ -285,39 +275,12 @@ jobs:
       # MikroTik apps don't conform — per user feedback, don't commit until both pass
       # so auto.yaml can detect missing schemas and retry the build.
       if: steps.validate.outputs.exit_code == '0'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        ROSVER="${{ steps.connection-check.outputs.rosver }}"
-        bun run docs:index
-        echo "Per-version schemas written to docs/${ROSVER}/ by appyamlvalidate.js"
-        ls -lh "docs/${ROSVER}/routeros-app-yaml-schema.json" \
-                "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
-        
-        git add "docs/${ROSVER}/routeros-app-yaml-schema.json" \
-                "docs/${ROSVER}/routeros-app-yaml-store-schema.json" \
-                docs/docs-index.json
-        
-        if git diff --cached --quiet; then
-          echo "No schema changes to commit — already up to date"
-        else
-          git commit -m "Publish ${ROSVER} /app YAML schemas [${{ github.workflow }}]"
-          # Retry push with pull --rebase to handle concurrent build conflicts.
-          for attempt in {1..5}; do
-            if git push origin main; then
-              break
-            elif [ $attempt -eq 5 ]; then
-              echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
-              exit 1
-            fi
-            echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-            # Clean up unstaged changes so rebase can proceed
-            git checkout -- .
-            git clean -fd
-            git pull --rebase
-            sleep $((RANDOM % 10 + 5))
-          done
-        fi
+      uses: ./.github/actions/publish-with-retry
+      with:
+        publish-paths: |
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-schema.json
+          docs/${{ steps.connection-check.outputs.rosver }}/routeros-app-yaml-store-schema.json
+        commit-message: Publish ${{ steps.connection-check.outputs.rosver }} /app YAML schemas [${{ github.workflow }}]
 
     - name: Save validation artifacts
       uses: actions/upload-artifact@v7

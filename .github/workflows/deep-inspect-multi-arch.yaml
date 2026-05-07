@@ -562,35 +562,12 @@ jobs:
           echo "Published to: $DOCS_PATH"
           ls -lh "$DOCS_PATH"/deep-inspect.*.json "$DOCS_PATH"/diff-deep-inspect.json
 
-      - name: Rebuild published docs index
-        run: bun run docs:index
-
       - name: Commit and push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VER="${{ inputs.rosver }}"
-          git add "docs/${VER}/extra/" docs/docs-index.json
-          # Only commit if there are changes (handles re-runs gracefully)
-          if git diff --cached --quiet; then
-            echo "No changes to commit — files already match."
-            exit 0
-          fi
-          git commit -m "Publish ${VER} deep-inspect multi-arch [${{ github.workflow }}]"
-          # Retry push with pull --rebase to handle concurrent build conflicts.
-          for attempt in {1..5}; do
-            if git push origin main; then
-              break
-            elif [ $attempt -eq 5 ]; then
-              echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
-              exit 1
-            fi
-            echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-            git checkout -- .
-            git clean -fd
-            git pull --rebase
-            sleep $((RANDOM % 10 + 5))
-          done
+        uses: ./.github/actions/publish-with-retry
+        with:
+          publish-paths: |
+            docs/${{ inputs.rosver }}/extra/
+          commit-message: Publish ${{ inputs.rosver }} deep-inspect multi-arch [${{ github.workflow }}]
 
       - name: Upload all build artifacts
         uses: actions/upload-artifact@v7
