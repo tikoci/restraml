@@ -321,13 +321,19 @@ docs/{rosver}/extra/{schema.raml,...}   # extra-packages build only
 
 ### Concurrent Build Push — Retry Pattern
 Multiple workflows (base + extra, multiple RouterOS versions) can run at the same time. All push
-to `main`, so a simple `git push` will fail if another job committed first. The fix used in all
-build workflows is to **commit first, then retry the push with `git pull --rebase`** on rejection:
+to `main`, so a simple `git push` will fail if another job committed first. Because every publish
+workflow also regenerates `docs/docs-index.json`, replaying a local publish commit with
+`git pull --rebase` can conflict in that generated file even when the version-specific docs trees
+do not overlap. The fix used in publish workflows is to **commit first, then on push rejection
+reset to `origin/main`, restore the version-specific publish tree from the local commit, regenerate
+`docs/docs-index.json`, recommit, and retry**:
 
 ```bash
-git add docs/${ROSVER}/
-git commit -m "Publish ${ROSVER} ..."
-# Retry up to 5 times with rebase on push rejection
+PUBLISH_PATH="docs/${ROSVER}/"
+COMMIT_MESSAGE="Publish ${ROSVER} ..."
+git add "$PUBLISH_PATH" docs/docs-index.json
+git commit -m "$COMMIT_MESSAGE"
+# Retry up to 5 times after rebuilding docs-index on push rejection
 for attempt in {1..5}; do
   if git push origin main; then
     break
@@ -335,20 +341,27 @@ for attempt in {1..5}; do
     echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
     exit 1
   fi
-  echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebasing and retrying..."
-  # Clean up unstaged changes left by bun install / npm install BEFORE rebase.
-  # Do NOT run this before artifact upload — run it only when a push fails.
-  git checkout -- .
+  echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
+  LOCAL_COMMIT=$(git rev-parse HEAD)
   git clean -fd
-  git pull --rebase
+  git fetch origin main
+  git reset --hard origin/main
+  git restore --source="$LOCAL_COMMIT" --worktree --staged -- "$PUBLISH_PATH"
+  bun run docs:index
+  git add "$PUBLISH_PATH" docs/docs-index.json
+  if git diff --cached --quiet; then
+    echo "Remote already contains the publish changes after syncing."
+    break
+  fi
+  git commit -m "$COMMIT_MESSAGE"
   sleep $((RANDOM % 10 + 5))
 done
 ```
 
 This is safe because each build writes to its own `docs/{version}/` directory — there are no
-real file conflicts between concurrent jobs. **Do not revert to a simple `git pull` + `git push`
-pattern.** The `git checkout -- .` / `git clean -fd` are required because `bun install` /
-`npm install` modify tracked files (`package.json`, `bun.lock`) which would block `git pull --rebase`.
+real file conflicts between concurrent jobs, and `docs/docs-index.json` is always regenerated
+from the full post-sync tree before retrying. **Do not revert to a simple `git pull` + `git push`
+or `git pull --rebase` pattern** for publish commits that include `docs/docs-index.json`.
 
 ---
 
