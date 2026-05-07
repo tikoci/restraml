@@ -275,7 +275,9 @@ jobs:
               fi
               echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
               LOCAL_COMMIT=$(git rev-parse HEAD)
-              git clean -fd
+              # `git reset --hard` on its own is sufficient — do NOT add `git clean -fd`, which
+              # would delete untracked build/validation outputs at the repo root that later
+              # steps (e.g. the validation-artifacts upload) depend on.
               git fetch origin main
               git reset --hard origin/main
               # Restore only app.json; the per-version schema files are intentionally excluded
@@ -333,7 +335,9 @@ jobs:
             fi
             echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
             LOCAL_COMMIT=$(git rev-parse HEAD)
-            git clean -fd
+            # `git reset --hard` on its own is sufficient — do NOT add `git clean -fd`, which
+            # would delete untracked build/validation outputs at the repo root that later
+            # steps (e.g. the validation-artifacts upload) depend on.
             git fetch origin main
             git reset --hard origin/main
             git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${SCHEMA_PATHS[@]}"

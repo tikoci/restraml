@@ -332,6 +332,11 @@ reset to `origin/main`, restore the version-specific publish tree from the local
 PUBLISH_PATH="docs/${ROSVER}/"
 COMMIT_MESSAGE="Publish ${ROSVER} ..."
 git add "$PUBLISH_PATH" docs/docs-index.json
+# Skip the commit/push entirely if there are no changes (re-runs, identical output).
+if git diff --cached --quiet; then
+  echo "No changes to commit — files already match."
+  exit 0
+fi
 git commit -m "$COMMIT_MESSAGE"
 # Retry up to 5 times after rebuilding docs-index on push rejection
 for attempt in {1..5}; do
@@ -343,7 +348,6 @@ for attempt in {1..5}; do
   fi
   echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
   LOCAL_COMMIT=$(git rev-parse HEAD)
-  git clean -fd
   git fetch origin main
   git reset --hard origin/main
   git restore --source="$LOCAL_COMMIT" --worktree --staged -- "$PUBLISH_PATH"
@@ -362,6 +366,15 @@ This is safe because each build writes to its own `docs/{version}/` directory �
 real file conflicts between concurrent jobs, and `docs/docs-index.json` is always regenerated
 from the full post-sync tree before retrying. **Do not revert to a simple `git pull` + `git push`
 or `git pull --rebase` pattern** for publish commits that include `docs/docs-index.json`.
+
+**Do NOT add `git clean -fd` to the retry loop.** The previous rebase-based pattern needed it
+because `bun install` left modified tracked files (`package.json`, `bun.lock`) that would block
+`git pull --rebase`. The new `git reset --hard origin/main` silently overwrites tracked-file
+modifications, so the clean step is unnecessary — and it would delete the untracked build outputs
+at the repo root (`ros-rest*.raml`, `ros-inspect*.json`, `deep-inspect*.json`, `openapi.json`,
+`index.html`) that the subsequent "Save build artifacts" / "Upload all build artifacts" steps
+upload. The empty-commit guard (`git diff --cached --quiet` after the initial `git add`) is also
+required so re-runs and identical-output cases exit cleanly instead of failing on an empty commit.
 
 ---
 
