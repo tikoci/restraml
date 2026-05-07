@@ -251,9 +251,11 @@ jobs:
         ROSVER="${{ steps.connection-check.outputs.rosver }}"
         APP_JSON_PATH="docs/${ROSVER}/app.json"
         APP_JSON_COMMIT_MESSAGE="Add ${ROSVER} app.json (raw /app data) [${{ github.workflow }}]"
-        bun run docs:index -- \
-          --exclude "docs/${ROSVER}/routeros-app-yaml-schema.json" \
+        INDEX_EXCLUDES=(
+          --exclude "docs/${ROSVER}/routeros-app-yaml-schema.json"
           --exclude "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+        )
+        bun run docs:index -- "${INDEX_EXCLUDES[@]}"
         if [ -f "$APP_JSON_PATH" ]; then
           echo "Committing app.json (raw /app data from CHR)"
           git add "$APP_JSON_PATH" docs/docs-index.json
@@ -276,10 +278,10 @@ jobs:
               git clean -fd
               git fetch origin main
               git reset --hard origin/main
+              # Restore only app.json; the per-version schema files are intentionally excluded
+              # from docs-index for this commit, so docs-index is regenerated with INDEX_EXCLUDES.
               git restore --source="$LOCAL_COMMIT" --worktree --staged -- "$APP_JSON_PATH"
-              bun run docs:index -- \
-                --exclude "docs/${ROSVER}/routeros-app-yaml-schema.json" \
-                --exclude "docs/${ROSVER}/routeros-app-yaml-store-schema.json"
+              bun run docs:index -- "${INDEX_EXCLUDES[@]}"
               git add "$APP_JSON_PATH" docs/docs-index.json
               if git diff --cached --quiet; then
                 echo "Remote already contains the app.json publish changes after syncing."
