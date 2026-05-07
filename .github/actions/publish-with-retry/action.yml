@@ -18,20 +18,15 @@ runs:
   steps:
     - name: Commit and push with retry
       shell: bash
+      env:
+        PUBLISH_PATHS_INPUT: ${{ inputs.publish-paths }}
+        DOCS_INDEX_EXCLUDES_INPUT: ${{ inputs.docs-index-excludes }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
       run: |
         set -euo pipefail
 
-        publish_paths_input="$(cat <<'EOF'
-${{ inputs.publish-paths }}
-EOF
-)"
-        docs_index_excludes_input="$(cat <<'EOF'
-${{ inputs.docs-index-excludes }}
-EOF
-)"
-
-        mapfile -t PUBLISH_PATHS < <(printf '%s\n' "$publish_paths_input" | sed '/^$/d')
-        mapfile -t DOCS_INDEX_EXCLUDES < <(printf '%s\n' "$docs_index_excludes_input" | sed '/^$/d')
+        mapfile -t PUBLISH_PATHS < <(printf '%s\n' "$PUBLISH_PATHS_INPUT" | sed '/^$/d')
+        mapfile -t DOCS_INDEX_EXCLUDES < <(printf '%s\n' "$DOCS_INDEX_EXCLUDES_INPUT" | sed '/^$/d')
 
         if [ "${#PUBLISH_PATHS[@]}" -eq 0 ]; then
           echo "::error::publish-paths input is empty"
@@ -63,7 +58,7 @@ EOF
           exit 0
         fi
 
-        git commit -m "${{ inputs.commit-message }}"
+        git commit -m "$COMMIT_MESSAGE"
         LOCAL_COMMIT=$(git rev-parse HEAD)
 
         # Do not add git clean -fd here; later upload-artifact steps rely on untracked build outputs.
@@ -94,6 +89,6 @@ EOF
             exit 0
           fi
 
-          git commit -m "${{ inputs.commit-message }}"
+          git commit -m "$COMMIT_MESSAGE"
           sleep $(( (2 ** attempt) + (RANDOM % 5) ))
         done
