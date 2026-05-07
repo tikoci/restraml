@@ -324,48 +324,38 @@ Multiple workflows (base + extra, multiple RouterOS versions) can run at the sam
 to `main`, so a simple `git push` will fail if another job committed first. Because every publish
 workflow also regenerates `docs/docs-index.json`, replaying a local publish commit with
 `git pull --rebase` can conflict in that generated file even when the version-specific docs trees
-do not overlap. The fix used in publish workflows is to **commit first, then on push rejection
-reset to `origin/main`, restore the version-specific publish tree from the local commit, regenerate
-`docs/docs-index.json`, recommit, and retry**:
+do not overlap.
 
-```bash
-PUBLISH_PATH="docs/${ROSVER}/"
-COMMIT_MESSAGE="Publish ${ROSVER} ..."
-git add "$PUBLISH_PATH" docs/docs-index.json
-# Skip the commit/push entirely if there are no changes (re-runs, identical output).
-if git diff --cached --quiet; then
-  echo "No changes to commit — files already match."
-  exit 0
-fi
-git commit -m "$COMMIT_MESSAGE"
-# Retry up to 5 times after rebuilding docs-index on push rejection
-for attempt in {1..5}; do
-  if git push origin main; then
-    break
-  elif [ $attempt -eq 5 ]; then
-    echo "::error::Failed to push after 5 attempts due to concurrent build conflicts."
-    exit 1
-  fi
-  echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
-  LOCAL_COMMIT=$(git rev-parse HEAD)
-  git fetch origin main
-  git reset --hard origin/main
-  git restore --source="$LOCAL_COMMIT" --worktree --staged -- "$PUBLISH_PATH"
-  bun run docs:index
-  git add "$PUBLISH_PATH" docs/docs-index.json
-  if git diff --cached --quiet; then
-    echo "Remote already contains the publish changes after syncing."
-    break
-  fi
-  git commit -m "$COMMIT_MESSAGE"
-  sleep $((RANDOM % 10 + 5))
-done
+All publish workflows now use the shared composite action
+`.github/actions/publish-with-retry`. It implements the required contract:
+
+- stage the publish paths plus `docs/docs-index.json`
+- skip empty commits cleanly on reruns / identical output
+- capture `LOCAL_COMMIT` **once** immediately after the initial publish commit
+- on push rejection, `git fetch` + `git reset --hard origin/main`, restore the original publish
+  paths from `LOCAL_COMMIT`, rebuild `docs/docs-index.json`, and retry
+- fail immediately if `git restore` or `bun run docs:index` fails
+- use exponential backoff with jitter between retries
+
+Typical usage:
+
+```yaml
+- uses: ./.github/actions/publish-with-retry
+  with:
+    publish-paths: |
+      docs/${{ steps.connection-check.outputs.rosver }}/
+    commit-message: Publish ${{ steps.connection-check.outputs.rosver }} [${{ github.workflow }}]
 ```
 
 This is safe because each build writes to its own `docs/{version}/` directory — there are no
 real file conflicts between concurrent jobs, and `docs/docs-index.json` is always regenerated
 from the full post-sync tree before retrying. **Do not revert to a simple `git pull` + `git push`
-or `git pull --rebase` pattern** for publish commits that include `docs/docs-index.json`.
+or `git pull --rebase` pattern**, and do not inline a separate retry loop when the shared action
+already fits the workflow.
+
+For the `/app` `app.json` publish step, pass the not-yet-published per-version schema files via
+the action's `docs-index-excludes` input so `docs-index.json` is rebuilt without prematurely
+advertising schema artifacts that were intentionally withheld after validation failures.
 
 **Do NOT add `git clean -fd` to the retry loop.** The previous rebase-based pattern needed it
 because `bun install` left modified tracked files (`package.json`, `bun.lock`) that would block

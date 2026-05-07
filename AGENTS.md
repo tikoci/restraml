@@ -26,9 +26,11 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 ### GitHub Actions Workflows (`.github/workflows/`)
 - Workflows run on `ubuntu-latest` GitHub-hosted runners with KVM available.
 - RouterOS CHR runs in QEMU (direct, not Docker-in-Docker). See `CLAUDE.md` for CHR boot details.
-- Git operations that push publish artifacts to `main` **must** use the retry pattern that
-  resets to `origin/main`, restores the version-specific docs tree from the local commit, and
-  regenerates `docs/docs-index.json` before retrying (see `CLAUDE.md` → "Concurrent Build Push — Retry Pattern").
+- Git operations that push publish artifacts to `main` **must** use the shared
+  `.github/actions/publish-with-retry` composite action, which resets to `origin/main`,
+  restores the original publish tree from the pre-retry local commit, regenerates
+  `docs/docs-index.json`, and retries with guarded restore/index rebuild steps and exponential
+  backoff (see `CLAUDE.md` → "Concurrent Build Push — Retry Pattern").
 - The apt package for QEMU is `qemu-system-x86` (not `qemu-system-x86_64`); also install
   `qemu-utils` for `qemu-img`.
 
