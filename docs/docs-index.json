@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-08T17:19:12.769Z",
+  "generatedAt": "2026-05-08T17:19:26.184Z",
   "rootPath": "docs",
   "latestVersion": "7.23beta5",
   "latestStableVersion": "7.22.3",
@@ -553,37 +553,29 @@
       "name": "7.22.3",
       "path": "docs/7.22.3",
       "type": "dir",
-      "files": [],
-      "dirs": [
+      "files": [
         {
-          "name": "extra",
-          "path": "docs/7.22.3/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.22.3/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.22.3/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.22.3/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.22.3/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
+          "name": "deep-inspect.json",
+          "path": "docs/7.22.3/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.22.3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.22.3/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.22.3/schema.raml",
+          "type": "file"
         }
-      ]
+      ],
+      "dirs": []
     },
     {
       "name": "7.22.2",
