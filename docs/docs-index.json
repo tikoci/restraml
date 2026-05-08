@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-08T05:59:23.671Z",
+  "generatedAt": "2026-05-08T06:00:18.300Z",
   "rootPath": "docs",
   "latestVersion": "7.23beta5",
   "latestStableVersion": "7.22.2",
@@ -257,21 +257,6 @@
           "type": "file"
         },
         {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc3/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc3/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc3/openapi.json",
-          "type": "file"
-        },
-        {
           "name": "routeros-app-yaml-schema.json",
           "path": "docs/7.23rc3/routeros-app-yaml-schema.json",
           "type": "file"
@@ -279,11 +264,6 @@
         {
           "name": "routeros-app-yaml-store-schema.json",
           "path": "docs/7.23rc3/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc3/schema.raml",
           "type": "file"
         }
       ],
@@ -299,6 +279,11 @@
               "type": "file"
             },
             {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23rc3/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
               "name": "deep-inspect.x86.json",
               "path": "docs/7.23rc3/extra/deep-inspect.x86.json",
               "type": "file"
@@ -306,6 +291,21 @@
             {
               "name": "diff-deep-inspect.json",
               "path": "docs/7.23rc3/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23rc3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23rc3/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23rc3/extra/schema.raml",
               "type": "file"
             }
           ],
