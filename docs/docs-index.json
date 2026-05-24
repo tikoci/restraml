@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-24T06:59:15.686Z",
+  "generatedAt": "2026-05-24T07:02:15.582Z",
   "rootPath": "docs",
   "latestVersion": "7.23beta5",
   "latestStableVersion": "7.22.3",
@@ -180,11 +180,6 @@
       "type": "dir",
       "files": [
         {
-          "name": "app.json",
-          "path": "docs/7.23rc4/app.json",
-          "type": "file"
-        },
-        {
           "name": "deep-inspect.json",
           "path": "docs/7.23rc4/deep-inspect.json",
           "type": "file"
@@ -197,16 +192,6 @@
         {
           "name": "openapi.json",
           "path": "docs/7.23rc4/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23rc4/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23rc4/routeros-app-yaml-store-schema.json",
           "type": "file"
         },
         {
@@ -227,6 +212,11 @@
               "type": "file"
             },
             {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23rc4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
               "name": "deep-inspect.x86.json",
               "path": "docs/7.23rc4/extra/deep-inspect.x86.json",
               "type": "file"
@@ -234,6 +224,21 @@
             {
               "name": "diff-deep-inspect.json",
               "path": "docs/7.23rc4/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23rc4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23rc4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23rc4/extra/schema.raml",
               "type": "file"
             }
           ],
