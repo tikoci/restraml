@@ -3,7 +3,7 @@ description: Commit published docs artifacts and retry pushes after rebuilding d
 
 inputs:
   publish-paths:
-    description: Newline-separated files or directories to stage initially and restore on retry.
+    description: Newline-separated files or directories to stage initially. On retry, only the specific files staged from this initial add are restored — not entire directories — to avoid clobbering files added by concurrent workflows.
     required: true
   commit-message:
     description: Commit message for the publish commit.
@@ -58,6 +58,14 @@ runs:
           exit 0
         fi
 
+        # Record the exact files staged before committing so that retries only
+        # restore those specific files rather than entire directories.  Restoring
+        # a directory from the local commit would delete any files that other
+        # concurrent workflows added to that directory between the checkout and
+        # the push (e.g. app.json / routeros-app-yaml-schema.json published by the
+        # /app YAML schemas workflow while the base schema workflow was running).
+        mapfile -t STAGED_FILES < <(git diff --cached --name-only)
+
         git commit -m "$COMMIT_MESSAGE"
         LOCAL_COMMIT=$(git rev-parse HEAD)
 
@@ -78,7 +86,10 @@ runs:
           echo "::warning::Push attempt $attempt/5 failed (remote is ahead), rebuilding docs index and retrying..."
           git fetch origin main
           git reset --hard origin/main
-          git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${PUBLISH_PATHS[@]}" || {
+          # Restore only the specific files that were staged, not entire directories.
+          # Using per-file restore prevents accidentally deleting files added by other
+          # concurrent workflows to the same directory.
+          git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${STAGED_FILES[@]}" || {
             echo "::error::git restore failed for $LOCAL_COMMIT"
             exit 1
           }
@@ -87,7 +98,7 @@ runs:
             exit 1
           fi
 
-          git add "${PUBLISH_PATHS[@]}" docs/docs-index.json
+          git add "${STAGED_FILES[@]}" docs/docs-index.json
           if git diff --cached --quiet; then
             echo "Remote already contains the publish changes after syncing."
             exit 0
