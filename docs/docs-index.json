@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-26T18:45:51.484Z",
+  "generatedAt": "2026-05-26T18:46:13.614Z",
   "rootPath": "docs",
   "latestVersion": "7.23",
   "latestStableVersion": "7.23",
@@ -150,6 +150,11 @@
               "type": "file"
             },
             {
+              "name": "deep-inspect.json",
+              "path": "docs/7.23/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
               "name": "deep-inspect.x86.json",
               "path": "docs/7.23/extra/deep-inspect.x86.json",
               "type": "file"
@@ -157,6 +162,21 @@
             {
               "name": "diff-deep-inspect.json",
               "path": "docs/7.23/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.23/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.23/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.23/extra/schema.raml",
               "type": "file"
             }
           ],
