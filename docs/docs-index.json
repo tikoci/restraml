@@ -1,9 +1,9 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-05-25T08:21:04.028Z",
+  "generatedAt": "2026-05-26T13:38:49.680Z",
   "rootPath": "docs",
-  "latestVersion": "7.23beta5",
-  "latestStableVersion": "7.22.3",
+  "latestVersion": "7.23",
+  "latestStableVersion": "7.23",
   "files": [
     {
       "name": "deep-inspect.md",
@@ -97,6 +97,19 @@
     }
   ],
   "versions": [
+    {
+      "name": "7.23",
+      "path": "docs/7.23",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23/app.json",
+          "type": "file"
+        }
+      ],
+      "dirs": []
+    },
     {
       "name": "7.23beta5",
       "path": "docs/7.23beta5",
