@@ -445,6 +445,13 @@
         //   "dir"/"path"      → comma-sep list of child cmd names
         //   not found         → found:false with detail explaining why
         // -----------------------------------------------------------------
+        function extractPreference(meta) {
+            if (!meta || typeof meta !== 'object') {
+                return null
+            }
+            return Number.isFinite(meta.preference) ? meta.preference : null
+        }
+
         function normalizeCompletionEntries(argNode) {
             if (!argNode || typeof argNode !== 'object' ||
                 !argNode._completion || typeof argNode._completion !== 'object') {
@@ -458,9 +465,7 @@
                 style: meta && typeof meta === 'object' && typeof meta.style === 'string'
                     ? meta.style
                     : '',
-                preference: meta && typeof meta === 'object' && Number.isFinite(meta.preference)
-                    ? meta.preference
-                    : null,
+                preference: extractPreference(meta),
             }))
         }
 
