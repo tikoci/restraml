@@ -47,6 +47,7 @@ interface Opts {
   version?: string;
   outputDir: string;
   keepRunning: boolean;
+  secureLogin: boolean;
 }
 
 function parseCli(): Opts {
@@ -153,7 +154,7 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
     channel: opts.channel,
     version: opts.version,
     installAllPackages: true,
-    secureLogin: false,
+    secureLogin: opts.secureLogin,
     background: true,
     license: "p1",
   });
