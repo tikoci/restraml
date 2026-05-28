@@ -284,8 +284,12 @@ async function runAtConcurrency(
   let totalMs = 0;
   let abortedEarly = false;
 
-  // Create and connect native API for this concurrency level
-  let api = new RosAPI(apiHost, apiPort, "admin", "");
+  // Create and connect native API for this concurrency level.
+  // Credentials are configurable for safety; defaults preserve disposable test CHR behavior.
+  // Empty default password is intentional for isolated local/CI test environments only.
+  const apiUser = process.env.ROS_API_USER ?? "admin";
+  const apiPassword = process.env.ROS_API_PASSWORD ?? "";
+  let api = new RosAPI(apiHost, apiPort, apiUser, apiPassword);
   await api.connect();
 
   // Rounds of queries: each round sends `concurrency` copies of EACH probe path.
