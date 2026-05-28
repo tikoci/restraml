@@ -1,25 +1,26 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://tikoci.github.io/restraml/routeros-app-yaml-schema.editor.json",
+  "$id": "https://tikoci.github.io/restraml/7.24beta1/routeros-app-yaml-schema.json",
   "title": "RouterOS /app YAML",
-  "description": "MikroTik RouterOS /app container application definition (7.22+). Editor-friendly variant: relaxed port validation (no regex), case-insensitive env var names. Use routeros-app-yaml-schema.latest.json for strict CI validation.",
-  "$comment": "SchemaStore submission target. Differences from .latest.json: (1) ports items have no pattern (see per-item $comment for strict regex); (2) environment patternProperties allows lowercase names.",
+  "description": "Schema for MikroTik RouterOS /app YAML",
   "type": "object",
-  "required": ["services"],
+  "required": [
+    "services"
+  ],
   "additionalProperties": false,
   "properties": {
     "name": {
       "type": "string",
-      "description": "Unique /app identifier"
+      "description": "Unique name for the /app"
     },
     "descr": {
       "type": "string",
-      "description": "Human-readable description shown in the app UI"
+      "description": "Description of the /app"
     },
     "page": {
       "type": "string",
       "format": "uri",
-      "description": "Project homepage URL"
+      "description": "URL to the project homepage"
     },
     "category": {
       "type": "string",
@@ -44,22 +45,23 @@
         "security",
         "business"
       ],
-      "description": "App store category. Validated against RouterOS-accepted values; build CI raises an issue when new categories appear."
+      "description": "Category classification for the /app"
     },
     "icon": {
       "type": "string",
       "format": "uri",
-      "description": "Icon image URL. With `show-in-webfig=yes`, displayed on the WebFig login screen."
+      "description": "URL to the icon image (use with `show-in-webfig=yes` to display on WebFig login screen)"
     },
     "default-credentials": {
-      "type": ["string", "null"],
-      "description": "Credentials shown in the app UI. Format: `username:password`. Use `null` for no credentials.",
-      "examples": ["admin:admin", "admin:", null]
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Default login credentials in format username:password or special values"
     },
     "url-path": {
       "type": "string",
-      "description": "URL path suffix appended to the access URL for browser access",
-      "examples": ["/", "/ui", "/admin"]
+      "description": "Default URL path to append to access the /app via a browser"
     },
     "credentials": {
       "type": "string",
@@ -71,14 +73,17 @@
     },
     "auto-update": {
       "type": "boolean",
-      "description": "Pull and restart all service containers on every router boot"
+      "description": "Whether to enable automatic updates of all containers at boot"
     },
     "secrets": {
       "type": "object",
-      "description": "Generated secret declarations referenced by service `secrets` and `[secret:name]` placeholders. Empty/null entries request RouterOS-generated secret values.",
+      "description": "Generated secret declarations referenced by service `secrets` and `[secret:name]` placeholders",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": false
         }
       },
@@ -86,22 +91,22 @@
     },
     "services": {
       "type": "object",
-      "description": "Container services. At least one entry required.",
-      "minProperties": 1,
+      "description": "Container services definition",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["image"],
+          "required": [
+            "image"
+          ],
           "properties": {
             "image": {
               "type": "string",
-              "description": "Container image reference. Omit registry to use `registry-url` from `/container/config`.",
-              "examples": ["nginx:alpine", "ghcr.io/owner/app:latest"]
+              "description": "Container image to use.  Can prepend the container registry, or the `registry-url` in `/container/config` will be assumed."
             },
             "container_name": {
               "type": "string",
-              "description": "Explicit container name; also used as the base for file paths under `/container`"
+              "description": "Explicit container name.  Also used in file paths."
             },
             "hostname": {
               "type": "string",
@@ -109,41 +114,59 @@
             },
             "entrypoint": {
               "oneOf": [
-                {"type": "string"},
-                {"type": "array", "items": {"type": "string"}}
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               ],
-              "description": "Override the default container entrypoint (string or list)",
-              "examples": ["/bin/bash", ["/bin/sh", "-c"]]
+              "description": "Override the default container entrypoint"
             },
             "command": {
               "oneOf": [
-                {"type": "string"},
-                {"type": "array", "items": {"type": "string"}}
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               ],
-              "description": "Override the default container command (string or list)"
+              "description": "Override the default command"
             },
             "ports": {
               "type": "array",
               "description": "Port mappings",
               "items": {
+                "$comment": "Port mappings can be strings (two formats) or objects (long syntax with name/target/published/app_protocol).",
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "Two formats supported: (1) `[ip:]host:container[/tcp|/udp][:label]` (OCI-style, pre-7.23) or (2) `[ip:]host:container[:label][:tcp|:udp]` (RouterOS 7.23+, protocol after label). RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
-                    "$comment": "Two strict patterns used in .latest.json (anyOf): (1) old OCI-style: ^(ip:)?host:container(/tcp|/udp)?(:label)?$ and (2) new RouterOS 7.23+ style: ^(ip:)?host:container(:label)?(:tcp|:udp)?$ where label may not contain / or :. Mixing both protocol styles in one entry is rejected.",
-                    "examples": [
-                      "80:80",
-                      "80:80:web",
-                      "8080:8080/tcp:rest api",
-                      "8080:8080:web:tcp",
-                      "[accessIP]:[accessPort]:80:web",
-                      "127.0.0.1:9000:9000"
+                    "$comment": "Two port formats supported, exactly one protocol style per entry: (1) old OCI-style [ip:]host:container[/tcp|/udp][:label] and (2) new RouterOS 7.23+ style [ip:]host:container[:label][:tcp|:udp]. Mixing styles (e.g. host:container/tcp:label:tcp) is rejected.",
+                    "anyOf": [
+                      {
+                        "$comment": "Old OCI-style: [ip:]host:container[/tcp|/udp][:label]",
+                        "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+                      },
+                      {
+                        "$comment": "New RouterOS 7.23+ style: [ip:]host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
+                        "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
+                      }
                     ]
                   },
                   {
                     "type": "object",
                     "$comment": "Long syntax port mapping with named fields",
-                    "required": ["target", "published"],
+                    "required": [
+                      "target",
+                      "published"
+                    ],
                     "properties": {
                       "name": {
                         "type": "string",
@@ -159,7 +182,10 @@
                       },
                       "protocol": {
                         "type": "string",
-                        "enum": ["tcp", "udp"],
+                        "enum": [
+                          "tcp",
+                          "udp"
+                        ],
                         "description": "Protocol (tcp or udp)"
                       },
                       "app_protocol": {
@@ -176,14 +202,21 @@
               "oneOf": [
                 {
                   "type": "object",
-                  "description": "Map of env var name → value. Keys: letters, digits, underscore (case-sensitive).",
                   "patternProperties": {
-                    "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+                    "^[A-Z_][A-Z0-9_]*$": {
                       "oneOf": [
-                        {"type": "string"},
-                        {"type": "number"},
-                        {"type": "boolean"},
-                        {"type": "null"}
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     }
                   }
@@ -191,82 +224,101 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "description": "`KEY=value` string"
+                    "type": "string"
                   }
                 },
-                {"type": "null"}
+                {
+                  "type": "null"
+                }
               ],
-              "description": "Service environment variables (object, KEY=value array, or null)"
+              "description": "Environment variables"
             },
             "volumes": {
               "type": "array",
-              "description": "Volume mounts",
+              "description": "Volume mappings",
               "items": {
-                "type": "string",
-                "description": "Format: `source:target[:options]`",
-                "examples": ["mydata:/data", "/host/path:/container/path:ro"]
+                "type": "string"
               }
             },
             "configs": {
               "type": "array",
-              "description": "Config file mounts. Each `source` must match a top-level `configs` key.",
+              "description": "Config file mappings",
               "items": {
                 "type": "object",
-                "required": ["source", "target"],
+                "required": [
+                  "source",
+                  "target"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "source": {
-                    "type": "string",
-                    "description": "Top-level `configs` key name"
+                    "type": "string"
                   },
                   "target": {
-                    "type": "string",
-                    "description": "Absolute path inside the container"
+                    "type": "string"
                   },
                   "mode": {
-                    "type": ["integer", "string"],
-                    "description": "File permissions, octal (e.g. `0644`)"
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "description": "File permissions in octal"
                   }
                 }
               }
             },
             "restart": {
               "type": "string",
-              "enum": ["no", "always", "on-failure", "unless-stopped"],
-              "description": "Container restart policy"
+              "enum": [
+                "no",
+                "always",
+                "on-failure",
+                "unless-stopped"
+              ],
+              "description": "Restart policy"
             },
             "depends_on": {
               "oneOf": [
-                {"type": "array", "items": {"type": "string"}},
-                {"type": "object"}
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "object"
+                }
               ],
-              "description": "Start after these named services"
+              "description": "Service dependencies"
             },
             "devices": {
               "type": "array",
-              "description": "Host device mappings passed into the container (e.g. for USB/serial hardware access)",
+              "description": "Device mappings to pass to the container",
               "items": {
-                "type": "string",
-                "description": "Format: `host-device[:container-device]` (e.g. `/dev/ttyACM0:/dev/ttyACM0`)"
+                "type": "string"
               }
             },
             "user": {
               "type": "string",
-              "description": "Run container as this user (name or `uid:gid`)"
+              "description": "User to run container as"
             },
             "security_opt": {
               "type": "array",
-              "items": {"type": "string"},
-              "description": "Security options (e.g. `no-new-privileges:true`)"
+              "items": {
+                "type": "string"
+              },
+              "description": "Security options"
             },
             "shm_size": {
               "type": "string",
-              "description": "Shared memory size (e.g. `128m`, `1g`)"
+              "description": "Shared memory size"
             },
             "stop_grace_period": {
-              "type": ["string", "integer"],
-              "description": "Wait this long before sending SIGKILL (e.g. `10s`, `1m30s`)"
+              "type": [
+                "string",
+                "integer"
+              ],
+              "description": "Time to wait before killing container"
             },
             "ulimits": {
               "type": "object",
@@ -276,14 +328,23 @@
                   "oneOf": [
                     {
                       "type": "object",
-                      "required": ["soft", "hard"],
+                      "required": [
+                        "soft",
+                        "hard"
+                      ],
                       "additionalProperties": false,
                       "properties": {
-                        "soft": {"type": "integer"},
-                        "hard": {"type": "integer"}
+                        "soft": {
+                          "type": "integer"
+                        },
+                        "hard": {
+                          "type": "integer"
+                        }
                       }
                     },
-                    {"type": "integer"}
+                    {
+                      "type": "integer"
+                    }
                   ]
                 }
               }
@@ -294,12 +355,20 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "context": {"type": "string"},
-                    "dockerfile": {"type": "string"},
-                    "args": {"type": "object"}
+                    "context": {
+                      "type": "string"
+                    },
+                    "dockerfile": {
+                      "type": "string"
+                    },
+                    "args": {
+                      "type": "object"
+                    }
                   }
                 },
-                {"type": "string"}
+                {
+                  "type": "string"
+                }
               ],
               "description": "Build configuration for the container image"
             },
@@ -310,14 +379,29 @@
               "properties": {
                 "test": {
                   "oneOf": [
-                    {"type": "array", "items": {"type": "string"}},
-                    {"type": "string"}
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "string"
+                    }
                   ]
                 },
-                "interval": {"type": "string"},
-                "timeout": {"type": "string"},
-                "retries": {"type": "integer"},
-                "start_period": {"type": "string"}
+                "interval": {
+                  "type": "string"
+                },
+                "timeout": {
+                  "type": "string"
+                },
+                "retries": {
+                  "type": "integer"
+                },
+                "start_period": {
+                  "type": "string"
+                }
               }
             },
             "stdin_open": {
@@ -327,15 +411,24 @@
             "expose": {
               "type": "array",
               "description": "Expose ports without publishing them to the host",
-              "items": {"type": ["string", "integer"]}
+              "items": {
+                "type": [
+                  "string",
+                  "integer"
+                ]
+              }
             },
             "secrets": {
               "oneOf": [
                 {
                   "type": "array",
-                  "items": {"type": "string"}
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                {"type": "string"}
+                {
+                  "type": "string"
+                }
               ],
               "description": "Secret name or secret names to expose to the service"
             },
@@ -343,9 +436,13 @@
               "oneOf": [
                 {
                   "type": "array",
-                  "items": {"type": "string"}
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                {"type": "string"}
+                {
+                  "type": "string"
+                }
               ],
               "description": "Singular secret alias accepted by RouterOS built-in app YAML"
             },
@@ -355,32 +452,34 @@
             }
           }
         }
-      }
+      },
+      "minProperties": 1
     },
     "volumes": {
       "type": "object",
-      "description": "Named volume definitions. Referenced by service `volumes` entries.",
+      "description": "Named volumes definition",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
-          "type": ["object", "null"]
+          "type": [
+            "object",
+            "null"
+          ]
         }
       }
     },
     "networks": {
       "type": "object",
-      "description": "Network definitions",
+      "description": "Networks configuration",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "name": {
-              "type": "string",
-              "description": "Network name on the router"
+              "type": "string"
             },
             "external": {
-              "type": "boolean",
-              "description": "Reference a pre-existing network rather than creating one"
+              "type": "boolean"
             }
           }
         }
@@ -388,7 +487,7 @@
     },
     "configs": {
       "type": "object",
-      "description": "Config file content definitions. Each key is referenced by a service's `configs[].source`.",
+      "description": "Config files definition.  Used along with a service's `configs`, which controls placement of the contents.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
@@ -396,7 +495,7 @@
           "properties": {
             "content": {
               "type": "string",
-              "description": "Inline file content injected into the container at deploy time"
+              "description": "Inline config file content"
             }
           }
         }
