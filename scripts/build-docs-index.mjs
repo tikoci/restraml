@@ -3,7 +3,7 @@ import path from "node:path";
 
 const DOCS_ROOT = path.resolve("docs");
 const OUTPUT_PATH = path.join(DOCS_ROOT, "docs-index.json");
-const VERSION_RE = /^\d+\.\d+(?:\.\d+)?(?:beta|rc)?\d*$/;
+const VERSION_RE = /^\d+\.\d+(?:\.\d+)?(?:(?:beta|rc)\d+)?$/;
 const EXCLUDED_PATHS = new Set();
 
 function toPosix(value) {
