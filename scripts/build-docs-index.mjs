@@ -11,14 +11,14 @@ function toPosix(value) {
 }
 
 function parseVersion(str) {
-  const match = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/);
+  const match = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(?:(beta|rc)(\d+))?$/);
   if (!match) return null;
   return {
     major: Number.parseInt(match[1], 10),
     minor: Number.parseInt(match[2], 10),
     patch: Number.parseInt(match[3] || "0", 10),
     pre: match[4] || "",
-    preNum: match[5] ? Number.parseInt(match[5], 10) : (match[4] ? 0 : Number.POSITIVE_INFINITY),
+    preNum: match[5] ? Number.parseInt(match[5], 10) : Number.POSITIVE_INFINITY,
   };
 }
 
