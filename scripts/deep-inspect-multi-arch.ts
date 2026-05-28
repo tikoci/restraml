@@ -196,9 +196,14 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
   // Post-crawl load snapshot (best-effort) — informational, not load-bearing.
   // Proof-of-life for queryLoad(); the real retry/load correlation work wants
   // in-crawl sampling — a future improvement, not yet scheduled.
-  const load = await chr.queryLoad();
-  if (load) {
-    console.log(`  post-crawl load: cpu=${load.cpuPercent}% mem=${load.memUsedMb}MB`);
+  try {
+    const load = await chr.queryLoad();
+    if (load) {
+      console.log(`  post-crawl load: cpu=${load.cpuPercent}% mem=${load.memUsedMb}MB`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`  post-crawl load query failed for ${arch} (best-effort): ${message}`);
   }
 
   // Read the output file and extract _meta to check for anomalies.
