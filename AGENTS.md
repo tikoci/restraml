@@ -214,6 +214,8 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
 | `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
 | `docs/deep-inspect.md` | Deep-inspect design/history reference; shipped Phase 3 and ARM64 CI postmortem |
+| `docs/deep-inspect.schema.json` | Strict JSON Schema for current published `deep-inspect.json` / per-arch artifacts |
+| `docs/deep-inspect.future.schema.json` | Design-target JSON Schema for future merged/source/provenance deep-inspect output |
 | `docs/routeros-app-yaml-schema.latest.json` | /app YAML schema — stable public URL, do not rename |
 | `docs/routeros-app-yaml-store-schema.latest.json` | /app store schema — do not rename |
 | `docs/docs-index.json` | Published inventory of root docs files + per-version file listings |

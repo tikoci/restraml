@@ -21,6 +21,29 @@ The published multi-arch pipeline produces these files under
 - `openapi.arm64.json`
 - `diff-deep-inspect.json`
 
+## JSON Schema contracts
+
+Two JSON Schemas live at the docs root:
+
+- [`deep-inspect.schema.json`](deep-inspect.schema.json) is the strict contract
+  for the current emitted format. It validates the `_meta` envelope, recursive
+  inspect nodes, `desc`, and `_completion` maps as they exist in published
+  artifacts today. It intentionally rejects future-only metadata such as
+  `_source` and `_package`. Retry counters in `_meta.completionStats`
+  (`argsTimedOut` and `argsBlankOnRetry`) are optional because the earliest
+  published `deep-inspect.json` artifacts predate that instrumentation.
+- [`deep-inspect.future.schema.json`](deep-inspect.future.schema.json) is a
+  design-target superset for planned backlog work. It keeps the current tree
+  shape but allows sparse `_source` annotations for future merged
+  multi-arch output, `_meta.mergeStats` conflict counters, an explicit
+  `_meta.mergePolicy`, and a provisional package-provenance declaration.
+
+The current schema leaves completion `style` as an open string instead of a
+closed enum. Published artifacts currently use styles such as `none`,
+`obj-disabled`, `obj-dynamic`, `obj-inactive`, `obj-wildcard`, `arg`, `dir`,
+`flag-title`, and `syntax-meta`, but RouterOS can add styles without changing
+the deep-inspect container shape.
+
 ## Non-negotiable design rules
 
 ### `inspect.json` is load-bearing and frozen

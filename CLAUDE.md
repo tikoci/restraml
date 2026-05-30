@@ -50,6 +50,8 @@ restraml/
 │   ├── tikapp.html       # /app YAML editor with Monaco + live validation
 │   ├── tikapp-manual.html # /app YAML documentation / manual reference
 │   ├── deep-inspect.md   # Deep-inspect design/history reference
+│   ├── deep-inspect.schema.json        # Strict JSON Schema for current deep-inspect artifacts
+│   ├── deep-inspect.future.schema.json # Design-target schema for future merge/provenance output
 │   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
 │   ├── restraml-shared.css # Shared CSS: fonts, logo, theme, guide, modal, utilities
 │   ├── docs-index.json     # Published JSON inventory of root docs assets and per-version files

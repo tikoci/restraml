@@ -1,0 +1,296 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tikoci.github.io/restraml/deep-inspect.future.schema.json",
+  "title": "restraml deep-inspect.json future design target",
+  "description": "Future-oriented deep-inspect.json schema sketch for planned multi-arch merge, source, conflict-policy, and package-provenance work. This is not the current emitted contract.",
+  "type": "object",
+  "required": ["_meta"],
+  "properties": {
+    "_meta": {
+      "$ref": "#/definitions/meta"
+    }
+  },
+  "patternProperties": {
+    "^(?!_meta$)[^_].*$": {
+      "$ref": "#/definitions/node"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "version",
+        "generatedAt",
+        "crashPathsTested",
+        "crashPathsSafe",
+        "crashPathsCrashed",
+        "completionStats"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?)$"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["x86", "arm64"]
+        },
+        "apiTransport": {
+          "type": "string",
+          "enum": ["rest", "native"]
+        },
+        "enrichmentDurationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "crashPathsTested": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "crashPathsSafe": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "crashPathsCrashed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completionStats": {
+          "$ref": "#/definitions/completionStats"
+        },
+        "nativeApiReconnects": {
+          "$ref": "#/definitions/nativeApiReconnects"
+        },
+        "mergeStats": {
+          "$ref": "#/definitions/mergeStats"
+        },
+        "mergePolicy": {
+          "$ref": "#/definitions/mergePolicy"
+        },
+        "packageProvenance": {
+          "$ref": "#/definitions/packageProvenance"
+        }
+      },
+      "additionalProperties": false
+    },
+    "completionStats": {
+      "type": "object",
+      "required": [
+        "argsTotal",
+        "argsWithCompletion",
+        "argsFailed"
+      ],
+      "properties": {
+        "argsTotal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsWithCompletion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsFailed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsTimedOut": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsBlankOnRetry": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "nativeApiReconnects": {
+      "type": "object",
+      "required": ["count", "firstPaths"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mergeStats": {
+      "type": "object",
+      "description": "Planned merge summary for a future merged deep-inspect.json built from per-arch inputs.",
+      "required": [
+        "sharedNodes",
+        "x86OnlyNodes",
+        "arm64OnlyNodes",
+        "completionEnumDriftArgs",
+        "completionPayloadDriftArgs",
+        "typeMismatchNodes",
+        "conflictsTotal"
+      ],
+      "properties": {
+        "sharedNodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "x86OnlyNodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "arm64OnlyNodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completionEnumDriftArgs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completionPayloadDriftArgs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "typeMismatchNodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conflictsTotal": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "mergePolicy": {
+      "type": "object",
+      "description": "Planned explicit policy for resolving shared-node disagreements during future multi-arch merges.",
+      "required": ["completionConflict", "typeMismatch"],
+      "properties": {
+        "sourcePrecedence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["arm64", "x86"]
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "archUniqueNodeSource": {
+          "const": "annotate-_source"
+        },
+        "completionConflict": {
+          "type": "string",
+          "enum": ["union", "prefer-arm64", "prefer-x86", "record-conflict", "fail"]
+        },
+        "typeMismatch": {
+          "type": "string",
+          "enum": ["prefer-arm64", "prefer-x86", "record-conflict", "fail"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "packageProvenance": {
+      "type": "object",
+      "description": "Planned package provenance declaration. Provenance may land as node annotations or a sidecar; this field records the chosen strategy for an artifact.",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["none", "node-_package", "sidecar"]
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "required": ["_type"],
+      "properties": {
+        "_type": {
+          "type": "string",
+          "enum": ["arg", "cmd", "dir", "path"]
+        },
+        "desc": {
+          "type": "string"
+        },
+        "_completion": {
+          "$ref": "#/definitions/completionMap"
+        },
+        "_source": {
+          "type": "string",
+          "enum": ["x86", "arm64"],
+          "description": "Planned sparse source annotation for arch-unique nodes in merged output."
+        },
+        "_package": {
+          "description": "Provisional package provenance annotation for nodes whose owning package has been inferred. If provenance lands as a sidecar, packageProvenance.strategy should say sidecar and this field should be omitted.",
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        }
+      },
+      "patternProperties": {
+        "^(?!desc$)[^_].*$": {
+          "$ref": "#/definitions/node"
+        }
+      },
+      "additionalProperties": false
+    },
+    "completionMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/completionEntry"
+      }
+    },
+    "completionEntry": {
+      "type": "object",
+      "required": ["style"],
+      "properties": {
+        "style": {
+          "type": "string"
+        },
+        "preference": {
+          "type": "integer"
+        },
+        "desc": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

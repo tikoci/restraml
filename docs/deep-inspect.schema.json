@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tikoci.github.io/restraml/deep-inspect.schema.json",
+  "title": "restraml deep-inspect.json",
+  "description": "Current emitted deep-inspect.json format: a RouterOS inspect tree enriched with completion metadata and a top-level _meta envelope.",
+  "type": "object",
+  "required": ["_meta"],
+  "properties": {
+    "_meta": {
+      "$ref": "#/definitions/meta"
+    }
+  },
+  "patternProperties": {
+    "^(?!_meta$)[^_].*$": {
+      "$ref": "#/definitions/node"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "version",
+        "generatedAt",
+        "crashPathsTested",
+        "crashPathsSafe",
+        "crashPathsCrashed",
+        "completionStats"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "RouterOS version used to generate this artifact, or unknown for offline developer output.",
+          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?)$"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["x86", "arm64"],
+          "description": "Architecture of the crawled CHR when this is a per-arch artifact. Legacy unsuffixed files omit this field."
+        },
+        "apiTransport": {
+          "type": "string",
+          "enum": ["rest", "native"],
+          "description": "Transport used for completion enrichment. Omitted when completion enrichment did not run."
+        },
+        "enrichmentDurationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "crashPathsTested": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "crashPathsSafe": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "crashPathsCrashed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completionStats": {
+          "$ref": "#/definitions/completionStats"
+        },
+        "nativeApiReconnects": {
+          "$ref": "#/definitions/nativeApiReconnects"
+        }
+      },
+      "additionalProperties": false
+    },
+    "completionStats": {
+      "type": "object",
+      "required": [
+        "argsTotal",
+        "argsWithCompletion",
+        "argsFailed"
+      ],
+      "properties": {
+        "argsTotal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsWithCompletion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsFailed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsTimedOut": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argsBlankOnRetry": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "nativeApiReconnects": {
+      "type": "object",
+      "required": ["count", "firstPaths"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "required": ["_type"],
+      "properties": {
+        "_type": {
+          "type": "string",
+          "enum": ["arg", "cmd", "dir", "path"]
+        },
+        "desc": {
+          "type": "string"
+        },
+        "_completion": {
+          "$ref": "#/definitions/completionMap"
+        }
+      },
+      "patternProperties": {
+        "^(?!desc$)[^_].*$": {
+          "$ref": "#/definitions/node"
+        }
+      },
+      "additionalProperties": false
+    },
+    "completionMap": {
+      "type": "object",
+      "description": "Completion values keyed by the RouterOS completion string. Empty-string keys are valid in published artifacts.",
+      "additionalProperties": {
+        "$ref": "#/definitions/completionEntry"
+      }
+    },
+    "completionEntry": {
+      "type": "object",
+      "required": ["style"],
+      "properties": {
+        "style": {
+          "type": "string",
+          "description": "RouterOS completion style. This is intentionally open-ended because RouterOS can add styles across releases."
+        },
+        "preference": {
+          "type": "integer"
+        },
+        "desc": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

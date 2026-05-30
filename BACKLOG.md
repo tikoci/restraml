@@ -68,6 +68,9 @@ depend on accidental file shape.
 - Decide which `_meta` fields are contract vs diagnostic.
 - Clarify whether downstream consumers should prefer arm64, x86, both, or a
   future merged file.
+- Keep `docs/deep-inspect.schema.json` aligned with the currently emitted file
+  shape, and use `docs/deep-inspect.future.schema.json` only for planned merge
+  and provenance design targets.
 
 **Acceptance criteria:**
 
@@ -88,6 +91,8 @@ single enriched tree.
 - `--merge` CLI mode for local generation.
 - `_meta.mergeStats` with counts for shared, arch-only, and conflict buckets.
 - Explicit conflict policy for shared-node `_completion` disagreements.
+- `docs/deep-inspect.future.schema.json` sketches the target metadata shape;
+  treat it as design guidance until merge implementation lands.
 
 **Acceptance criteria:**
 
