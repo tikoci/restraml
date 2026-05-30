@@ -9,17 +9,19 @@ postmortems here.
 
 `deep-inspect.ts` enriches RouterOS `/console/inspect` output with
 `request=completion` data. The result is a richer schema tree than
-`inspect.json`, including argument completion metadata and OpenAPI output used
-by downstream tooling.
+`inspect.json`, including argument completion metadata that downstream tooling
+can import directly or use to generate richer OpenAPI output.
 
-The published multi-arch pipeline produces these files under
+The published multi-arch pipeline currently produces these files under
 `docs/{version}/extra/`:
 
 - `deep-inspect.x86.json`
 - `deep-inspect.arm64.json`
-- `openapi.x86.json`
-- `openapi.arm64.json`
 - `diff-deep-inspect.json`
+
+`deep-inspect.ts` and `scripts/deep-inspect-multi-arch.ts` can generate
+`openapi.<arch>.json` locally, but CI intentionally skips publishing per-arch
+OpenAPI files until the replacement path for public `openapi.json` is verified.
 
 ## JSON Schema contracts
 

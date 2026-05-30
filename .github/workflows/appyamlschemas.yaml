@@ -77,6 +77,7 @@ jobs:
 
     - name: Start RouterOS CHR in QEMU
       # host:9180 → VM:80 (REST API), host:9122 → VM:22 (SSH for extra-packages SCP)
+      # Extra-package jobs use 1024 MB to avoid memory pressure after package activation.
       run: |
         ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
         KVM_OPTS=""
@@ -88,7 +89,7 @@ jobs:
         fi
         nohup qemu-system-x86_64 \
             ${KVM_OPTS} \
-            -m 256 \
+            -m 1024 \
             -nographic \
             -drive file=chr-${ROUTEROS_VERSION}.qcow2,format=qcow2,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \

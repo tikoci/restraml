@@ -205,6 +205,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `ros-api-protocol.ts` | Vendored RouterOS native API wire protocol (Bun) |
 | `ros-api-protocol.test.ts` | Unit + integration + stress tests for `ros-api-protocol.ts` |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
+| `BACKLOG.md` | Ready-to-go work queue and decision-needed policy backlog |
 | `scripts/entrypoint.sh` | QEMU launcher for local Docker use |
 | `scripts/test-with-qemu.sh` | Integration tests (deep-inspect) against local QEMU CHR |
 | `scripts/test-ros-api.sh` | Integration + stress tests (ros-api-protocol) against local CHR |
@@ -223,7 +224,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `.github/workflows/manual-using-docker-in-docker.yaml` | Build: base RouterOS schema |
 | `.github/workflows/manual-using-extra-docker-in-docker.yaml` | Build: schema + extra packages |
 | `.github/workflows/appyamlschemas.yaml` | Build: validate and publish /app YAML schemas per-version |
-| `.github/workflows/deep-inspect-multi-arch.yaml` | Build: per-arch deep-inspect (x86 KVM + arm64 TCG) with diff |
+| `.github/workflows/deep-inspect-multi-arch.yaml` | Build: per-arch deep-inspect (x86 KVM + arm64 KVM/TCG fallback) with diff |
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `docs/restraml-shared.js` | Shared JS utilities for all tool pages (version parsing, theme, share modal) |
 | `docs/restraml-shared.css` | Shared CSS for all tool pages (fonts, logo, theme, guide, modal, utilities) |

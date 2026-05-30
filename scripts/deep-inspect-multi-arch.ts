@@ -13,6 +13,8 @@
  *
  * This script is the local-iteration counterpart to the per-arch deep-inspect
  * pipeline; the CI equivalent lives in .github/workflows/deep-inspect-multi-arch.yaml.
+ * CI currently passes --skip-openapi and publishes only deep-inspect + diff artifacts;
+ * local runs keep openapi.<arch>.json for the deferred OpenAPI publication review.
  * See docs/deep-inspect.md for the design rules and shipped Phase 3 history.
  *
  * Usage:

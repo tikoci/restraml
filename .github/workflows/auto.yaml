@@ -6,6 +6,7 @@ name: "Auto-Build New RouterOS Versions"
 #   - Base schema: docs/{version}/schema.raml
 #   - Extra-packages schema: docs/{version}/extra/schema.raml
 #   - /app YAML schemas: docs/{version}/routeros-app-yaml-schema.json
+#   - Deep-inspect multi-arch: docs/{version}/extra/deep-inspect.{x86,arm64}.json
 #
 # Can also be triggered manually to retry/fix any missing builds.
 #
@@ -24,8 +25,8 @@ on:
           Comma-separated list of RouterOS versions to skip ALL builds for.
           Use this for beta/RC versions with known schema issues that are pending
           a fix from MikroTik (e.g. duplicate YAML keys, array-typed env vars).
-          Versions here are excluded from base, extra-packages, and /app YAML schema builds.
-          **Issue was in 7.23beta4 to 7.23rc1 => fixed in 7.23rc2  
+          Versions here are excluded from base, extra-packages, /app YAML schema,
+          and deep-inspect multi-arch builds.
         required: false
         default: "7.23rc1,7.23beta5,7.23beta4"
   schedule:
@@ -95,6 +96,7 @@ jobs:
         #   1. docs/{version}/schema.raml + openapi.json — base schema (triggers base build)
         #   2. docs/{version}/extra/schema.raml + extra/openapi.json — extra-packages schema (triggers extra build)
         #   3. docs/{version}/routeros-app-yaml-schema.json — /app YAML schemas (triggers app schema build)
+        #   4. docs/{version}/extra/deep-inspect.{x86,arm64}.json + diff-deep-inspect.json — multi-arch enrichment
         # Each is tracked independently so a failed extra build can be retried without
         # re-running the base build. Deduplication is applied so the same version reported
         # by multiple channels only triggers one build per artifact type.
@@ -102,6 +104,8 @@ jobs:
         # Versions in skip_versions input are excluded from ALL build types. Use this for
         # beta/RC releases with known upstream issues (e.g. duplicate YAML keys, invalid app YAML)
         # that are pending a fix from MikroTik rather than a schema change.
+        # Manual dispatch defaults can be broader for historical backfill; the scheduled
+        # fallback stays narrow so current channels can recover automatically.
         id: needs-builds
         env:
           STABLE: ${{ steps.get-stable.outputs.version }}

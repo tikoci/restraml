@@ -76,6 +76,7 @@ jobs:
       # host:9180 → VM:80 (REST API), host:9122 → VM:22 (SSH for extra-packages SCP)
       # Uses virtio disk (qcow2) and virtio-net — both supported by MikroTik CHR on x86.
       # KVM is used when available; falls back to software emulation automatically.
+      # Extra-package jobs use 1024 MB to match the deep-inspect memory guardrail.
       run: |
         ROUTEROS_VERSION="${{ github.event.inputs.rosver }}"
         KVM_OPTS=""
@@ -87,7 +88,7 @@ jobs:
         fi
         nohup qemu-system-x86_64 \
             ${KVM_OPTS} \
-            -m 256 \
+            -m 1024 \
             -nographic \
             -drive file=chr-${ROUTEROS_VERSION}.qcow2,format=qcow2,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::9180-:80,hostfwd=tcp::9122-:22 \

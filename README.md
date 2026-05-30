@@ -159,6 +159,9 @@ restraml/
 ├── BACKLOG.md                # Actionable queue for future work
 ├── scripts/
 │   ├── entrypoint.sh         # QEMU launcher for local Docker use
+│   ├── deep-inspect-multi-arch.ts  # Per-arch deep-inspect orchestrator
+│   ├── diff-deep-inspect.ts  # Diff two per-arch deep-inspect outputs
+│   ├── build-docs-index.mjs  # Generate docs/docs-index.json
 │   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local CHR
 │   ├── test-ros-api.sh       # Integration + stress tests (ros-api-protocol) against local CHR
 │   └── benchmark-qemu.sh     # REST vs native API benchmark suite against local CHR
@@ -169,8 +172,13 @@ restraml/
 │   ├── diff.html             # Schema diff tool
 │   ├── tikapp.html           # /app YAML editor (Monaco-based)
 │   ├── deep-inspect.md       # Deep-inspect design/history reference
+│   ├── deep-inspect.schema.json
+│   ├── deep-inspect.future.schema.json
+│   ├── docs-index.json       # Published inventory for static version discovery
 │   ├── routeros-app-yaml-schema.latest.json
+│   ├── routeros-app-yaml-schema.editor.json
 │   ├── routeros-app-yaml-store-schema.latest.json
+│   ├── routeros-app-yaml-store-schema.editor.json
 │   └── {version}/            # Per-version schemas (RAML, OpenAPI 3, inspect JSON)
 ├── CLAUDE.md                 # Full architecture guide for AI agents
 ├── AGENTS.md                 # GitHub Copilot agent instructions
@@ -179,6 +187,7 @@ restraml/
     ├── manual-using-docker-in-docker.yaml
     ├── manual-using-extra-docker-in-docker.yaml
     ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
+    ├── deep-inspect-multi-arch.yaml
     └── manual-from-secrets.yaml
 ```
 
@@ -188,3 +197,4 @@ For full architecture details, CI/CD pipeline documentation, and development ins
 
 * [CLAUDE.md](CLAUDE.md) — comprehensive architecture guide
 * [AGENTS.md](AGENTS.md) — GitHub Copilot agent instructions
+* [BACKLOG.md](BACKLOG.md) — ready-to-go tasks and policy decisions still needed

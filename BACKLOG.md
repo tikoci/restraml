@@ -28,7 +28,7 @@ These are intentionally repeated here because they affect future backlog work:
    `deep-inspect.arm64.json` remain independently published until a merge policy
    is designed and validated.
 
-## Active tasks
+## Ready-to-go tasks
 
 ### P1 — Backfill deep-inspect artifacts for supported channels
 
@@ -38,13 +38,14 @@ importers.
 
 **Scope:**
 
-- Regenerate `deep-inspect.x86.json`, `deep-inspect.arm64.json`,
-  `openapi.x86.json`, `openapi.arm64.json`, and `diff-deep-inspect.json` under
-  `docs/{version}/extra/`.
+- Regenerate `deep-inspect.x86.json`, `deep-inspect.arm64.json`, and
+  `diff-deep-inspect.json` under `docs/{version}/extra/`.
 - Cover all current RouterOS channels, back to at least the current long-term
   release.
 - Prioritize development → stable → long-term → testing unless a release is
   known-broken upstream.
+- Do not publish `openapi.x86.json` / `openapi.arm64.json` as part of this
+  backfill; per-arch OpenAPI publication is tracked separately below.
 
 **Acceptance criteria:**
 
@@ -103,11 +104,13 @@ single enriched tree.
 
 **Reference:** [`docs/deep-inspect.md`](docs/deep-inspect.md)
 
-### P2 — Verify `openapi.json` replacement path
+### P2 — Verify per-arch OpenAPI publication path
 
-**Why:** `openapi.html` consumes `openapi.json`, while the deep-inspect pipeline
-can also generate per-arch OpenAPI files. Replacing or deriving the public
-OpenAPI schema needs an equivalence check.
+**Why:** `openapi.html` consumes `openapi.json`, while `deep-inspect.ts` and the
+local multi-arch orchestrator can generate per-arch OpenAPI files. CI currently
+passes `--skip-openapi` in `deep-inspect-multi-arch.yaml`, so publishing
+`openapi.x86.json` / `openapi.arm64.json` needs an equivalence check before it
+becomes a public artifact contract.
 
 **Scope:**
 
@@ -116,6 +119,8 @@ OpenAPI schema needs an equivalence check.
 - Decide whether the public API explorer should use x86, arm64, a merged file,
   or keep the current file.
 - Document any intentional differences.
+- If per-arch OpenAPI files are published, update `auto.yaml` gating so missing
+  OpenAPI artifacts retrigger the workflow.
 
 **Acceptance criteria:**
 
@@ -123,6 +128,8 @@ OpenAPI schema needs an equivalence check.
   regressions.
 - `docs/openapi.html` behavior is unchanged unless a deliberate migration task
   changes it.
+- `deep-inspect-multi-arch.yaml`, docs, and `auto.yaml` agree on whether
+  per-arch OpenAPI files are published.
 
 ### P2 — Evaluate docs pages that could use deep-inspect
 
@@ -158,6 +165,54 @@ extra package adds a command would improve docs and downstream search.
 - A prototype proves the method on a small package subset.
 - Runtime and reboot cost are measured before adding CI automation.
 - The output format does not pollute `inspect.json`.
+
+## Decision-needed tasks
+
+These are deliberately not implementation-ready until the policy questions are
+answered. Keep the details here instead of duplicating unresolved questions in
+`CLAUDE.md`.
+
+### P3 — Resolve `/app` parser leniency policy
+
+**Why:** RouterOS can ship built-in `/app` entries that its own parser accepts
+but strict YAML/JSON Schema tooling rejects. The validator needs a clear policy
+before relaxing anything.
+
+**Questions to answer:**
+
+- Should duplicate YAML mapping keys be accepted to match RouterOS behavior, or
+  should they remain upstream bugs that block schema publication?
+- If duplicates are accepted, does first-key or last-key wins match RouterOS?
+- Should placeholder values such as `ROUTER_HOST: [routerIP]` be treated as
+  RouterOS string placeholders, or should MikroTik quote them upstream?
+
+**Acceptance criteria:**
+
+- `appyamlvalidate.js` behavior matches the chosen policy.
+- The schema does not silently accept malformed YAML unless that behavior is
+  documented as RouterOS-compatible.
+- New failing built-in apps are classified as schema gaps vs upstream bugs using
+  this policy.
+
+### P3 — Resolve `/app` retry and skip policy
+
+**Why:** When `appyamlschemas.yaml` exits 2, `auto.yaml` keeps retrying because
+the per-version schema file is intentionally absent. Manual `skip_versions`
+works, but repeated daily failures can create issue churn.
+
+**Questions to answer:**
+
+- Should `auto.yaml` pause a version automatically after N validation failures?
+- Where should pause state live without creating another mutable source of
+  truth?
+- Should schedule and manual dispatch use the same default skip list, or should
+  scheduled runs stay narrower so upstream recovery is detected?
+
+**Acceptance criteria:**
+
+- Retry behavior is explicit in `auto.yaml` and `CLAUDE.md`.
+- Known upstream-broken versions do not create duplicate daily issues.
+- Manual dispatch still lets a maintainer override the skip list for backfill.
 
 ### P3 — Resolve `/app` schema naming and release-scope policy
 

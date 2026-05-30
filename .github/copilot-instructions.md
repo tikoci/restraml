@@ -21,7 +21,10 @@ the `/docs/` directory in this repository.
 - **`appyamlvalidate.js`** — Validates RouterOS /app YAML schemas and built-in /app entries (Bun)
 - **`ros-api-protocol.ts`** — Vendored RouterOS native API wire protocol (kept for future use; NOT used in CI)
 - **`Dockerfile.chr-qemu`** — Alpine image that runs RouterOS CHR in QEMU
+- **`BACKLOG.md`** — Ready-to-go work queue and decision-needed policy backlog
 - **`docs/deep-inspect.md`** — Deep-inspect design/history reference and ARM64 CI postmortem
+- **`docs/deep-inspect.schema.json`** — Current JSON Schema contract for deep-inspect artifacts
+- **`docs/deep-inspect.future.schema.json`** — Design-target schema for future merge/provenance output
 - **`docs/`** — Published schema files, one subdirectory per RouterOS version
 - **`docs/restraml-shared.js`** — Shared JS utilities for all docs/*.html pages (version parsing, theme switcher, share modal, GitHub API)
 - **`docs/restraml-shared.css`** — Shared CSS for all docs/*.html pages (fonts, logo swap, theme icon, page-guide, share-modal, utility classes)
