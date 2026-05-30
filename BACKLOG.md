@@ -56,29 +56,18 @@ importers.
 
 **Reference:** [`docs/deep-inspect.md`](docs/deep-inspect.md)
 
-### P1 — Define downstream import contract for rosetta
+### P1 — Define downstream import contract for rosetta — RESOLVED
 
-**Why:** `tikoci/rosetta` expects `deep-inspect.x86.json` and
-`deep-inspect.arm64.json` in `docs/{version}/extra/` to enrich its SQL/RAG
-database. restraml should make the published contract explicit before consumers
-depend on accidental file shape.
+**Resolved (May 2026).** The per-arch deep-inspect contract is now explicit and pinned:
 
-**Scope:**
+- Stable shape is enforced by `docs/deep-inspect.schema.json` (strict) and the consumer-perspective
+  tests in `rosetta-consumer.test.ts` (`_meta` envelope, node `_type`/`desc`, `_completion` shape).
+- `docs/deep-inspect.md` → "Downstream consumers" documents who reads what; rosetta consumes **both**
+  `deep-inspect.x86.json` and `deep-inspect.arm64.json`.
+- `CLAUDE.md` (deep-inspect section) and `AGENTS.md` now point agents to that contract and state that
+  completion-enriched consumers read `deep-inspect.*.json`, not `inspect.json`.
 
-- Document the stable fields rosetta can rely on.
-- Decide which `_meta` fields are contract vs diagnostic.
-- Clarify whether downstream consumers should prefer arm64, x86, both, or a
-  future merged file.
-- Keep `docs/deep-inspect.schema.json` aligned with the currently emitted file
-  shape, and use `docs/deep-inspect.future.schema.json` only for planned merge
-  and provenance design targets.
-
-**Acceptance criteria:**
-
-- A reference section or docs page describes the per-arch file contract.
-- `CLAUDE.md` and `AGENTS.md` point agents to that contract.
-- No consumer is told to read `inspect.json` when it needs completion-enriched
-  data.
+A future merged-file consumer preference is folded into the P2 multi-arch merge task below.
 
 ### P2 — Design multi-arch merge (`deep-inspect.json`)
 
@@ -243,3 +232,4 @@ URLs are already linked externally, so any change needs a compatibility plan.
 | Phase 2.9 native API non-determinism finding | Resolved: REST only | `docs/mikrotik-bug-native-api-inspect.md` |
 | Phase 3 ARM64 per-arch enrichment | Shipped | `docs/deep-inspect.md` |
 | ARM64 CI memory/TCG postmortem | Resolved: use 1024 MB for extra-package jobs | `docs/deep-inspect.md`, `CLAUDE.md` |
+| Downstream import contract for rosetta | Resolved: pinned by schema + `rosetta-consumer.test.ts` | `docs/deep-inspect.md` → "Downstream consumers", `CLAUDE.md`, `AGENTS.md` |

@@ -72,6 +72,10 @@ and publishing the results to GitHub Pages at https://tikoci.github.io/restraml.
 - `validraml.cjs` runs under **Node.js 18**.
 - `appyamlvalidate.js` runs under **Bun**. Validates /app YAML schemas and live /app entries.
 - `deep-inspect.ts` runs under **Bun**. Enriches inspect trees with completion data. Uses REST transport.
+  Its per-arch output (`deep-inspect.{x86,arm64}.json`) is a published contract consumed by
+  `tikoci/rosetta`. The shape is pinned by `docs/deep-inspect.schema.json` and `rosetta-consumer.test.ts`;
+  see `docs/deep-inspect.md` → "Downstream consumers". Do not change the emitted shape without updating
+  both and running `bun test`.
 - `URLBASE` and `BASICAUTH` env vars configure the RouterOS REST API connection.
 
 ### ⚠️ Native API Transport — REST Only for Schema Generation
@@ -204,6 +208,11 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `deep-inspect.ts` | Crawls live CHR + enriches with completion data → deep-inspect.json / openapi.json (Bun) |
 | `ros-api-protocol.ts` | Vendored RouterOS native API wire protocol (Bun) |
 | `ros-api-protocol.test.ts` | Unit + integration + stress tests for `ros-api-protocol.ts` |
+| `enrich-openapi.ts` | Enriches generated OpenAPI schemas with descriptions (Bun) |
+| `validate-openapi.ts` | OpenAPI 3.0 schema validator (Bun) |
+| `validate-workflows.mjs` | Runs actionlint over `.github/workflows/` (`bun run lint:workflows`) |
+| `rosetta-consumer.test.ts` | Contract tests asserting the deep-inspect output shape `tikoci/rosetta` consumes |
+| `scripts/build-docs-index.mjs` | Generates `docs/docs-index.json` from the checked-in docs tree |
 | `Dockerfile.chr-qemu` | Local dev: RouterOS CHR in QEMU via Docker |
 | `BACKLOG.md` | Ready-to-go work queue and decision-needed policy backlog |
 | `scripts/entrypoint.sh` | QEMU launcher for local Docker use |

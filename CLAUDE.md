@@ -29,6 +29,7 @@ restraml/
 ├── enrich-openapi.ts     # Enriches generated OpenAPI schemas (Bun)
 ├── validate-openapi.ts   # Validates OpenAPI 3.0 schemas (Bun)
 ├── ros-api-protocol.ts   # Vendored RouterOS native API wire protocol (Bun)
+├── validate-workflows.mjs # Runs actionlint over .github/workflows/ (bun run lint:workflows)
 ├── *.test.ts             # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu   # Alpine image that runs RouterOS CHR in QEMU (for local use)
 ├── scripts/
@@ -38,9 +39,15 @@ restraml/
 │   ├── benchmark-qemu.sh           # REST vs native API timing benchmark against local CHR
 │   ├── deep-inspect-multi-arch.ts  # Per-arch deep-inspect orchestrator (quickchr library, x86 + arm64)
 │   ├── diff-deep-inspect.ts        # Diff two deep-inspect.<arch>.json files (enum drift + path delta)
+│   ├── build-docs-index.mjs        # Generate docs/docs-index.json from the checked-in docs tree
+│   ├── experiment-arm64-reboot-timing.sh # Local QEMU arm64 reboot-timing experiment helper
+│   ├── test-crash-path-memory.ts   # Reproduce /console/inspect crash-path hang at varied RAM (SUP-127641)
+│   ├── test-native-api-drops.ts    # Diagnostic: native API completion non-determinism (drops)
+│   ├── test-native-api-tags.ts     # Diagnostic: native API tag-multiplexing probe
 │   ├── analyze_appports.js         # Analyze /app port mappings (Bun)
 │   ├── analyze_appyamls.py         # Analyze /app YAML patterns (Python)
-│   └── extract_appyamls.py         # Extract /app YAMLs from app.json (Python)
+│   ├── extract_appyamls.py         # Extract /app YAMLs from app.json (Python)
+│   └── native-api-investigation/   # Archived native API non-determinism research scripts + README
 ├── .env                  # Local dev env vars (URLBASE, BASICAUTH) — not committed secrets
 ├── docs/                 # GitHub Pages root; one subdirectory per RouterOS version
 │   ├── index.html        # Main SPA: version list, diff tool, download links
@@ -50,6 +57,7 @@ restraml/
 │   ├── tikapp.html       # /app YAML editor with Monaco + live validation
 │   ├── tikapp-manual.html # /app YAML documentation / manual reference
 │   ├── deep-inspect.md   # Deep-inspect design/history reference
+│   ├── mikrotik-bug-native-api-inspect.md # Native API request=completion non-determinism bug report
 │   ├── deep-inspect.schema.json        # Strict JSON Schema for current deep-inspect artifacts
 │   ├── deep-inspect.future.schema.json # Design-target schema for future merge/provenance output
 │   ├── restraml-shared.js  # Shared JS utilities for all docs/*.html pages
@@ -70,13 +78,17 @@ restraml/
 ├── CLAUDE.md             # Full architecture guide for AI agents
 ├── AGENTS.md             # GitHub Copilot agent-specific instructions
 └── .github/
+    ├── actions/
+    │   └── publish-with-retry/   # Composite action: reset-to-origin publish + index rebuild + retry
     └── workflows/
         ├── auto.yaml                                    # Daily cron: detect new versions, trigger builds
         ├── manual-using-docker-in-docker.yaml           # Build: base RouterOS schema
         ├── manual-using-extra-docker-in-docker.yaml     # Build: schema with extra packages
         ├── appyamlschemas.yaml                          # Build: validate and publish /app YAML schemas
         ├── deep-inspect-multi-arch.yaml                 # Build: per-arch deep-inspect (x86 KVM + arm64 KVM/TCG fallback) with diff
-        └── manual-from-secrets.yaml                     # Build: using a real RouterOS device (secrets)
+        ├── manual-from-secrets.yaml                     # Build: using a real RouterOS device (secrets)
+        ├── codeql.yml                                   # Code scanning (JS/TS + GitHub Actions)
+        └── dependency-review.yml                        # PR dependency review
 ```
 
 ---
@@ -242,6 +254,20 @@ failed when only CDN was tried. **Do not change this order.**
   data from the RouterOS REST API. Outputs `deep-inspect.json` and `openapi.json`.
 - Supports two transports: REST (`RouterOSClient`) and native API (`NativeRouterOSClient`)
 - **CI production uses `--transport rest` only** — do not change without reading the note below
+
+#### Downstream consumer contract (deep-inspect output)
+
+The per-arch `deep-inspect.{x86,arm64}.json` files under `docs/{version}/extra/` are a published
+contract consumed by `tikoci/rosetta` (SQL/RAG import). Before changing the emitted shape:
+
+- The stable field shape is pinned by **`docs/deep-inspect.schema.json`** (strict) and the
+  consumer-perspective tests in **`rosetta-consumer.test.ts`** (`_meta` envelope, node `_type`/`desc`,
+  and `_completion` entry shape). Run `bun test` after any change to `deep-inspect.ts` output.
+- **`docs/deep-inspect.md` → "Downstream consumers"** lists who reads what; rosetta expects both
+  the x86 and arm64 files.
+- `docs/deep-inspect.future.schema.json` is design-target only — do not emit its merge/provenance
+  fields until the P2 merge task lands.
+- Consumers that need completion-enriched data read `deep-inspect.*.json`, **not** `inspect.json`.
 
 ### Native API Wire Protocol (`ros-api-protocol.ts`)
 - Vendored from `tikoci/tiktui`. Zero external dependencies. Fully functional binary protocol.

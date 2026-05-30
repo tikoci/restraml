@@ -154,6 +154,7 @@ restraml/
 ├── ros-api-protocol.ts       # Vendored RouterOS native API wire protocol
 ├── enrich-openapi.ts         # Enriches OpenAPI schemas with descriptions
 ├── validate-openapi.ts       # OpenAPI 3.0 schema validator
+├── validate-workflows.mjs    # Runs actionlint over .github/workflows/
 ├── *.test.ts                 # Unit + integration tests (bun test)
 ├── Dockerfile.chr-qemu       # Local dev: RouterOS CHR in QEMU via Docker
 ├── BACKLOG.md                # Actionable queue for future work
@@ -164,14 +165,19 @@ restraml/
 │   ├── build-docs-index.mjs  # Generate docs/docs-index.json
 │   ├── test-with-qemu.sh     # Integration tests (deep-inspect) against local CHR
 │   ├── test-ros-api.sh       # Integration + stress tests (ros-api-protocol) against local CHR
-│   └── benchmark-qemu.sh     # REST vs native API benchmark suite against local CHR
+│   ├── benchmark-qemu.sh     # REST vs native API benchmark suite against local CHR
+│   └── native-api-investigation/   # Archived native API non-determinism research scripts
 ├── docs/                     # GitHub Pages root (one subdirectory per version)
 │   ├── index.html            # Main website: version list, diff tool, downloads
 │   ├── openapi.html          # Interactive API Explorer (Scalar-based)
 │   ├── lookup.html           # Command search tool
 │   ├── diff.html             # Schema diff tool
 │   ├── tikapp.html           # /app YAML editor (Monaco-based)
+│   ├── tikapp-manual.html    # /app YAML editor user manual
+│   ├── restraml-shared.js    # Shared JS utilities for all docs/*.html pages
+│   ├── restraml-shared.css   # Shared CSS for all docs/*.html pages
 │   ├── deep-inspect.md       # Deep-inspect design/history reference
+│   ├── mikrotik-bug-native-api-inspect.md  # Native API completion bug report
 │   ├── deep-inspect.schema.json
 │   ├── deep-inspect.future.schema.json
 │   ├── docs-index.json       # Published inventory for static version discovery
@@ -182,13 +188,17 @@ restraml/
 │   └── {version}/            # Per-version schemas (RAML, OpenAPI 3, inspect JSON)
 ├── CLAUDE.md                 # Full architecture guide for AI agents
 ├── AGENTS.md                 # GitHub Copilot agent instructions
-└── .github/workflows/
-    ├── auto.yaml             # Daily cron: detect new versions, trigger builds
-    ├── manual-using-docker-in-docker.yaml
-    ├── manual-using-extra-docker-in-docker.yaml
-    ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
-    ├── deep-inspect-multi-arch.yaml
-    └── manual-from-secrets.yaml
+└── .github/
+    ├── actions/publish-with-retry/  # Composite action: retrying publish to main
+    └── workflows/
+        ├── auto.yaml         # Daily cron: detect new versions, trigger builds
+        ├── manual-using-docker-in-docker.yaml
+        ├── manual-using-extra-docker-in-docker.yaml
+        ├── appyamlschemas.yaml   # Validate and publish /app YAML schemas
+        ├── deep-inspect-multi-arch.yaml
+        ├── manual-from-secrets.yaml
+        ├── codeql.yml        # Code scanning (JS/TS + Actions)
+        └── dependency-review.yml  # PR dependency review
 ```
 
 ## Architecture & Development
