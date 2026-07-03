@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-07-03T03:44:31.483Z",
+  "generatedAt": "2026-07-03T03:47:22.611Z",
   "rootPath": "docs",
   "latestVersion": "7.24beta3",
   "latestStableVersion": "7.23.1",
@@ -379,6 +379,21 @@
           "type": "file"
         },
         {
+          "name": "deep-inspect.json",
+          "path": "docs/7.24rc1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.24rc1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.24rc1/openapi.json",
+          "type": "file"
+        },
+        {
           "name": "routeros-app-yaml-schema.json",
           "path": "docs/7.24rc1/routeros-app-yaml-schema.json",
           "type": "file"
@@ -386,6 +401,11 @@
         {
           "name": "routeros-app-yaml-store-schema.json",
           "path": "docs/7.24rc1/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.24rc1/schema.raml",
           "type": "file"
         }
       ],
