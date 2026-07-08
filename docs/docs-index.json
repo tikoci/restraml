@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-07-08T06:28:02.293Z",
+  "generatedAt": "2026-07-08T06:44:54.233Z",
   "rootPath": "docs",
   "latestVersion": "7.24beta3",
   "latestStableVersion": "7.23.2",
@@ -503,8 +503,23 @@
           "type": "dir",
           "files": [
             {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.23.2/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
               "name": "deep-inspect.json",
               "path": "docs/7.23.2/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.23.2/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.23.2/extra/diff-deep-inspect.json",
               "type": "file"
             },
             {
