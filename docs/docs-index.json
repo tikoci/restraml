@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-07-08T06:44:54.233Z",
+  "generatedAt": "2026-07-14T06:13:03.598Z",
   "rootPath": "docs",
   "latestVersion": "7.24beta3",
   "latestStableVersion": "7.23.2",
@@ -280,6 +280,34 @@
           "dirs": []
         }
       ]
+    },
+    {
+      "name": "7.24rc2",
+      "path": "docs/7.24rc2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.24rc2/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.24rc2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.24rc2/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.24rc2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": []
     },
     {
       "name": "7.24beta1",
