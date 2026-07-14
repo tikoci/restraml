@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-07-14T06:13:03.598Z",
+  "generatedAt": "2026-07-14T06:13:36.831Z",
   "rootPath": "docs",
   "latestVersion": "7.24beta3",
   "latestStableVersion": "7.23.2",
@@ -286,6 +286,11 @@
       "path": "docs/7.24rc2",
       "type": "dir",
       "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.24rc2/app.json",
+          "type": "file"
+        },
         {
           "name": "deep-inspect.json",
           "path": "docs/7.24rc2/deep-inspect.json",
