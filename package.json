@@ -27,7 +27,7 @@
     "test:native-api-drops": "bun scripts/test-native-api-drops.ts"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^5.2.1"
   },
   "optionalDependencies": {
     "@tikoci/quickchr": "file:../quickchr"
