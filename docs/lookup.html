@@ -24,7 +24,7 @@
         rel="stylesheet">
 
     <!-- Privacy-friendly analytics by Plausible -->
-    <script async src="https://plausible.io/js/pa-ubWop5eYckoDPVbIjXU4_.js"></script>
+    <script async src="https://plausible.io/js/script.js"></script>
     <script>
       window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
       plausible.init()
@@ -144,7 +144,7 @@
                     <input type="text" id="input-cmdpath" placeholder="e.g. /ip/address/set"
                         aria-label="RouterOS path and command, e.g. /ip/address/set">
                 </label>
-                <label>
+                <label for="input-attr">
                     Attribute <small>(optional)</small>
                     <input type="text" id="input-attr"
                         aria-label="RouterOS attribute name (optional)">
@@ -445,6 +445,13 @@
         //   "dir"/"path"      → comma-sep list of child cmd names
         //   not found         → found:false with detail explaining why
         // -----------------------------------------------------------------
+        function extractPreference(meta) {
+            if (!meta || typeof meta !== 'object') {
+                return null
+            }
+            return Number.isFinite(meta.preference) ? meta.preference : null
+        }
+
         function normalizeCompletionEntries(argNode) {
             if (!argNode || typeof argNode !== 'object' ||
                 !argNode._completion || typeof argNode._completion !== 'object') {
@@ -458,9 +465,7 @@
                 style: meta && typeof meta === 'object' && typeof meta.style === 'string'
                     ? meta.style
                     : '',
-                preference: meta && typeof meta === 'object' && Number.isFinite(meta.preference)
-                    ? meta.preference
-                    : null,
+                preference: extractPreference(meta),
             }))
         }
 
