@@ -1,9 +1,9 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-07-30T06:32:31.802Z",
+  "generatedAt": "2026-08-04T06:29:39.497Z",
   "rootPath": "docs",
   "latestVersion": "7.24rc3",
-  "latestStableVersion": "7.23.2",
+  "latestStableVersion": "7.23.3",
   "files": [
     {
       "name": "deep-inspect.future.schema.json",
@@ -613,6 +613,19 @@
           "dirs": []
         }
       ]
+    },
+    {
+      "name": "7.23.3",
+      "path": "docs/7.23.3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.23.3/app.json",
+          "type": "file"
+        }
+      ],
+      "dirs": []
     },
     {
       "name": "7.23.2",
