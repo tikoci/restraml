@@ -173,7 +173,7 @@ async function nativeCompletionCall(
   proplist?: string,
 ): Promise<{ items: string[]; ms: number; timedOut: boolean }> {
   const t0 = Date.now();
-  const words: string[] = [
+  const words: [string, ...string[]] = [
     "/console/inspect",
     "=request=completion",
     `=path=${path.join(",")}`,
@@ -183,7 +183,7 @@ async function nativeCompletionCall(
   }
 
   const queryP = api
-    .write(words[0]!, ...words.slice(1))
+    .write(...words)
     .then(
       (sentences: Sentence[]): { items: string[]; ms: number; timedOut: false } => ({
         items: sentences

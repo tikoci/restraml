@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 /**
- * nightly-build.ts — validate RouterOS nightly (ab) upgrade via quickchr
+ * nightly-build.ts — nightly build driver for single-slot nightly (ab) upgrade via quickchr
  *
- * Provisional "squeeze out unknowns before CI" step from #90.
  * Boots a stable CHR via @tikoci/quickchr, discovers the current nightly
  * (mt.lv Box), downloads arch-specific NPKs, uploads via quickchr SCP,
  * reboots, and validates the version moves to the nightly build.
+ * Single-slot `docs/nightly/` shape per #90 §6; one boot / two crawls
+ * (base then extra) will be driven with --phase in N4.
  *
  * Now arch-aware and CI-hardened:
  *   - `--arch x86|arm64` — x86 uses HVF on Intel, arm64 uses TCG (slow but viable)
@@ -15,7 +16,7 @@
  *   - Per-arch machine names, timeouts, and package filters so x86 and arm64
  *     runs can coexist and map directly to the eventual nightly.yaml workflow.
  *   - Always boots a fresh quickchr instance (never reuses a mikropkl Machine);
- *     the inspect crawl is the slow part, not CHR boot — this script proves that.
+ *     the inspect crawl is the slow part, not CHR boot.
  *   - Pinned to `stable` by default (`--channel stable` / `--base-version` override).
  *   - Writes provenance `nightly.json` under the per-run tmp dir (mirrors the
  *     `docs/nightly/nightly.json` strawman from #90).
@@ -32,6 +33,8 @@ import { parseArgs } from "node:util";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+const REPO_ROOT = join(import.meta.dir, "..");
 import { QuickCHR } from "@tikoci/quickchr";
 
 // Public share-link token for https://mt.lv/nightly-build → box.mikrotik.com/d/<token>/
@@ -111,7 +114,7 @@ Options:
                             /console/inspect child count. Aliases: --skip-crawl,
                             --skip-deep-inspect. Recommended for arm64/TCG.
   --output-dir <dir>        Where to write deep-inspect outputs when not skipped
-                            (default: /tmp/nightly-quickchr-<ver>-<arch>).
+                            (default: mkdtemp nightly-quickchr-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
   --machine-name <name>     Override quickchr machine name (default:
                             restraml-nightly-quickchr-<arch>).
   --keep-running            Leave CHR running after the run (for manual inspection).
@@ -193,7 +196,7 @@ export function compareAb(a: string, b: string): number {
   return pa[3] - pb[3];
 }
 
-async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string }> {
+async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
   const token = await resolveToken();
   const apiUrl = boxApiUrl(token);
   log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch})`);
@@ -206,8 +209,9 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
     clearTimeout(t);
   }
   if (!res.ok) fail(`Box API ${res.status} ${await res.text().then((t) => t.slice(0, 500))}`);
-  const data = (await res.json()) as { dirent_list: Array<{ file_name: string; size?: number }> };
-  const allFiles: string[] = (data.dirent_list ?? []).map((d) => d.file_name);
+  const data = (await res.json()) as { dirent_list: Array<{ file_name: string; size?: number; last_modified?: string }> };
+  const dirents = data.dirent_list ?? [];
+  const allFiles: string[] = dirents.map((d) => d.file_name);
   const nightlyRe = /(\d+\.\d+(?:\.\d+)?_ab\d+)/;
   const versions = [...new Set(allFiles.map((f) => f.match(nightlyRe)?.[1]).filter(Boolean))] as string[];
   if (versions.length === 0) fail("no nightly version found in Box dirent list");
@@ -215,9 +219,23 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
   if (!nightlyVer) fail("no nightly version found in Box dirent list");
   log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
   const files = filterNpksByArch(allFiles, nightlyVer, arch);
+  const rejected = allFiles.filter((f) => f.includes(nightlyVer) && !files.includes(f));
   if (files.length === 0) fail(`no ${arch} NPKs for ${nightlyVer} (arch filter rejected all ${allFiles.filter((f) => f.includes(nightlyVer)).length} nightly files)`);
   log(`  ${arch} NPKs (${files.length}): ${files.join(", ")}`);
-  return { version: nightlyVer, files, allFiles, token };
+  if (rejected.length > 0) log(`  rejected (${rejected.length}): ${rejected.join(", ")}`);
+  const direntMap = new Map(dirents.map((d) => [d.file_name, d]));
+  const npks = files.map((f) => {
+    const d = direntMap.get(f);
+    return { file: f, size: d?.size ?? null, lastModified: (d?.last_modified as string | undefined) ?? null };
+  });
+  const nightlyDirents = dirents.filter((d) => d.file_name.includes(nightlyVer) && d.last_modified);
+  const buildWindow = nightlyDirents.length > 0
+    ? {
+        earliest: nightlyDirents.map((d) => d.last_modified as string).sort()[0],
+        latest: nightlyDirents.map((d) => d.last_modified as string).sort().at(-1) as string,
+      }
+    : null;
+  return { version: nightlyVer, files, allFiles, token, dirents, npks, rejected, buildWindow };
 }
 
 async function downloadNpks(files: string[], dir: string, token: string) {
@@ -252,7 +270,7 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { version: nightlyVer, files: archFiles, token: nightlyToken } = await discoverNightly(ARCH);
+  const { version: nightlyVer, files: archFiles, token: nightlyToken, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
   const tmpDir = (() => {
     const custom = values["output-dir"] as string | undefined;
     if (custom) {
@@ -435,6 +453,7 @@ async function main() {
         if (postPkgCount < expectedMin) fail(`Package count ${postPkgCount} < expected ${expectedMin} for ${ARCH} — extra-package set incomplete after upgrade`);
         else log(`  ✓ package count ${postPkgCount} ≥ ${expectedMin} for ${ARCH}`);
         if (postPkgNames.length !== archFiles.length) {
+          // Warn-only: version mismatch already fails the run, but this makes a bad filter diagnosable
           log(`  ⚠ uploaded ${archFiles.length} NPKs but RouterOS reports ${postPkgCount} packages — possible duplicate/filter mismatch`);
         }
       } else log(`  packages raw=${JSON.stringify(pkgs).slice(0, 800)}`);
@@ -444,23 +463,26 @@ async function main() {
     }
 
     // ── shallow probes (always, even when skipping heavy collection) ──
-    log(`\n→ shallow probes (REST smoke)`);
+    let rootChildCount = 0;
     try {
       const root: unknown = await chr.rest("/console/inspect", {
         method: "POST",
         body: JSON.stringify({ request: "child", path: "" }),
       });
       const count = Array.isArray(root) ? root.length : Object.keys((root as object) ?? {}).length;
+      rootChildCount = count;
       const sample: string[] = Array.isArray(root)
         ? (root as Array<{ name?: string }>).map((r) => r.name ?? String(r)).slice(0, 12)
         : Object.keys((root as object) ?? {}).slice(0, 12);
       log(`  /console/inspect root children: ${count} sample=${sample.join(", ")}`);
-      if (count < 70) log(`  ⚠ root child count ${count} is below typical (~79-83) — inspect tree may be incomplete`);
+      if (count < 70) fail(`root child count ${count} is below typical 70 — inspect tree may be incomplete`);
     } catch (e) {
       log(`  /console/inspect probe failed: ${String(e).slice(0, 500)}`);
+      throw e;
     }
 
-    // Provenance artifact — mirrors docs/nightly/nightly.json strawman from #90
+    // Provenance artifact — mirrors docs/nightly/nightly.json strawman from #90 §6
+    // Note: tmpDir is intentionally not included; N4 copies this file to docs/nightly/nightly.json
     nightlyProvenance = {
       nightlyVersion: nightlyVer,
       arch: ARCH,
@@ -468,7 +490,6 @@ async function main() {
       postVersion: postVer ?? null,
       machineName: MACHINE_NAME,
       builtAt: new Date().toISOString(),
-      tmpDir,
       bootMs,
       packageCount: postPkgCount,
       packageNames: postPkgNames,
@@ -476,6 +497,19 @@ async function main() {
       hostArch: process.arch,
       crossArchTcg: IS_CROSS_ARCH,
       skipCollect: SKIP_COLLECT,
+      source: {
+        shortUrl: MT_LV_URL,
+        token: nightlyToken,
+        resolvedFrom: nightlyToken === PINNED_TOKEN ? "pinned" : "302",
+        dirents: nightlyDirents.length,
+      },
+      buildWindow: nightlyBuildWindow,
+      packages: {
+        arch: ARCH,
+        count: nightlyNpks.length,
+        npks: nightlyNpks,
+        rejected: nightlyRejected,
+      },
     };
     try {
       writeFileSync(join(tmpDir, "nightly.json"), JSON.stringify(nightlyProvenance, null, 2) + "\n");
@@ -486,11 +520,7 @@ async function main() {
 
     if (SKIP_COLLECT) {
       log(`\n→ --skip-collect: skipping rest2raml + deep-inspect (use without flag to run full collection — slow under TCG)`);
-      if (postVer !== nightlyVer) {
-        log(`\n⚠ completed with version mismatch — inspect packages/provenance above`);
-      } else {
-        log(`\n✓ nightly upgrade validated (shallow) — nightly ${nightlyVer} (${ARCH}) via quickchr${IS_CROSS_ARCH ? " [TCG]" : ""}`);
-      }
+      log(`\n✓ nightly upgrade validated (shallow) — nightly ${nightlyVer} (${ARCH}) via quickchr${IS_CROSS_ARCH ? " [TCG]" : ""}`);
       return;
     }
 
@@ -498,7 +528,7 @@ async function main() {
     log(`\n→ running rest2raml.js --version against upgraded CHR`);
     const env = await chr.subprocessEnv();
     {
-      const repoRoot = join(import.meta.dir, "..");
+      const repoRoot = REPO_ROOT;
       const proc = Bun.spawn(["bun", "rest2raml.js", "--version"], {
         cwd: repoRoot,
         env: { ...(process.env as Record<string, string>), ...env },
@@ -528,7 +558,7 @@ async function main() {
 
     log(`\n→ running full rest2raml crawl`);
     {
-      const repoRootCrawl = join(import.meta.dir, "..");
+      const repoRootCrawl = REPO_ROOT;
       const proc = Bun.spawn(["bun", "rest2raml.js"], {
         cwd: repoRootCrawl,
         env: { ...(process.env as Record<string, string>), ...env },
@@ -541,7 +571,7 @@ async function main() {
       log(`  rest2raml exit=${code} stdout ${out.length} chars, stderr ${err.length} chars`);
       if (err) log(`  stderr preview: ${err.slice(0, 800)}`);
       if (code !== 0) throw new Error(`rest2raml crawl failed with exit code ${code}: ${err.slice(0, 800)}`);
-      const repoRootArtifacts = join(import.meta.dir, "..");
+      const repoRootArtifacts = REPO_ROOT;
       const arts = readdirSync(repoRootArtifacts).filter((f) => f.startsWith("ros-"));
       log(`  artifacts: ${arts.join(", ")}`);
       for (const a of arts.slice(0, 4)) {
@@ -571,7 +601,7 @@ async function main() {
         nightlyVer,
       ];
       log(`  bun ${deepArgs.join(" ")}`);
-      const repoRootDeep = join(import.meta.dir, "..");
+      const repoRootDeep = REPO_ROOT;
       const proc = Bun.spawn(["bun", ...deepArgs], {
         cwd: repoRootDeep,
         env: { ...(process.env as Record<string, string>), ...env },
@@ -593,8 +623,25 @@ async function main() {
             const s = statSync(join(tmpDir, f));
             log(`    ${f} ${(s.size / 1024 / 1024).toFixed(2)} MiB`);
           } catch (e) {
-            log(`  ignored error: ${String(e).slice(0, 200)}`);
+            log(`  ignored error reading ${f}: ${String(e).slice(0, 200)}`);
           }
+        }
+        // Hard gate: deep-inspect argsTotal floor (catches green exit but truncated tree)
+        try {
+          const deepFile = outs.find((f) => f.startsWith("deep-inspect."));
+          if (deepFile) {
+            const deepData = JSON.parse(await Bun.file(join(tmpDir, deepFile)).text()) as { _meta?: { completionStats?: { argsTotal?: number } } };
+            const argsTotal = deepData._meta?.completionStats?.argsTotal ?? 0;
+            const floor = ARCH === "arm64" ? 34000 : 33000;
+            if (argsTotal < floor) fail(`deep-inspect argsTotal ${argsTotal} < floor ${floor} for ${ARCH} — tree may be truncated`);
+            else log(`  ✓ deep-inspect argsTotal ${argsTotal} ≥ floor ${floor}`);
+            if (rootChildCount > 0 && argsTotal < rootChildCount * 10) {
+              log(`  ⚠ argsTotal ${argsTotal} is low relative to root children ${rootChildCount}`);
+            }
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes("deep-inspect argsTotal")) throw e;
+          log(`  argsTotal check failed: ${String(e).slice(0, 300)}`);
         }
       }
     }
