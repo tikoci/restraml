@@ -31,7 +31,7 @@
         "version": {
           "type": "string",
           "description": "RouterOS version used to generate this artifact, or unknown for offline developer output.",
-          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?)$"
+          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?(?:_ab\\d+)?)$"
         },
         "generatedAt": {
           "type": "string",
