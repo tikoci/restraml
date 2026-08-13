@@ -445,7 +445,6 @@ async function runAtRam(memMb: number): Promise<RamRunResult> {
 
   // REST baseline
   const baselines = await establishBaselines(restClient);
-  restClient.close?.();
 
   // Run each concurrency level (each level manages its own API connection + reconnect)
   const apiHost = "127.0.0.1";

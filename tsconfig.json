@@ -10,5 +10,7 @@
     "allowImportingTsExtensions": true,
     "types": ["bun-types"]
   },
-  "include": ["*.ts", "fixtures/**/*.ts"]
+  "include": ["*.ts", "fixtures/**/*.ts", "scripts/**/*.ts"],
+  // archived research scripts, not part of CI type gate
+  "exclude": ["scripts/native-api-investigation"]
 }
