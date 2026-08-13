@@ -139,6 +139,9 @@ interface ArchResult {
   argsTotal: number;
   argsWithCompletion: number;
   enrichmentDurationMs?: number;
+  crawlFailed: number;
+  crawlFailedPaths: string[];
+  census?: Record<string, number>;
 }
 
 async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
@@ -150,15 +153,37 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
   // boot timeout are handled inside quickchr based on cross-arch emulation
   // detection, so no manual bumping here. start() resolves REST-ready per its
   // docstring (all provisioning complete), so no belt-and-suspenders waitForBoot.
-  const chr = await QuickCHR.start({
-    arch,
-    channel: opts.channel,
-    version: opts.version,
-    installAllPackages: true,
-    secureLogin: false,
-    background: true,
-    license: "p1",
-  });
+  // If the MikroTik account has exhausted trials ("too many trial licences",
+  // seen since 2026-08-13), retry at free tier — the crawl is correct just slower.
+  let chr: Awaited<ReturnType<typeof QuickCHR.start>>;
+  try {
+    chr = await QuickCHR.start({
+      arch,
+      channel: opts.channel,
+      version: opts.version,
+      installAllPackages: true,
+      secureLogin: false,
+      background: true,
+      license: "p1",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("too many trial licences")) {
+      console.warn(`⚠ License exhausted (${msg}) — retrying without license (free tier, 1 Mbit/s, slower but correct).`);
+      chr = await QuickCHR.start({
+        arch,
+        channel: opts.channel,
+        version: opts.version,
+        installAllPackages: true,
+        secureLogin: false,
+        background: true,
+        // no license field → free tier
+      });
+      console.warn(`✓ CHR ready at free tier (no p1) — continuing.`);
+    } else {
+      throw e;
+    }
+  }
 
   console.log(`CHR ready at ${chr.restUrl}`);
   console.log(`  ports: http=${chr.ports.http} ssh=${chr.ports.ssh} api=${chr.ports.api}`);
@@ -191,8 +216,15 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
   });
 
   const exitCode = await proc.exited;
-  if (exitCode !== 0) {
+  // deep-inspect.ts exits 2 for crawl-stage truncation (writes _meta.crawlStats
+  // before exiting). That is an incomplete artifact — we still want to read
+  // its _meta (so checkAnomalies can surface crawlFailed/census) and run
+  // chr.destroy() before failing. Only truly unexpected exits should throw here.
+  if (exitCode !== 0 && exitCode !== 2) {
     throw new Error(`${arch}: deep-inspect.ts exited with code ${exitCode}`);
+  }
+  if (exitCode === 2) {
+    console.warn(`⚠ ${arch}: deep-inspect.ts exited 2 (crawl incomplete) — reading _meta for diagnostics before cleanup.`);
   }
 
   // Post-crawl load snapshot (best-effort) — informational, not load-bearing.
@@ -218,6 +250,11 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
         argsTimedOut: number;
         argsBlankOnRetry: number;
       };
+      crawlStats?: {
+        pathsFailed: number;
+        failedPaths: string[];
+      };
+      census?: Record<string, number>;
     };
   };
 
@@ -233,6 +270,9 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
     argsTotal: meta.completionStats.argsTotal,
     argsWithCompletion: meta.completionStats.argsWithCompletion,
     enrichmentDurationMs: meta.enrichmentDurationMs,
+    crawlFailed: meta.crawlStats?.pathsFailed ?? 0,
+    crawlFailedPaths: meta.crawlStats?.failedPaths ?? [],
+    census: meta.census,
   };
 
   // Sanity check that --arch threaded through correctly
@@ -262,15 +302,21 @@ function summarize(results: ArchResult[]): void {
   console.log("\n━━━ SUMMARY ━━━");
   for (const r of results) {
     const durS = r.enrichmentDurationMs ? `${(r.enrichmentDurationMs / 1000).toFixed(1)}s` : "?";
+    const crawlNote = r.crawlFailed > 0 ? `  ${r.crawlFailed} crawlFailed` : "";
     console.log(
       `  ${r.arch.padEnd(5)} v${r.version}  ` +
       `${r.argsWithCompletion}/${r.argsTotal} enriched  ` +
       `${r.argsFailed} failed  ${r.argsTimedOut} retried  ` +
       `${r.argsBlankOnRetry} blank-on-retry  ` +
-      `${r.crashPathsCrashed.length} crashed  ` +
+      `${r.crashPathsCrashed.length} crashed${crawlNote}  ` +
       `(${durS})`,
     );
     console.log(`         → ${r.deepInspectPath}`);
+    if (r.census) {
+      const top = Object.entries(r.census).sort((a, b) => b[1] - a[1]).slice(0, 3)
+        .map(([k, v]) => `/${k}=${v}`).join(", ");
+      if (top) console.log(`         census: ${top}`);
+    }
   }
 }
 
@@ -279,6 +325,18 @@ function checkAnomalies(results: ArchResult[]): boolean {
   // or failed arg is a signal worth investigating, not a thing to silently tolerate.
   let anomalies = false;
   for (const r of results) {
+    if (r.crawlFailed > 0) {
+      anomalies = true;
+      console.error(`\n⚠ ${r.arch}: ${r.crawlFailed} path(s) failed during crawl (fetchChild timeout/error) — subtrees dropped:`);
+      for (const p of r.crawlFailedPaths) console.error(`    ${p}`);
+      console.error(`  → This is NOT a small schema delta; it is a truncated crawl (#96).`);
+      console.error(`  See ${r.deepInspectPath} _meta.crawlStats and _meta.census for that run.`);
+      if (r.census) {
+        const sorted = Object.entries(r.census).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([k, v]) => `/${k}=${v}`).join(", ");
+        console.error(`  Census top roots: ${sorted || "<empty>"}`);
+      }
+    }
     if (r.crashPathsCrashed.length > 0) {
       anomalies = true;
       console.error(`\n⚠ ${r.arch}: ${r.crashPathsCrashed.length} path(s) crashed during crawl:`);

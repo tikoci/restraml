@@ -52,6 +52,20 @@ export interface DeepInspectMeta {
      *  These are "silent misses" that should never differ from the REST transport. */
     argsBlankOnRetry: number;
   };
+  /** Crawl-stage observability — tracks REST `fetchChild` failures that previously
+   *  silently shrank `argsTotal` (see #96). A non-zero `pathsFailed` means subtrees
+   *  were dropped; the run should be treated as incomplete. Per-root `census` lets a
+   *  shortfall point at which subtree vanished. */
+  crawlStats?: {
+    /** Number of paths whose `fetchChild` errored or timed out (AbortSignal.timeout). */
+    pathsFailed: number;
+    /** First up to 50 failed path strings (e.g. "/ip/address") for diagnosis. */
+    failedPaths: string[];
+  };
+  /** Per top-level root (first path segment) arg count census — e.g. { "ip": 4231 }.
+   *  Derived from the crawled tree before enrichment. Lets a total shortfall (e.g.
+   *  36793 → 28748) point at which subtree disappeared. See scripts/census.mjs. */
+  census?: Record<string, number>;
   /** Present only when native transport was used. Tracks TCP connection resets
    *  observed during enrichment — each reset rejects all in-flight commands on the
    *  shared connection. Non-zero values indicate a potential RouterOS or Bun bug
@@ -545,12 +559,31 @@ export function setCrawlRequestTimeout(ms: number | undefined) {
   CRAWL_REQUEST_TIMEOUT_MS = ms;
 }
 
-/** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren) */
+/** Crawl the inspect tree from scratch via the live router (mirrors rest2raml.js parseChildren)
+ *
+ *  Failures are tracked rather than thrown so a single flaky REST call does
+ *  not abort the entire multi-thousand-path crawl, but they are recorded
+ *  in `crawlFailures` (and surfaced in `_meta.crawlStats`) so CI can treat
+ *  any failure as a hard error instead of silently shrinking `argsTotal` (#96).
+ */
+export interface CrawlFailures {
+  count: number;
+  /** Sample of failed path strings, capped at 50 for _meta.crawlStats.failedPaths. */
+  paths: string[];
+}
+
+export function recordCrawlFailure(failures: CrawlFailures | undefined, path: string): void {
+  if (!failures) return;
+  failures.count++;
+  if (failures.paths.length < 50) failures.paths.push(path);
+}
+
 export async function crawlInspectTree(
   client: IRouterOSClient,
   rpath: string[] = [],
   skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
   _depth = 0,
+  crawlFailures?: CrawlFailures,
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
   const signal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
@@ -559,6 +592,7 @@ export async function crawlInspectTree(
     children = await client.fetchChild(rpath, signal);
   } catch (err) {
     const pathStr = `/${rpath.join("/")}`;
+    recordCrawlFailure(crawlFailures, pathStr);
     console.error(`  ⚠ fetchChild failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
     return memo;
   }
@@ -591,15 +625,38 @@ export async function crawlInspectTree(
     }
 
     try {
-      const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1);
+      const childTree = await crawlInspectTree(client, newpath, skipPaths, _depth + 1, crawlFailures);
       Object.assign(node, childTree);
     } catch (err) {
       const pathStr = `/${newpath.join("/")}`;
+      recordCrawlFailure(crawlFailures, pathStr);
       console.error(`  ⚠ crawl failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
     }
   }
 
   return memo;
+}
+
+/** Build a per top-level root arg census from a crawled tree.
+ *  Mirrors scripts/census.mjs / /tmp/repro-96/census.mjs for in-process use. */
+export function buildCensus(tree: InspectNode): Record<string, number> {
+  function countArgs(node: InspectNode): number {
+    let n = 0;
+    for (const [k, v] of Object.entries(node)) {
+      if (k.startsWith("_") || typeof v !== "object" || v === null) continue;
+      const child = v as InspectNode;
+      if (child._type === "arg") n++;
+      n += countArgs(child);
+    }
+    return n;
+  }
+  const census: Record<string, number> = {};
+  for (const [k, v] of Object.entries(tree)) {
+    if (k.startsWith("_")) continue;
+    if (!v || typeof v !== "object") continue;
+    census[k] = countArgs(v as InspectNode);
+  }
+  return census;
 }
 
 // ── OpenAPI 3.0 Generation ─────────────────────────────────────────────────
@@ -1266,6 +1323,7 @@ async function main() {
   // Load or crawl the inspect tree
   let inspectTree: InspectNode;
   let version = "unknown";
+  const crawlFailures: CrawlFailures = { count: 0, paths: [] };
 
   if (opts.live) {
     if (!client) {
@@ -1287,7 +1345,15 @@ async function main() {
       }
     }
 
-    inspectTree = await crawlInspectTree(client, pathArgs, skipPaths);
+    inspectTree = await crawlInspectTree(client, pathArgs, skipPaths, 0, crawlFailures);
+    if (crawlFailures.count > 0) {
+      console.error(`\n⚠ Crawl had ${crawlFailures.count} fetchChild failure(s) — subtrees were dropped:`);
+      for (const p of crawlFailures.paths) console.error(`    ${p}`);
+      if (crawlFailures.count > crawlFailures.paths.length) {
+        console.error(`    ...and ${crawlFailures.count - crawlFailures.paths.length} more (capped at 50 sampled)`);
+      }
+      console.error("  → _meta.crawlStats records this. Treat as a failed crawl (#96).");
+    }
   } else if (opts.inspectFile) {
     const file = Bun.file(opts.inspectFile);
     if (!(await file.exists())) {
@@ -1313,6 +1379,15 @@ async function main() {
   }
 
   console.log(`Version: ${version}`);
+
+  // Build census immediately after crawl so a shortfall is diagnosable even
+  // before enrichment. For --inspect-file, census is just derived from the file.
+  const census = buildCensus(inspectTree);
+  if (opts.live) {
+    const top3 = Object.entries(census).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([k, v]) => `/${k}=${v}`).join(", ");
+    console.log(`Census (top roots): ${top3 || "<empty>"}`);
+  }
 
   // Test CRASH_PATHS (if requested and not already done in --live mode)
   let crashPathResults: CrashPathResult[] = [];
@@ -1358,6 +1433,13 @@ async function main() {
     crashPathsSafe: crashPathResults.filter((r) => r.safe).map((r) => r.path),
     crashPathsCrashed: crashPathResults.filter((r) => !r.safe).map((r) => r.path),
     completionStats,
+    // Crawl-stage failures: previously silent shrinkage of argsTotal is now
+    // visible and checked by CI/orchestrator. Empty = healthy crawl.
+    crawlStats: {
+      pathsFailed: crawlFailures.count,
+      failedPaths: crawlFailures.paths.slice(0, 50),
+    },
+    census,
   };
 
   // Attach native API reconnect diagnostics when present.
@@ -1394,6 +1476,18 @@ async function main() {
 
   // Close native API connection if open
   client?.close?.();
+
+  // Fail loudly on crawl-stage truncation (#96) — a dropped subtree must
+  // not be mistaken for a small upstream delta. The written _meta.crawlStats
+  // preserves diagnostics for the artifact.
+  if (crawlFailures.count > 0) {
+    console.error(`\n✗ Crawl incomplete: ${crawlFailures.count} path(s) failed (see _meta.crawlStats.failedPaths).`);
+    if (crawlFailures.paths.length > 0) {
+      console.error(`  Sample: ${crawlFailures.paths.slice(0, 5).join(", ")}${crawlFailures.count > 5 ? " …" : ""}`);
+    }
+    console.error("  → NOT a schema delta — investigate REST/timeout/harness before merging.");
+    process.exit(2);
+  }
 }
 
 // Only run main when executed directly (not imported in tests)

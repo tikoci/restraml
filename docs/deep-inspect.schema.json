@@ -72,6 +72,12 @@
         "completionStats": {
           "$ref": "#/definitions/completionStats"
         },
+        "crawlStats": {
+          "$ref": "#/definitions/crawlStats"
+        },
+        "census": {
+          "$ref": "#/definitions/census"
+        },
         "nativeApiReconnects": {
           "$ref": "#/definitions/nativeApiReconnects"
         }
@@ -108,6 +114,31 @@
         }
       },
       "additionalProperties": false
+    },
+    "crawlStats": {
+      "type": "object",
+      "description": "Crawl-stage observability (see #96). Non-zero pathsFailed means subtrees were silently dropped previously — now surfaced. Max 50 failedPaths stored.",
+      "required": ["pathsFailed", "failedPaths"],
+      "properties": {
+        "pathsFailed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedPaths": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "census": {
+      "type": "object",
+      "description": "Per top-level root arg count census (e.g. {\"ip\": 4231}). Lets a total shortfall point at which subtree vanished. Derived from crawled tree before enrichment.",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
     },
     "nativeApiReconnects": {
       "type": "object",

@@ -188,6 +188,10 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
       - name: Run deep-inspect (x86, live crawl + enrichment)
+        # deep-inspect.ts may exit 2 on crawl truncation (crawlStats; see #97).
+        # This workflow invokes deep-inspect.ts directly, not
+        # scripts/deep-inspect-multi-arch.ts, so exit-2 upload handling is
+        # workflow-local (if: always() on Upload) until harnesses converge.
         run: |
           bun deep-inspect.ts --live --arch x86 --output-suffix x86 \
             --output-dir . --skip-openapi --test-crash-paths --transport rest
@@ -203,6 +207,7 @@ jobs:
           echo "✓ x86 argsTotal=$ARGS_TOTAL (≥30000)"
 
       - name: Upload deep-inspect.x86.json
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: deep-inspect-x86
@@ -450,6 +455,10 @@ jobs:
         # TCG per-request timeout: 120s (generous margin over measured ~70ms;
         # handles occasional slow calls without masking real failures).
         # KVM: 30s is sufficient.
+        # Note: deep-inspect.ts may exit 2 on crawl truncation (crawlStats; see #97).
+        # This workflow invokes deep-inspect.ts directly — exit-2 upload handling is
+        # workflow-local (if: always() on Upload) until harnesses converge with
+        # scripts/deep-inspect-multi-arch.ts.
         run: |
           if [ "${ARM_ACCEL}" = "kvm" ]; then REQ_TIMEOUT=30000; else REQ_TIMEOUT=120000; fi
           bun deep-inspect.ts --live --arch arm64 --output-suffix arm64 \
@@ -467,6 +476,7 @@ jobs:
           echo "✓ arm64 argsTotal=$ARGS_TOTAL (≥30000)"
 
       - name: Upload deep-inspect.arm64.json
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: deep-inspect-arm64
