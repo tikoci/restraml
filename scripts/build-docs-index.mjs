@@ -43,6 +43,10 @@ function isPreRelease(version) {
   return SYNTHETIC_VERSIONS.has(version) || /(?:beta|rc)\d*$/.test(version);
 }
 
+function isVersionDir(name) {
+  return VERSION_RE.test(name) || SYNTHETIC_VERSIONS.has(name);
+}
+
 function scanDir(absDir, relDir, name) {
   const children = fs
     .readdirSync(absDir, { withFileTypes: true })
@@ -110,7 +114,7 @@ function scanRootFiles() {
 function scanVersionDirs() {
   return fs
     .readdirSync(DOCS_ROOT, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && VERSION_RE.test(entry.name))
+    .filter((entry) => entry.isDirectory() && isVersionDir(entry.name))
     .sort((a, b) => compareVersions(a.name, b.name))
     .map((entry) =>
       scanDir(
@@ -135,7 +139,8 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 
 const versions = scanVersionDirs();
-const stableVersions = versions.filter((version) => !isPreRelease(version.name));
+const realVersions = versions.filter((version) => !SYNTHETIC_VERSIONS.has(version.name));
+const stableVersions = realVersions.filter((version) => !isPreRelease(version.name));
 
 let nightly = null;
 try {
@@ -147,15 +152,15 @@ try {
       nightly = { name: "nightly", nightlyVersion: data.nightlyVersion, builtAt: data.builtAt };
     }
   }
-} catch {
-  // ignore malformed nightly.json — nightly stays null
+} catch (err) {
+  console.warn(`Warning: malformed ${path.join(DOCS_ROOT, "nightly", "nightly.json")}: ${err instanceof Error ? err.message : String(err)}`);
 }
 
 const payload = {
   format: "restraml-docs-index@1",
   generatedAt: new Date().toISOString(),
   rootPath: "docs",
-  latestVersion: versions[0]?.name || null,
+  latestVersion: realVersions[0]?.name || null,
   latestStableVersion: stableVersions[0]?.name || null,
   ...(nightly ? { nightly } : {}),
   files: scanRootFiles(),

@@ -14,7 +14,8 @@
             "docs/*.js",
             "docs/*.html",
             "scripts/*.js",
-            "scripts/*.ts"
+            "scripts/*.ts",
+            "scripts/*.mjs"
         ]
     },
     "formatter": {
