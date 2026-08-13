@@ -5,8 +5,9 @@
  * Boots a stable CHR via @tikoci/quickchr, discovers the current nightly
  * (mt.lv Box), downloads arch-specific NPKs, uploads via quickchr SCP,
  * reboots, and validates the version moves to the nightly build.
- * Single-slot `docs/nightly/` shape per #90 §6; one boot / two crawls
- * (base then extra) will be driven with --phase in N4.
+ * Single-slot `docs/nightly/` shape per #90 §6. `.github/workflows/nightly.yaml`
+ * drives this once per phase — a fresh CHR per `--phase`, each with its own
+ * `--output-dir`, rather than one boot with two crawls.
  *
  * Now arch-aware and CI-hardened:
  *   - `--arch x86|arm64` — x86 uses HVF on Intel, arm64 uses TCG (slow but viable)
@@ -83,6 +84,7 @@ const { values } = parseArgs({
     arch: { type: "string", default: "x86" },
     phase: { type: "string", default: "all" },
     "base-version": { type: "string" },
+    "nightly-version": { type: "string" },
     channel: { type: "string", default: "stable" },
     "keep-running": { type: "boolean", default: false },
     "skip-collect": { type: "boolean", default: false },
@@ -117,16 +119,20 @@ Options:
                             Pinned to stable for nightly promotion; overridden by
                             --base-version.
   --base-version <ver>      Pin to an explicit RouterOS version instead of channel.
+  --nightly-version <ver>   Pin to a specific nightly version (e.g. 7.25_ab434).
+                            When set, the build uses that Box version instead of
+                            the latest discovered. Required in CI to pin all
+                            phases/jobs to the version from the discover job.
   --skip-collect            Skip heavy collection (rest2raml crawl + deep-inspect).
                             Does only shallow probes: /system/resource, /system/package,
                             /console/inspect child count. Aliases: --skip-crawl,
                             --skip-deep-inspect. Recommended for arm64/TCG.
   --output-dir <dir>        Where to write deep-inspect outputs when not skipped
-                            (default: mkdtemp nightly-quickchr-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
+                            (default: mkdtemp nightly-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
   --output-suffix <str>     Override deep-inspect output suffix (default:
-                            nightly-quickchr-<arch>[-<phase>]).
+                            nightly-<arch>[-<phase>]).
   --machine-name <name>     Override quickchr machine name (default:
-                            restraml-nightly-quickchr-<arch>).
+                            restraml-nightly-<arch>).
   --keep-running            Leave CHR running after the run (for manual inspection).
   --dry-run                 Discover nightly + filter per-arch NPKs and exit (no QEMU).
   --help                    Show this help.
@@ -154,6 +160,10 @@ const PHASE = (() => {
 })();
 
 const BASE_VERSION: string | undefined = values["base-version"] as string | undefined;
+const PINNED_NIGHTLY_VERSION: string | undefined = values["nightly-version"] as string | undefined;
+if (PINNED_NIGHTLY_VERSION && !parseAb(PINNED_NIGHTLY_VERSION)) {
+  fail(`--nightly-version must be a nightly version like 7.25_ab434; got "${PINNED_NIGHTLY_VERSION}"`);
+}
 const CHANNEL = (values.channel as string) ?? "stable";
 const KEEP_RUNNING = Boolean(values["keep-running"]);
 const SKIP_COLLECT =
@@ -161,7 +171,7 @@ const SKIP_COLLECT =
 // cross-arch on this host = TCG = slower reboot/probe windows
 const NATIVE_HOST_ARCH: Record<Arch, string> = { x86: "x64", arm64: "arm64" };
 const IS_CROSS_ARCH = process.arch !== NATIVE_HOST_ARCH[ARCH];
-const MACHINE_NAME = (values["machine-name"] as string | undefined) ?? `restraml-nightly-quickchr-${ARCH}`;
+const MACHINE_NAME = (values["machine-name"] as string | undefined) ?? `restraml-nightly-${ARCH}`;
 const EXTRA_TIMEOUT_MS = IS_CROSS_ARCH ? 120_000 : 0; // extra headroom for TCG reboots
 
 function formatBytes(n: number): string {
@@ -214,10 +224,10 @@ export function compareAb(a: string, b: string): number {
 }
 
 export function getNpksForPhase(allArchNpks: string[], phase: Phase): string[] {
-  // base → routeros-* only (1 NPK); extra/all → full arch set (5 or 9)
-  // For N4's one-boot/two-crawls, N4 will call base then extra against the same
-  // CHR via two workflow steps; isolated extra=all (full set) remains valid as a
-  // standalone full upgrade, while phase-aware floors keep base from failing.
+  // base → routeros-* only (1 NPK); extra/all → full arch set (5 or 9).
+  // nightly.yaml runs base and extra as separate steps against separate CHRs, so
+  // extra=all (full set) is always a standalone full upgrade; the phase-aware
+  // floors are what keep the smaller base crawl from failing the extra gate.
   if (phase === "base") return allArchNpks.filter((f) => f.toLowerCase().startsWith("routeros-"));
   return allArchNpks;
 }
@@ -255,7 +265,9 @@ export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: strin
     }
     return customSuffix;
   }
-  const base = `nightly-quickchr-${arch}`;
+  // Suffix names the *artifact* (arch/phase), never the harness — nightly.json
+  // provenance is published to docs/, so "quickchr" must not leak into it.
+  const base = `nightly-${arch}`;
   if (phase !== "all" && phase !== "extra") return `${base}-${phase}`;
   // extra and all both mean full set — keep suffix stable (no -extra) so existing
   // single-crawl consumers keep the same file names; N4 can pass explicit
@@ -263,10 +275,10 @@ export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: strin
   return base;
 }
 
-async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
+async function discoverNightly(arch: Arch, pinVersion?: string): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
   const { token, resolvedFrom } = await resolveToken();
   const apiUrl = boxApiUrl(token);
-  log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch})`);
+  log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch}${pinVersion ? ` pin=${pinVersion}` : ""})`);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15_000);
   let res: Response;
@@ -282,9 +294,17 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
   const nightlyRe = /(\d+\.\d+(?:\.\d+)?_ab\d+)/;
   const versions = [...new Set(allFiles.map((f) => f.match(nightlyRe)?.[1]).filter(Boolean))] as string[];
   if (versions.length === 0) fail("no nightly version found in Box dirent list");
-  const nightlyVer = [...versions].sort(compareAb).at(-1);
+  let nightlyVer: string | undefined;
+  if (pinVersion) {
+    if (!versions.includes(pinVersion)) fail(`pinned nightly version ${pinVersion} not found in Box dirent list (available: ${versions.join(", ")})`);
+    nightlyVer = pinVersion;
+    log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → pinned ${nightlyVer}`);
+  } else {
+    nightlyVer = [...versions].sort(compareAb).at(-1);
+    if (!nightlyVer) fail("no nightly version found in Box dirent list");
+    log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
+  }
   if (!nightlyVer) fail("no nightly version found in Box dirent list");
-  log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
   const files = filterNpksByArch(allFiles, nightlyVer, arch);
   const rawRejected = allFiles.filter((f) => f.includes(nightlyVer) && !files.includes(f));
   // Narrow to plausible rejects (the one that actually matters for the bug is the generic routeros duplicate)
@@ -345,7 +365,7 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
+  const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH, PINNED_NIGHTLY_VERSION);
   const phaseFiles = getNpksForPhase(archFiles, PHASE);
   const outputSuffix = buildOutputSuffix(ARCH, PHASE, values["output-suffix"] as string | undefined);
   if (phaseFiles.length === 0) fail(`no ${ARCH} NPKs for phase ${PHASE} (arch filter yielded ${archFiles.length} before phase filter)`);
@@ -355,10 +375,15 @@ async function main() {
       mkdirSync(custom, { recursive: true });
       return custom;
     }
-    return mkdtempSync(join(tmpdir(), `nightly-quickchr-${nightlyVer}-${ARCH}-`));
+    return mkdtempSync(join(tmpdir(), `nightly-${nightlyVer}-${ARCH}-`));
   })();
 
   if (values["dry-run"]) {
+    // Stable, machine-readable marker for CI discovery. Do not remove or reword:
+    // .github/workflows/nightly.yaml greps `^nightly-version=` for this exact line.
+    // Scraping prose instead would pick the wrong version whenever the Box share
+    // holds two ab builds during the upload window (the log lists all of them).
+    log(`nightly-version=${nightlyVer}`);
     log(`\n--dry-run: would download ${phaseFiles.length} ${ARCH} NPK(s) for ${nightlyVer} [phase=${PHASE}, suffix=${outputSuffix}] to ${join(tmpDir, "npks")}`);
     for (const f of phaseFiles) log(`  ${f}`);
     if (PHASE !== "all") log(`  (all for ${ARCH}: ${archFiles.join(", ")})`);
@@ -581,7 +606,6 @@ async function main() {
       outputSuffix,
       source: {
         shortUrl: MT_LV_URL,
-        token: nightlyToken,
         resolvedFrom: nightlyResolvedFrom,
         dirents: nightlyDirents.length,
       },
@@ -594,6 +618,8 @@ async function main() {
         allArchCount: nightlyNpks.length,
         rejected: nightlyRejected,
       },
+      // Roots nightly can never supply (Box share has no NPKs for these) — see #90 §1.2
+      absentRoots: ["dude", "openflow", "tr069-client", "user-manager"],
     };
     try {
       writeFileSync(join(tmpDir, "nightly.json"), JSON.stringify(nightlyProvenance, null, 2) + "\n");
@@ -666,6 +692,23 @@ async function main() {
           log(`    stat ${a} failed: ${String(e).slice(0, 200)}`);
         }
       }
+      // Stage rest2raml outputs into tmpDir with stable names so the
+      // workflow can collect per-phase artifacts without root collisions.
+      // Each --phase run gets its own tmpDir, so base and extra do not overwrite.
+      try {
+        const inspectSrc = join(repoRootArtifacts, "ros-inspect-all.json");
+        const ramlSrc = join(repoRootArtifacts, "ros-rest-all.raml");
+        if (existsSync(inspectSrc)) {
+          await Bun.write(join(tmpDir, "inspect.json"), Bun.file(inspectSrc));
+          log(`  staged → ${join(tmpDir, "inspect.json")}`);
+        }
+        if (existsSync(ramlSrc)) {
+          await Bun.write(join(tmpDir, "schema.raml"), Bun.file(ramlSrc));
+          log(`  staged → ${join(tmpDir, "schema.raml")}`);
+        }
+      } catch (e) {
+        log(`  stage rest2raml outputs failed: ${String(e).slice(0, 300)}`);
+      }
     }
 
     log(`\n→ running deep-inspect (enrichment) — can take minutes${IS_CROSS_ARCH ? " [longer under TCG]" : ""}`);
@@ -730,6 +773,39 @@ async function main() {
         } catch (e) {
           if (e instanceof Error && e.message.includes("deep-inspect argsTotal")) throw e;
           log(`  argsTotal check failed: ${String(e).slice(0, 300)}`);
+        }
+        // Stage OpenAPI with stable name for publish; deep-inspect already wrote
+        // openapi.<suffix>.json — copy to openapi.json in the same tmpDir.
+        try {
+          const openapiSuffixed = join(tmpDir, `openapi.${outputSuffix}.json`);
+          const openapiStable = join(tmpDir, "openapi.json");
+          if (existsSync(openapiSuffixed) && !existsSync(openapiStable)) {
+            await Bun.write(openapiStable, Bun.file(openapiSuffixed));
+            log(`  staged → ${openapiStable}`);
+          }
+        } catch (e) {
+          log(`  stage openapi failed: ${String(e).slice(0, 300)}`);
+        }
+        // Fetch /app for extra phases (container package present in nightly 5/9 set).
+        // Base phase has no container — skip. On 404/400 skip quietly (pre-7.22).
+        if (PHASE !== "base") {
+          try {
+            const appData: unknown = await chr.rest("/app");
+            if (Array.isArray(appData)) {
+              const dest = join(tmpDir, "app.json");
+              writeFileSync(dest, JSON.stringify(appData, null, 2) + "\n");
+              log(`  /app → ${dest} (${(appData as unknown[]).length} entries)`);
+            } else {
+              log(`  /app returned non-array: ${JSON.stringify(appData).slice(0, 300)}`);
+            }
+          } catch (e) {
+            const msg = String(e);
+            if (msg.includes("404") || msg.includes("400") || msg.includes("Not Found")) {
+              log(`  /app not available on this build (skip): ${msg.slice(0, 300)}`);
+            } else {
+              log(`  /app fetch failed (warn, not fatal): ${msg.slice(0, 500)}`);
+            }
+          }
         }
       }
     }

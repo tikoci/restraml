@@ -118,11 +118,14 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
   });
 
   test("buildOutputSuffix is arch+phase aware and overridable", () => {
-    expect(buildOutputSuffix("x86", "all")).toBe("nightly-quickchr-x86");
-    expect(buildOutputSuffix("x86", "extra")).toBe("nightly-quickchr-x86");
-    expect(buildOutputSuffix("x86", "base")).toBe("nightly-quickchr-x86-base");
-    expect(buildOutputSuffix("arm64", "base")).toBe("nightly-quickchr-arm64-base");
-    expect(buildOutputSuffix("arm64", "all")).toBe("nightly-quickchr-arm64");
+    expect(buildOutputSuffix("x86", "all")).toBe("nightly-x86");
+    expect(buildOutputSuffix("x86", "extra")).toBe("nightly-x86");
+    expect(buildOutputSuffix("x86", "base")).toBe("nightly-x86-base");
+    expect(buildOutputSuffix("arm64", "base")).toBe("nightly-arm64-base");
+    expect(buildOutputSuffix("arm64", "all")).toBe("nightly-arm64");
+    // The harness name must never appear in a suffix — nightly.json provenance
+    // records outputSuffix and is published to docs/.
+    expect(buildOutputSuffix("arm64", "extra")).not.toContain("quickchr");
     expect(buildOutputSuffix("x86", "base", "custom")).toBe("custom");
     expect(buildOutputSuffix("x86", "extra", "x86")).toBe("x86");
   });
@@ -139,17 +142,17 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
 
   test("outs.find fix — phase suffix prevents collision when tmpDir holds two crawls", () => {
     // Simulates N4's one-boot/two-crawl tmpDir holding both files.
-    const outs = ["deep-inspect.nightly-quickchr-x86-base.json", "deep-inspect.nightly-quickchr-x86.json", "nightly.json"];
+    const outs = ["deep-inspect.nightly-x86-base.json", "deep-inspect.nightly-x86.json", "nightly.json"];
     const baseSuffix = buildOutputSuffix("x86", "base");
     const extraSuffix = buildOutputSuffix("x86", "extra");
     const expectedBase = `deep-inspect.${baseSuffix}.json`;
     const expectedExtra = `deep-inspect.${extraSuffix}.json`;
-    expect(expectedBase).toBe("deep-inspect.nightly-quickchr-x86-base.json");
-    expect(expectedExtra).toBe("deep-inspect.nightly-quickchr-x86.json");
+    expect(expectedBase).toBe("deep-inspect.nightly-x86-base.json");
+    expect(expectedExtra).toBe("deep-inspect.nightly-x86.json");
     expect(outs.includes(expectedBase)).toBe(true);
     expect(outs.includes(expectedExtra)).toBe(true);
     // Old code: outs.find(f => f.startsWith("deep-inspect.")) → ambiguous (always picks first)
-    expect(outs.find((f) => f.startsWith("deep-inspect."))).toBe("deep-inspect.nightly-quickchr-x86-base.json");
+    expect(outs.find((f) => f.startsWith("deep-inspect."))).toBe("deep-inspect.nightly-x86-base.json");
     // New logic: exact match only
     expect(outs.includes(expectedBase) ? expectedBase : undefined).toBe(expectedBase);
     expect(outs.includes(expectedExtra) ? expectedExtra : undefined).toBe(expectedExtra);
@@ -158,13 +161,13 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
   test("exact-match gate does not validate wrong phase when expected output missing", () => {
     // Regression for coderabbit 3778267083: if extra output is absent but base
     // output exists, the gate must not fall back to the base file.
-    const outsOnlyBase = ["deep-inspect.nightly-quickchr-x86-base.json", "nightly.json"];
+    const outsOnlyBase = ["deep-inspect.nightly-x86-base.json", "nightly.json"];
     const extraSuffix = buildOutputSuffix("x86", "extra");
     const expectedExtra = `deep-inspect.${extraSuffix}.json`;
     const deepFile = outsOnlyBase.includes(expectedExtra) ? expectedExtra : undefined;
     expect(deepFile).toBeUndefined();
     // And vice versa: only extra present, asking for base should miss
-    const outsOnlyExtra = ["deep-inspect.nightly-quickchr-x86.json", "nightly.json"];
+    const outsOnlyExtra = ["deep-inspect.nightly-x86.json", "nightly.json"];
     const baseSuffix = buildOutputSuffix("x86", "base");
     const expectedBase = `deep-inspect.${baseSuffix}.json`;
     const deepFileBase = outsOnlyExtra.includes(expectedBase) ? expectedBase : undefined;

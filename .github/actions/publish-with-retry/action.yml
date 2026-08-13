@@ -64,7 +64,14 @@ runs:
         # concurrent workflows added to that directory between the checkout and
         # the push (e.g. app.json / routeros-app-yaml-schema.json published by the
         # /app YAML schemas workflow while the base schema workflow was running).
-        mapfile -t STAGED_FILES < <(git diff --cached --name-only)
+        # Split by kind: deletions cannot be replayed with `git restore
+        # --source=LOCAL_COMMIT` (they do not exist in that commit, so git aborts
+        # with "pathspec did not match").  A publish that replaces a whole
+        # directory — the nightly single slot — legitimately drops files between
+        # runs, so both kinds have to survive a retry.
+        mapfile -t STAGED_PRESENT < <(git diff --cached --name-only --diff-filter=d)
+        mapfile -t STAGED_DELETED < <(git diff --cached --name-only --diff-filter=D)
+        echo "Staged: ${#STAGED_PRESENT[@]} added/modified, ${#STAGED_DELETED[@]} deleted"
 
         git commit -m "$COMMIT_MESSAGE"
         LOCAL_COMMIT=$(git rev-parse HEAD)
@@ -89,16 +96,29 @@ runs:
           # Restore only the specific files that were staged, not entire directories.
           # Using per-file restore prevents accidentally deleting files added by other
           # concurrent workflows to the same directory.
-          git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${STAGED_FILES[@]}" || {
-            echo "::error::git restore failed for $LOCAL_COMMIT"
-            exit 1
-          }
+          if [ "${#STAGED_PRESENT[@]}" -gt 0 ]; then
+            git restore --source="$LOCAL_COMMIT" --worktree --staged -- "${STAGED_PRESENT[@]}" || {
+              echo "::error::git restore failed for $LOCAL_COMMIT"
+              exit 1
+            }
+          fi
+          # Re-apply removals. --ignore-unmatch: a concurrent workflow may have
+          # deleted the same file already, which is not an error for us.
+          if [ "${#STAGED_DELETED[@]}" -gt 0 ]; then
+            git rm -q -f --ignore-unmatch -- "${STAGED_DELETED[@]}" || {
+              echo "::error::git rm failed while re-applying deletions"
+              exit 1
+            }
+          fi
           if ! run_docs_index; then
             echo "::error::docs:index failed on retry attempt $attempt"
             exit 1
           fi
 
-          git add "${STAGED_FILES[@]}" docs/docs-index.json
+          # Only re-add paths that exist; deletions were already staged by git rm
+          # above, and `git add` on a path that is gone from both worktree and
+          # index fails with "pathspec did not match".
+          git add "${STAGED_PRESENT[@]}" docs/docs-index.json
           if git diff --cached --quiet; then
             echo "Remote already contains the publish changes after syncing."
             exit 0
