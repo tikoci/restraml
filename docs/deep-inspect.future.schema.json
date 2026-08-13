@@ -30,7 +30,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?)$"
+          "pattern": "^(unknown|\\d+\\.\\d+(?:\\.\\d+)?(?:(?:beta|rc)\\d+)?(?:_ab\\d+)?)$"
         },
         "generatedAt": {
           "type": "string",

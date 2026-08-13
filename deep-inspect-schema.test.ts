@@ -135,4 +135,76 @@ describe("deep-inspect JSON Schemas", () => {
   test("future schema accepts planned merge/source/provenance fields", () => {
     expectValid(futureValidate, futureShapeExample(), "future-shape example");
   });
+
+  test("current and future schemas accept nightly _ab versions", () => {
+    const abVersions = ["7.25_ab430", "7.25_ab433", "7.25_ab1", "7.25.1_ab99", "7.24_ab0"];
+    for (const version of abVersions) {
+      const data = {
+        _meta: {
+          version,
+          generatedAt: "2026-08-13T12:00:00.000Z",
+          crashPathsTested: [],
+          crashPathsSafe: [],
+          crashPathsCrashed: [],
+          completionStats: {
+            argsTotal: 1,
+            argsWithCompletion: 0,
+            argsFailed: 0,
+            argsTimedOut: 0,
+            argsBlankOnRetry: 0,
+          },
+        },
+        ip: { _type: "path" as const },
+      };
+      expectValid(currentValidate, data, `current ab ${version}`);
+      expectValid(futureValidate, data, `future ab ${version}`);
+    }
+    // unknown must still pass in both schemas
+    for (const version of ["unknown", "7.22", "7.22.1", "7.24rc4", "7.24beta2"]) {
+      const data = {
+        _meta: {
+          version,
+          generatedAt: "2026-08-13T12:00:00.000Z",
+          crashPathsTested: [],
+          crashPathsSafe: [],
+          crashPathsCrashed: [],
+          completionStats: {
+            argsTotal: 1,
+            argsWithCompletion: 0,
+            argsFailed: 0,
+            argsTimedOut: 0,
+            argsBlankOnRetry: 0,
+          },
+        },
+        ip: { _type: "path" as const },
+      };
+      expectValid(currentValidate, data, `current ${version}`);
+      expectValid(futureValidate, data, `future ${version}`);
+    }
+  });
+
+  test("current and future schemas reject malformed _ab versions", () => {
+    const bad = ["7.25_ab", "7.25_ab-1", "7.25_abX", "7.25__ab1", "nightly", "_ab430", "7.25ab430"];
+    for (const version of bad) {
+      const data = {
+        _meta: {
+          version,
+          generatedAt: "2026-08-13T12:00:00.000Z",
+          crashPathsTested: [],
+          crashPathsSafe: [],
+          crashPathsCrashed: [],
+          completionStats: {
+            argsTotal: 1,
+            argsWithCompletion: 0,
+            argsFailed: 0,
+            argsTimedOut: 0,
+            argsBlankOnRetry: 0,
+          },
+        },
+        ip: { _type: "path" as const },
+      };
+      expect(currentValidate(data)).toBe(false);
+      expect(futureValidate(data)).toBe(false);
+    }
+  });
 });
