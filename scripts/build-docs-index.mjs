@@ -4,6 +4,7 @@ import path from "node:path";
 const DOCS_ROOT = path.resolve("docs");
 const OUTPUT_PATH = path.join(DOCS_ROOT, "docs-index.json");
 const VERSION_RE = /^\d+\.\d+(?:\.\d+)?(?:beta|rc)?\d*$/;
+const SYNTHETIC_VERSIONS = new Set(["nightly"]);
 const EXCLUDED_PATHS = new Set();
 
 function toPosix(value) {
@@ -23,6 +24,9 @@ function parseVersion(str) {
 }
 
 function compareVersions(a, b) {
+  if (a === b) return 0;
+  if (SYNTHETIC_VERSIONS.has(a)) return -1;
+  if (SYNTHETIC_VERSIONS.has(b)) return 1;
   const va = parseVersion(a);
   const vb = parseVersion(b);
   if (!va && !vb) return a.localeCompare(b);
@@ -36,7 +40,7 @@ function compareVersions(a, b) {
 }
 
 function isPreRelease(version) {
-  return /(?:beta|rc)\d*$/.test(version);
+  return SYNTHETIC_VERSIONS.has(version) || /(?:beta|rc)\d*$/.test(version);
 }
 
 function scanDir(absDir, relDir, name) {
@@ -132,15 +136,31 @@ for (let i = 2; i < process.argv.length; i++) {
 
 const versions = scanVersionDirs();
 const stableVersions = versions.filter((version) => !isPreRelease(version.name));
+
+let nightly = null;
+try {
+  const nightlyPath = path.join(DOCS_ROOT, "nightly", "nightly.json");
+  if (fs.existsSync(nightlyPath)) {
+    const raw = fs.readFileSync(nightlyPath, "utf-8");
+    const data = JSON.parse(raw);
+    if (data && typeof data.nightlyVersion === "string" && typeof data.builtAt === "string") {
+      nightly = { name: "nightly", nightlyVersion: data.nightlyVersion, builtAt: data.builtAt };
+    }
+  }
+} catch {
+  // ignore malformed nightly.json — nightly stays null
+}
+
 const payload = {
   format: "restraml-docs-index@1",
   generatedAt: new Date().toISOString(),
   rootPath: "docs",
   latestVersion: versions[0]?.name || null,
   latestStableVersion: stableVersions[0]?.name || null,
+  ...(nightly ? { nightly } : {}),
   files: scanRootFiles(),
   versions,
 };
 
 fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(payload, null, 2)}\n`);
-console.log(`Written ${OUTPUT_PATH} (${versions.length} version directories)`);
+console.log(`Written ${OUTPUT_PATH} (${versions.length} version directories)${nightly ? ` + nightly ${nightly.nightlyVersion}` : ""}`);

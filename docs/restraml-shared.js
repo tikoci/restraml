@@ -49,6 +49,8 @@ const _BRAND_GRADIENTS = [
  *           "7.21beta11" -> {major:7, minor:21, patch:0, pre:"beta", preNum:11}
  *           "7.15.3" -> {major:7, minor:15, patch:3, pre:"", preNum:Infinity}
  */
+const SYNTHETIC_VERSIONS = new Set(['nightly'])
+
 function parseVersion(str) {
     const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
     if (!m) return null
@@ -63,8 +65,12 @@ function parseVersion(str) {
 
 /**
  * Compare two version strings for sorting (descending: newest first).
+ * Synthetic versions (nightly) sort before all real RouterOS versions.
  */
 function compareVersions(a, b) {
+    if (a === b) return 0
+    if (SYNTHETIC_VERSIONS.has(a)) return -1
+    if (SYNTHETIC_VERSIONS.has(b)) return 1
     const va = parseVersion(a)
     const vb = parseVersion(b)
     if (!va && !vb) return a.localeCompare(b)
@@ -79,10 +85,10 @@ function compareVersions(a, b) {
 }
 
 /**
- * Returns true if the version is a pre-release (beta or rc).
+ * Returns true if the version is a pre-release (beta, rc, or nightly).
  */
 function isPreRelease(name) {
-    return /(?:beta|rc)\d*$/.test(name)
+    return SYNTHETIC_VERSIONS.has(name) || /(?:beta|rc)\d*$/.test(name)
 }
 
 /**
