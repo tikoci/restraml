@@ -183,7 +183,7 @@ async function nativeCompletionCall(
   }
 
   const queryP = api
-    .write(...(words as [string, ...string[]]))
+    .write(words[0]!, ...words.slice(1))
     .then(
       (sentences: Sentence[]): { items: string[]; ms: number; timedOut: false } => ({
         items: sentences

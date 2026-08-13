@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { filterNpksByArch } from "./nightly-build.ts";
+import { compareAb, filterNpksByArch, parseAb } from "./nightly-build.ts";
 
 const fixture = await Bun.file("fixtures/nightly-dirent-list.json").json() as {
   dirent_list: Array<{ file_name: string }>;
@@ -43,27 +43,20 @@ describe("filterNpksByArch (nightly duplicate gotcha)", () => {
     expect(x86_432.length).toBeGreaterThan(0);
   });
 
-  test("numeric ab sort picks highest ab, not lexicographic", async () => {
-    // Simulate the sort bug: lexicographic picks ab99 over ab433, numeric does not
+  test("numeric ab sort picks highest ab, not lexicographic (uses production compareAb)", async () => {
     const versions = ["7.25_ab99", "7.25_ab433", "7.25_ab100"];
-    function parseAb(v: string): [number, number, number] | null {
-      const m = v.match(/^(\d+)\.(\d+)_ab(\d+)$/);
-      if (!m) return null;
-      return [Number(m[1]), Number(m[2]), Number(m[3])];
-    }
-    function compareAb(a: string, b: string): number {
-      const pa = parseAb(a);
-      const pb = parseAb(b);
-      if (!pa && !pb) return a.localeCompare(b);
-      if (!pa) return 1;
-      if (!pb) return -1;
-      if (pa[0] !== pb[0]) return pa[0] - pb[0];
-      if (pa[1] !== pb[1]) return pa[1] - pb[1];
-      return pa[2] - pb[2];
-    }
     const lex = [...versions].sort().at(-1);
     const numeric = [...versions].sort(compareAb).at(-1);
     expect(lex).toBe("7.25_ab99"); // lexicographic bug
     expect(numeric).toBe("7.25_ab433");
+  });
+
+  test("parseAb handles patch segment (7.25.1_ab99)", () => {
+    expect(parseAb("7.25.1_ab99")).toEqual([7, 25, 1, 99]);
+    expect(parseAb("7.25_ab433")).toEqual([7, 25, 0, 433]);
+    expect(parseAb("7.25.1_ab100")).not.toBeNull();
+    // patch version sorts after non-patch with same ab? 7.25.1 vs 7.25
+    expect(compareAb("7.25.1_ab99", "7.25_ab99")).toBeGreaterThan(0);
+    expect(compareAb("7.25_ab100", "7.25_ab99")).toBeGreaterThan(0);
   });
 });

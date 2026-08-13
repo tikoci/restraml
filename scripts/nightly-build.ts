@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * experiment-nightly-quickchr.ts — validate RouterOS nightly (ab) upgrade via quickchr
+ * nightly-build.ts — validate RouterOS nightly (ab) upgrade via quickchr
  *
  * Provisional "squeeze out unknowns before CI" step from #90.
  * Boots a stable CHR via @tikoci/quickchr, discovers the current nightly
@@ -21,16 +21,17 @@
  *     `docs/nightly/nightly.json` strawman from #90).
  *
  * Usage:
- *   bun scripts/experiment-nightly-quickchr.ts
- *   bun scripts/experiment-nightly-quickchr.ts --arch arm64 --skip-collect
- *   bun scripts/experiment-nightly-quickchr.ts --arch arm64 --skip-collect --keep-running
- *   bun scripts/experiment-nightly-quickchr.ts --base-version 7.23.3 --arch x86
- *   bun scripts/experiment-nightly-quickchr.ts --dry-run --arch arm64   # discover only
+ *   bun scripts/nightly-build.ts
+ *   bun scripts/nightly-build.ts --arch arm64 --skip-collect
+ *   bun scripts/nightly-build.ts --arch arm64 --skip-collect --keep-running
+ *   bun scripts/nightly-build.ts --base-version 7.23.3 --arch x86
+ *   bun scripts/nightly-build.ts --dry-run --arch arm64   # discover only
  */
 
 import { parseArgs } from "node:util";
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { QuickCHR } from "@tikoci/quickchr";
 
 const PINNED_TOKEN = "5ce46054d5d2487e8755";
@@ -92,10 +93,10 @@ const { values } = parseArgs({
 if (values.help) {
   console.log(
     `
-experiment-nightly-quickchr — nightly upgrade probe via quickchr
+nightly-build — nightly upgrade probe via quickchr
 
 Usage:
-  bun scripts/experiment-nightly-quickchr.ts [options]
+  bun scripts/nightly-build.ts [options]
 
 Options:
   --arch <x86|arm64>        Target architecture (default: x86). arm64 on Intel
@@ -117,9 +118,9 @@ Options:
   --help                    Show this help.
 
 Examples:
-  bun scripts/experiment-nightly-quickchr.ts --arch x86
-  bun scripts/experiment-nightly-quickchr.ts --arch arm64 --skip-collect
-  bun scripts/experiment-nightly-quickchr.ts --arch arm64 --skip-collect --keep-running
+  bun scripts/nightly-build.ts --arch x86
+  bun scripts/nightly-build.ts --arch arm64 --skip-collect
+  bun scripts/nightly-build.ts --arch arm64 --skip-collect --keep-running
 `.trim(),
   );
   process.exit(0);
@@ -172,6 +173,24 @@ export function filterNpksByArch(files: string[], nightlyVer: string, arch: Arch
     .sort();
 }
 
+export function parseAb(v: string): [number, number, number, number] | null {
+  const m = v.match(/^(\d+)\.(\d+)(?:\.(\d+))?_ab(\d+)$/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] ?? 0), Number(m[4])];
+}
+
+export function compareAb(a: string, b: string): number {
+  const pa = parseAb(a);
+  const pb = parseAb(b);
+  if (!pa && !pb) return a.localeCompare(b);
+  if (!pa) return 1;
+  if (!pb) return -1;
+  if (pa[0] !== pb[0]) return pa[0] - pb[0];
+  if (pa[1] !== pb[1]) return pa[1] - pb[1];
+  if (pa[2] !== pb[2]) return pa[2] - pb[2];
+  return pa[3] - pb[3];
+}
+
 async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string }> {
   const token = await resolveToken();
   const apiUrl = boxApiUrl(token);
@@ -187,24 +206,9 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
   if (!res.ok) fail(`Box API ${res.status} ${await res.text().then((t) => t.slice(0, 500))}`);
   const data = (await res.json()) as { dirent_list: Array<{ file_name: string; size?: number }> };
   const allFiles: string[] = (data.dirent_list ?? []).map((d) => d.file_name);
-  const nightlyRe = /(\d+\.\d+_ab\d+)/;
+  const nightlyRe = /(\d+\.\d+(?:\.\d+)?_ab\d+)/;
   const versions = [...new Set(allFiles.map((f) => f.match(nightlyRe)?.[1]).filter(Boolean))] as string[];
   if (versions.length === 0) fail("no nightly version found in Box dirent list");
-  function parseAb(v: string): [number, number, number] | null {
-    const m = v.match(/^(\d+)\.(\d+)_ab(\d+)$/);
-    if (!m) return null;
-    return [Number(m[1]), Number(m[2]), Number(m[3])];
-  }
-  function compareAb(a: string, b: string): number {
-    const pa = parseAb(a);
-    const pb = parseAb(b);
-    if (!pa && !pb) return a.localeCompare(b);
-    if (!pa) return 1;
-    if (!pb) return -1;
-    if (pa[0] !== pb[0]) return pa[0] - pb[0];
-    if (pa[1] !== pb[1]) return pa[1] - pb[1];
-    return pa[2] - pb[2];
-  }
   const nightlyVer = [...versions].sort(compareAb).at(-1);
   if (!nightlyVer) fail("no nightly version found in Box dirent list");
   log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
@@ -247,9 +251,14 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 
 async function main() {
   const { version: nightlyVer, files: archFiles, token: nightlyToken } = await discoverNightly(ARCH);
-  const baseTmp = `/tmp/nightly-quickchr-${nightlyVer}-${ARCH}`;
-  const tmpDir = (values["output-dir"] as string | undefined) ?? baseTmp;
-  mkdirSync(tmpDir, { recursive: true });
+  const tmpDir = (() => {
+    const custom = values["output-dir"] as string | undefined;
+    if (custom) {
+      mkdirSync(custom, { recursive: true });
+      return custom;
+    }
+    return mkdtempSync(join(tmpdir(), `nightly-quickchr-${nightlyVer}-${ARCH}-`));
+  })();
 
   if (values["dry-run"]) {
     log(`\n--dry-run: would download ${archFiles.length} ${ARCH} NPK(s) for ${nightlyVer} to ${join(tmpDir, "npks")}`);
@@ -485,7 +494,9 @@ async function main() {
     log(`\n→ running rest2raml.js --version against upgraded CHR`);
     const env = await chr.subprocessEnv();
     {
+      const repoRoot = join(import.meta.dir, "..");
       const proc = Bun.spawn(["bun", "rest2raml.js", "--version"], {
+        cwd: repoRoot,
         env: { ...(process.env as Record<string, string>), ...env },
         stdout: "pipe",
         stderr: "pipe",
@@ -512,7 +523,9 @@ async function main() {
 
     log(`\n→ running full rest2raml crawl`);
     {
+      const repoRootCrawl = join(import.meta.dir, "..");
       const proc = Bun.spawn(["bun", "rest2raml.js"], {
+        cwd: repoRootCrawl,
         env: { ...(process.env as Record<string, string>), ...env },
         stdout: "pipe",
         stderr: "pipe",
@@ -522,12 +535,12 @@ async function main() {
       const err = await new Response(proc.stderr).text();
       log(`  rest2raml exit=${code} stdout ${out.length} chars, stderr ${err.length} chars`);
       if (err) log(`  stderr preview: ${err.slice(0, 800)}`);
-      const repoRoot = join(import.meta.dir, "..");
-      const arts = readdirSync(repoRoot).filter((f) => f.startsWith("ros-"));
+      const repoRootArtifacts = join(import.meta.dir, "..");
+      const arts = readdirSync(repoRootArtifacts).filter((f) => f.startsWith("ros-"));
       log(`  artifacts: ${arts.join(", ")}`);
       for (const a of arts.slice(0, 4)) {
         try {
-          const st = statSync(join(repoRoot, a));
+          const st = statSync(join(repoRootArtifacts, a));
           log(`    ${a} ${(st.size / 1024 / 1024).toFixed(2)} MiB`);
         } catch (e) {
           log(`    stat ${a} failed: ${String(e).slice(0, 200)}`);
@@ -552,9 +565,9 @@ async function main() {
         nightlyVer,
       ];
       log(`  bun ${deepArgs.join(" ")}`);
-      const repoRoot2 = join(import.meta.dir, "..");
+      const repoRootDeep = join(import.meta.dir, "..");
       const proc = Bun.spawn(["bun", ...deepArgs], {
-        cwd: repoRoot2,
+        cwd: repoRootDeep,
         env: { ...(process.env as Record<string, string>), ...env },
         stdout: "pipe",
         stderr: "pipe",
@@ -574,8 +587,8 @@ async function main() {
             const s = statSync(join(tmpDir, f));
             log(`    ${f} ${(s.size / 1024 / 1024).toFixed(2)} MiB`);
           } catch (e) {
-        log(`  ignored error: ${String(e).slice(0, 200)}`);
-      }
+            log(`  ignored error: ${String(e).slice(0, 200)}`);
+          }
         }
       }
     }
@@ -618,7 +631,7 @@ async function main() {
     if (!runError && nightlyProvenance) {
       const pv = nightlyProvenance as Record<string, unknown>;
       const nv = pv.nightlyVersion as string;
-      log(`\n✓ experiment-nightly-quickchr done — nightly ${nv} (${ARCH}) via quickchr${IS_CROSS_ARCH ? " [TCG]" : " [HVF/KVM]"} validated${SKIP_COLLECT ? " (shallow)" : ""}`);
+      log(`\n✓ nightly-build done — nightly ${nv} (${ARCH}) via quickchr${IS_CROSS_ARCH ? " [TCG]" : " [HVF/KVM]"} validated${SKIP_COLLECT ? " (shallow)" : ""}`);
       log(`  tmp: ${tmpDir}  provenance: ${join(tmpDir, "nightly.json")}`);
     }
   }
