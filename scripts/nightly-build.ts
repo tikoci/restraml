@@ -75,10 +75,13 @@ function fail(msg: string): never {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
+export type Phase = "base" | "extra" | "all";
+
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
     arch: { type: "string", default: "x86" },
+    phase: { type: "string", default: "all" },
     "base-version": { type: "string" },
     channel: { type: "string", default: "stable" },
     "keep-running": { type: "boolean", default: false },
@@ -86,6 +89,7 @@ const { values } = parseArgs({
     "skip-crawl": { type: "boolean", default: false },
     "skip-deep-inspect": { type: "boolean", default: false },
     "output-dir": { type: "string" },
+    "output-suffix": { type: "string" },
     "machine-name": { type: "string" },
     "dry-run": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
@@ -105,6 +109,10 @@ Usage:
 Options:
   --arch <x86|arm64>        Target architecture (default: x86). arm64 on Intel
                             uses TCG (slow emulation) — pair with --skip-collect.
+  --phase <base|extra|all>  Which package set to install (default: all).
+                            base  → routeros-* only (routeros-only tree)
+                            extra → full nightly NPK set (all packages)
+                            all   → full set (alias for extra; default)
   --channel <name>          Base channel to boot before upgrade (default: stable).
                             Pinned to stable for nightly promotion; overridden by
                             --base-version.
@@ -115,6 +123,8 @@ Options:
                             --skip-deep-inspect. Recommended for arm64/TCG.
   --output-dir <dir>        Where to write deep-inspect outputs when not skipped
                             (default: mkdtemp nightly-quickchr-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
+  --output-suffix <str>     Override deep-inspect output suffix (default:
+                            nightly-quickchr-<arch>[-<phase>]).
   --machine-name <name>     Override quickchr machine name (default:
                             restraml-nightly-quickchr-<arch>).
   --keep-running            Leave CHR running after the run (for manual inspection).
@@ -123,6 +133,7 @@ Options:
 
 Examples:
   bun scripts/nightly-build.ts --arch x86
+  bun scripts/nightly-build.ts --arch x86 --phase base
   bun scripts/nightly-build.ts --arch arm64 --skip-collect
   bun scripts/nightly-build.ts --arch arm64 --skip-collect --keep-running
 `.trim(),
@@ -134,6 +145,12 @@ const ARCH = (() => {
   const raw = (values.arch as string) ?? "x86";
   if (raw !== "x86" && raw !== "arm64") fail(`--arch must be x86 or arm64; got "${raw}"`);
   return raw as Arch;
+})();
+
+const PHASE = (() => {
+  const raw = (values.phase as string) ?? "all";
+  if (raw !== "base" && raw !== "extra" && raw !== "all") fail(`--phase must be base, extra, or all; got "${raw}"`);
+  return raw as Phase;
 })();
 
 const BASE_VERSION: string | undefined = values["base-version"] as string | undefined;
@@ -194,6 +211,39 @@ export function compareAb(a: string, b: string): number {
   if (pa[1] !== pb[1]) return pa[1] - pb[1];
   if (pa[2] !== pb[2]) return pa[2] - pb[2];
   return pa[3] - pb[3];
+}
+
+export function getNpksForPhase(allArchNpks: string[], phase: Phase): string[] {
+  // base → routeros-* only (1 NPK); extra/all → full arch set (5 or 9)
+  // For N4's one-boot/two-crawls, N4 will call base then extra against the same
+  // CHR via two workflow steps; isolated extra=all (full set) remains valid as a
+  // standalone full upgrade, while phase-aware floors keep base from failing.
+  if (phase === "base") return allArchNpks.filter((f) => f.toLowerCase().startsWith("routeros-"));
+  return allArchNpks;
+}
+
+export function getExpectedMinPackageCount(arch: Arch, phase: Phase): number {
+  if (phase === "base") return 1;
+  return arch === "arm64" ? 9 : 5;
+}
+
+export function getArgsTotalFloor(arch: Arch, phase: Phase): number {
+  // Calibrated from stable 7.24rc4 (base 28079 vs extra 35656) and nightly ab431
+  // full extra (x86 33685, arm64 34735). Base tree is ~7–8k smaller than extra.
+  // Floors are deliberately low (not near median) to avoid flaking on minor
+  // RouterOS churn while still catching a truncated crawl.
+  if (phase === "base") return arch === "arm64" ? 26000 : 25000;
+  return arch === "arm64" ? 34000 : 33000;
+}
+
+export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: string): string {
+  if (customSuffix) return customSuffix;
+  const base = `nightly-quickchr-${arch}`;
+  if (phase !== "all" && phase !== "extra") return `${base}-${phase}`;
+  // extra and all both mean full set — keep suffix stable (no -extra) so existing
+  // single-crawl consumers keep the same file names; N4 can pass explicit
+  // --output-suffix when it needs distinct base vs extra files in one tmpDir.
+  return base;
 }
 
 async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
@@ -279,6 +329,9 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 
 async function main() {
   const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
+  const phaseFiles = getNpksForPhase(archFiles, PHASE);
+  const outputSuffix = buildOutputSuffix(ARCH, PHASE, values["output-suffix"] as string | undefined);
+  if (phaseFiles.length === 0) fail(`no ${ARCH} NPKs for phase ${PHASE} (arch filter yielded ${archFiles.length} before phase filter)`);
   const tmpDir = (() => {
     const custom = values["output-dir"] as string | undefined;
     if (custom) {
@@ -289,9 +342,10 @@ async function main() {
   })();
 
   if (values["dry-run"]) {
-    log(`\n--dry-run: would download ${archFiles.length} ${ARCH} NPK(s) for ${nightlyVer} to ${join(tmpDir, "npks")}`);
-    for (const f of archFiles) log(`  ${f}`);
-    log(`\n✓ dry-run done — no CHR started (arch=${ARCH} ${IS_CROSS_ARCH ? "[cross-arch TCG on x64]" : "[native]"})`);
+    log(`\n--dry-run: would download ${phaseFiles.length} ${ARCH} NPK(s) for ${nightlyVer} [phase=${PHASE}, suffix=${outputSuffix}] to ${join(tmpDir, "npks")}`);
+    for (const f of phaseFiles) log(`  ${f}`);
+    if (PHASE !== "all") log(`  (all for ${ARCH}: ${archFiles.join(", ")})`);
+    log(`\n✓ dry-run done — no CHR started (arch=${ARCH} phase=${PHASE} ${IS_CROSS_ARCH ? "[cross-arch TCG on x64]" : "[native]"})`);
     return;
   }
 
@@ -325,7 +379,7 @@ async function main() {
     }
   }
 
-  await downloadNpks(archFiles, join(tmpDir, "npks"), nightlyToken);
+  await downloadNpks(phaseFiles, join(tmpDir, "npks"), nightlyToken);
 
   // ── boot stable CHR via quickchr — pinned to stable (the nightly.yaml shape) ──
   // Fresh instance every run; the inspect crawl is the slow part, not bring-up.
@@ -371,8 +425,8 @@ async function main() {
 
     // ── upload nightly NPKs via quickchr SCP ──
     const npkDir = join(tmpDir, "npks");
-    const npkPaths = archFiles.map((f) => join(npkDir, f));
-    log(`\n→ uploading ${npkPaths.length} ${ARCH} NPK(s) via instance.upload (SCP)`);
+    const npkPaths = phaseFiles.map((f) => join(npkDir, f));
+    log(`\n→ uploading ${npkPaths.length} ${ARCH} NPK(s) [phase=${PHASE}] via instance.upload (SCP)`);
     for (const p of npkPaths) {
       log(`  · ${p}`);
       await chr.upload(p);
@@ -457,12 +511,12 @@ async function main() {
         postPkgNames = list.map((p) => p.name ?? "?");
         log(`  post-upgrade packages: ${postPkgCount} names=${postPkgNames.join(", ")}`);
         for (const p of list) if (p.version) log(`    ${p.name} ${p.version} build-time=${p["build-time"] ?? "?"}`);
-        const expectedMin = ARCH === "arm64" ? 9 : 5;
-        if (postPkgCount < expectedMin) fail(`Package count ${postPkgCount} < expected ${expectedMin} for ${ARCH} — extra-package set incomplete after upgrade`);
-        else log(`  ✓ package count ${postPkgCount} ≥ ${expectedMin} for ${ARCH}`);
-        if (postPkgNames.length !== archFiles.length) {
+        const expectedMin = getExpectedMinPackageCount(ARCH, PHASE);
+        if (postPkgCount < expectedMin) fail(`Package count ${postPkgCount} < expected ${expectedMin} for ${ARCH} phase ${PHASE} — package set incomplete after upgrade`);
+        else log(`  ✓ package count ${postPkgCount} ≥ ${expectedMin} for ${ARCH} phase ${PHASE}`);
+        if (postPkgNames.length !== phaseFiles.length) {
           // Warn-only: version mismatch already fails the run, but this makes a bad filter diagnosable
-          log(`  ⚠ uploaded ${archFiles.length} NPKs but RouterOS reports ${postPkgCount} packages — possible duplicate/filter mismatch`);
+          log(`  ⚠ uploaded ${phaseFiles.length} NPKs but RouterOS reports ${postPkgCount} packages — possible duplicate/filter mismatch`);
         }
       } else log(`  packages raw=${JSON.stringify(pkgs).slice(0, 800)}`);
     } catch (e) {
@@ -494,6 +548,7 @@ async function main() {
     nightlyProvenance = {
       nightlyVersion: nightlyVer,
       arch: ARCH,
+      phase: PHASE,
       baseVersion: preVer,
       postVersion: postVer ?? null,
       machineName: MACHINE_NAME,
@@ -505,6 +560,8 @@ async function main() {
       hostArch: process.arch,
       crossArchTcg: IS_CROSS_ARCH,
       skipCollect: SKIP_COLLECT,
+      phaseFiles,
+      outputSuffix,
       source: {
         shortUrl: MT_LV_URL,
         token: nightlyToken,
@@ -514,8 +571,10 @@ async function main() {
       buildWindow: nightlyBuildWindow,
       packages: {
         arch: ARCH,
-        count: nightlyNpks.length,
-        npks: nightlyNpks,
+        phase: PHASE,
+        count: phaseFiles.length,
+        npks: phaseFiles.map((f) => nightlyNpks.find((n) => n.file === f) ?? { file: f, size: null as number | null, lastModified: null as string | null }),
+        allArchCount: nightlyNpks.length,
         rejected: nightlyRejected,
       },
     };
@@ -602,13 +661,13 @@ async function main() {
         "--transport",
         "rest",
         "--output-suffix",
-        `nightly-quickchr-${ARCH}`,
+        outputSuffix,
         "--output-dir",
         tmpDir,
         "--ros-version",
         nightlyVer,
       ];
-      log(`  bun ${deepArgs.join(" ")}`);
+      log(`  bun ${deepArgs.join(" ")} [phase=${PHASE}]`);
       const repoRootDeep = REPO_ROOT;
       const proc = Bun.spawn(["bun", ...deepArgs], {
         cwd: repoRootDeep,
@@ -635,17 +694,21 @@ async function main() {
           }
         }
         // Hard gate: deep-inspect argsTotal floor (catches green exit but truncated tree)
+        // Phase-aware so base crawl (28k) does not fail the extra floor (33k).
         try {
-          const deepFile = outs.find((f) => f.startsWith("deep-inspect."));
+          const expectedFile = `deep-inspect.${outputSuffix}.json`;
+          const deepFile = outs.includes(expectedFile) ? expectedFile : outs.find((f) => f === expectedFile || f.startsWith(`deep-inspect.${outputSuffix}`)) ?? outs.find((f) => f.startsWith("deep-inspect."));
           if (deepFile) {
             const deepData = JSON.parse(await Bun.file(join(tmpDir, deepFile)).text()) as { _meta?: { completionStats?: { argsTotal?: number } } };
             const argsTotal = deepData._meta?.completionStats?.argsTotal ?? 0;
-            const floor = ARCH === "arm64" ? 34000 : 33000;
-            if (argsTotal < floor) fail(`deep-inspect argsTotal ${argsTotal} < floor ${floor} for ${ARCH} — tree may be truncated`);
-            else log(`  ✓ deep-inspect argsTotal ${argsTotal} ≥ floor ${floor}`);
+            const floor = getArgsTotalFloor(ARCH, PHASE);
+            if (argsTotal < floor) fail(`deep-inspect argsTotal ${argsTotal} < floor ${floor} for ${ARCH} phase ${PHASE} (${deepFile}) — tree may be truncated`);
+            else log(`  ✓ deep-inspect argsTotal ${argsTotal} ≥ floor ${floor} for ${ARCH} phase ${PHASE} (${deepFile})`);
             if (rootChildCount > 0 && argsTotal < rootChildCount * 10) {
               log(`  ⚠ argsTotal ${argsTotal} is low relative to root children ${rootChildCount}`);
             }
+          } else {
+            log(`  ⚠ no deep-inspect output found (expected ${expectedFile})`);
           }
         } catch (e) {
           if (e instanceof Error && e.message.includes("deep-inspect argsTotal")) throw e;
