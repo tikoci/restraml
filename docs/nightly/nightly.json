@@ -1,0 +1,390 @@
+{
+  "nightlyVersion": "7.25_ab434",
+  "builtAt": "2026-08-13T21:30:18.740Z",
+  "baseVersion": "7.23.3 (stable)",
+  "source": {
+    "shortUrl": "https://mt.lv/nightly-build",
+    "resolvedFrom": "302",
+    "dirents": 40
+  },
+  "buildWindow": {
+    "earliest": "2026-08-13T16:34:29+00:00",
+    "latest": "2026-08-13T16:44:45+00:00"
+  },
+  "packages": {
+    "x86": {
+      "count": 5,
+      "names": [
+        "iot",
+        "routeros",
+        "container",
+        "wireless",
+        "rose-storage"
+      ],
+      "npks": [
+        {
+          "file": "container-7.25_ab434.npk",
+          "size": 1147025,
+          "lastModified": "2026-08-13T16:34:29+00:00"
+        },
+        {
+          "file": "iot-7.25_ab434.npk",
+          "size": 594065,
+          "lastModified": "2026-08-13T16:36:04+00:00"
+        },
+        {
+          "file": "rose-storage-7.25_ab434.npk",
+          "size": 5292177,
+          "lastModified": "2026-08-13T16:38:28+00:00"
+        },
+        {
+          "file": "routeros-x86-7.25_ab434.npk",
+          "size": 20927372,
+          "lastModified": "2026-08-13T16:44:45+00:00"
+        },
+        {
+          "file": "wireless-7.25_ab434.npk",
+          "size": 1163409,
+          "lastModified": "2026-08-13T16:38:50+00:00"
+        }
+      ],
+      "phaseFiles": [
+        "container-7.25_ab434.npk",
+        "iot-7.25_ab434.npk",
+        "rose-storage-7.25_ab434.npk",
+        "routeros-x86-7.25_ab434.npk",
+        "wireless-7.25_ab434.npk"
+      ]
+    },
+    "arm64": {
+      "count": 9,
+      "names": [
+        "wifi-qcom",
+        "iot",
+        "zerotier",
+        "container",
+        "wifi-mediatek",
+        "wifi-qcom-be",
+        "wireless",
+        "routeros",
+        "rose-storage"
+      ],
+      "npks": [
+        {
+          "file": "container-7.25_ab434-arm64.npk",
+          "size": 1159313,
+          "lastModified": "2026-08-13T16:34:31+00:00"
+        },
+        {
+          "file": "iot-7.25_ab434-arm64.npk",
+          "size": 934033,
+          "lastModified": "2026-08-13T16:36:06+00:00"
+        },
+        {
+          "file": "rose-storage-7.25_ab434-arm64.npk",
+          "size": 4554897,
+          "lastModified": "2026-08-13T16:38:35+00:00"
+        },
+        {
+          "file": "routeros-7.25_ab434-arm64.npk",
+          "size": 14053661,
+          "lastModified": "2026-08-13T16:44:42+00:00"
+        },
+        {
+          "file": "wifi-mediatek-7.25_ab434-arm64.npk",
+          "size": 3985553,
+          "lastModified": "2026-08-13T16:40:03+00:00"
+        },
+        {
+          "file": "wifi-qcom-7.25_ab434-arm64.npk",
+          "size": 11489425,
+          "lastModified": "2026-08-13T16:41:43+00:00"
+        },
+        {
+          "file": "wifi-qcom-be-7.25_ab434-arm64.npk",
+          "size": 16601233,
+          "lastModified": "2026-08-13T16:39:38+00:00"
+        },
+        {
+          "file": "wireless-7.25_ab434-arm64.npk",
+          "size": 864401,
+          "lastModified": "2026-08-13T16:38:54+00:00"
+        },
+        {
+          "file": "zerotier-7.25_ab434-arm64.npk",
+          "size": 868497,
+          "lastModified": "2026-08-13T16:35:18+00:00"
+        }
+      ],
+      "phaseFiles": [
+        "container-7.25_ab434-arm64.npk",
+        "iot-7.25_ab434-arm64.npk",
+        "rose-storage-7.25_ab434-arm64.npk",
+        "routeros-7.25_ab434-arm64.npk",
+        "wifi-mediatek-7.25_ab434-arm64.npk",
+        "wifi-qcom-7.25_ab434-arm64.npk",
+        "wifi-qcom-be-7.25_ab434-arm64.npk",
+        "wireless-7.25_ab434-arm64.npk",
+        "zerotier-7.25_ab434-arm64.npk"
+      ]
+    },
+    "rejected": [
+      "routeros-7.25_ab434.npk (generic duplicate of routeros-x86)"
+    ]
+  },
+  "absentRoots": [
+    "dude",
+    "openflow",
+    "tr069-client",
+    "user-manager"
+  ],
+  "provenance": {
+    "x86": {
+      "base": {
+        "nightlyVersion": "7.25_ab434",
+        "arch": "x86",
+        "phase": "base",
+        "baseVersion": "7.23.3 (stable)",
+        "postVersion": "7.25_ab434",
+        "machineName": "restraml-nightly-x86",
+        "builtAt": "2026-08-13T21:02:18.298Z",
+        "bootMs": 95909,
+        "packageCount": 1,
+        "packageNames": [
+          "routeros"
+        ],
+        "channel": "stable",
+        "hostArch": "x64",
+        "crossArchTcg": false,
+        "skipCollect": false,
+        "phaseFiles": [
+          "routeros-x86-7.25_ab434.npk"
+        ],
+        "outputSuffix": "x86-base",
+        "source": {
+          "shortUrl": "https://mt.lv/nightly-build",
+          "resolvedFrom": "302",
+          "dirents": 40
+        },
+        "buildWindow": {
+          "earliest": "2026-08-13T16:34:29+00:00",
+          "latest": "2026-08-13T16:44:45+00:00"
+        },
+        "packages": {
+          "arch": "x86",
+          "phase": "base",
+          "count": 1,
+          "npks": [
+            {
+              "file": "routeros-x86-7.25_ab434.npk",
+              "size": 20927372,
+              "lastModified": "2026-08-13T16:44:45+00:00"
+            }
+          ],
+          "allArchCount": 5,
+          "rejected": [
+            "routeros-7.25_ab434.npk (generic duplicate of routeros-x86)"
+          ]
+        },
+        "absentRoots": [
+          "dude",
+          "openflow",
+          "tr069-client",
+          "user-manager"
+        ]
+      },
+      "extra": {
+        "nightlyVersion": "7.25_ab434",
+        "arch": "x86",
+        "phase": "extra",
+        "baseVersion": "7.23.3 (stable)",
+        "postVersion": "7.25_ab434",
+        "machineName": "restraml-nightly-x86",
+        "builtAt": "2026-08-13T21:15:24.078Z",
+        "bootMs": 24165,
+        "packageCount": 5,
+        "packageNames": [
+          "iot",
+          "routeros",
+          "container",
+          "wireless",
+          "rose-storage"
+        ],
+        "channel": "stable",
+        "hostArch": "x64",
+        "crossArchTcg": false,
+        "skipCollect": false,
+        "phaseFiles": [
+          "container-7.25_ab434.npk",
+          "iot-7.25_ab434.npk",
+          "rose-storage-7.25_ab434.npk",
+          "routeros-x86-7.25_ab434.npk",
+          "wireless-7.25_ab434.npk"
+        ],
+        "outputSuffix": "x86",
+        "source": {
+          "shortUrl": "https://mt.lv/nightly-build",
+          "resolvedFrom": "302",
+          "dirents": 40
+        },
+        "buildWindow": {
+          "earliest": "2026-08-13T16:34:29+00:00",
+          "latest": "2026-08-13T16:44:45+00:00"
+        },
+        "packages": {
+          "arch": "x86",
+          "phase": "extra",
+          "count": 5,
+          "npks": [
+            {
+              "file": "container-7.25_ab434.npk",
+              "size": 1147025,
+              "lastModified": "2026-08-13T16:34:29+00:00"
+            },
+            {
+              "file": "iot-7.25_ab434.npk",
+              "size": 594065,
+              "lastModified": "2026-08-13T16:36:04+00:00"
+            },
+            {
+              "file": "rose-storage-7.25_ab434.npk",
+              "size": 5292177,
+              "lastModified": "2026-08-13T16:38:28+00:00"
+            },
+            {
+              "file": "routeros-x86-7.25_ab434.npk",
+              "size": 20927372,
+              "lastModified": "2026-08-13T16:44:45+00:00"
+            },
+            {
+              "file": "wireless-7.25_ab434.npk",
+              "size": 1163409,
+              "lastModified": "2026-08-13T16:38:50+00:00"
+            }
+          ],
+          "allArchCount": 5,
+          "rejected": [
+            "routeros-7.25_ab434.npk (generic duplicate of routeros-x86)"
+          ]
+        },
+        "absentRoots": [
+          "dude",
+          "openflow",
+          "tr069-client",
+          "user-manager"
+        ]
+      }
+    },
+    "arm64": {
+      "extra": {
+        "nightlyVersion": "7.25_ab434",
+        "arch": "arm64",
+        "phase": "extra",
+        "baseVersion": "7.23.3 (stable)",
+        "postVersion": "7.25_ab434",
+        "machineName": "restraml-nightly-arm64",
+        "builtAt": "2026-08-13T21:03:06.006Z",
+        "bootMs": 54049,
+        "packageCount": 9,
+        "packageNames": [
+          "wifi-qcom",
+          "iot",
+          "zerotier",
+          "container",
+          "wifi-mediatek",
+          "wifi-qcom-be",
+          "wireless",
+          "routeros",
+          "rose-storage"
+        ],
+        "channel": "stable",
+        "hostArch": "arm64",
+        "crossArchTcg": false,
+        "skipCollect": false,
+        "phaseFiles": [
+          "container-7.25_ab434-arm64.npk",
+          "iot-7.25_ab434-arm64.npk",
+          "rose-storage-7.25_ab434-arm64.npk",
+          "routeros-7.25_ab434-arm64.npk",
+          "wifi-mediatek-7.25_ab434-arm64.npk",
+          "wifi-qcom-7.25_ab434-arm64.npk",
+          "wifi-qcom-be-7.25_ab434-arm64.npk",
+          "wireless-7.25_ab434-arm64.npk",
+          "zerotier-7.25_ab434-arm64.npk"
+        ],
+        "outputSuffix": "arm64",
+        "source": {
+          "shortUrl": "https://mt.lv/nightly-build",
+          "resolvedFrom": "302",
+          "dirents": 40
+        },
+        "buildWindow": {
+          "earliest": "2026-08-13T16:34:29+00:00",
+          "latest": "2026-08-13T16:44:45+00:00"
+        },
+        "packages": {
+          "arch": "arm64",
+          "phase": "extra",
+          "count": 9,
+          "npks": [
+            {
+              "file": "container-7.25_ab434-arm64.npk",
+              "size": 1159313,
+              "lastModified": "2026-08-13T16:34:31+00:00"
+            },
+            {
+              "file": "iot-7.25_ab434-arm64.npk",
+              "size": 934033,
+              "lastModified": "2026-08-13T16:36:06+00:00"
+            },
+            {
+              "file": "rose-storage-7.25_ab434-arm64.npk",
+              "size": 4554897,
+              "lastModified": "2026-08-13T16:38:35+00:00"
+            },
+            {
+              "file": "routeros-7.25_ab434-arm64.npk",
+              "size": 14053661,
+              "lastModified": "2026-08-13T16:44:42+00:00"
+            },
+            {
+              "file": "wifi-mediatek-7.25_ab434-arm64.npk",
+              "size": 3985553,
+              "lastModified": "2026-08-13T16:40:03+00:00"
+            },
+            {
+              "file": "wifi-qcom-7.25_ab434-arm64.npk",
+              "size": 11489425,
+              "lastModified": "2026-08-13T16:41:43+00:00"
+            },
+            {
+              "file": "wifi-qcom-be-7.25_ab434-arm64.npk",
+              "size": 16601233,
+              "lastModified": "2026-08-13T16:39:38+00:00"
+            },
+            {
+              "file": "wireless-7.25_ab434-arm64.npk",
+              "size": 864401,
+              "lastModified": "2026-08-13T16:38:54+00:00"
+            },
+            {
+              "file": "zerotier-7.25_ab434-arm64.npk",
+              "size": 868497,
+              "lastModified": "2026-08-13T16:35:18+00:00"
+            }
+          ],
+          "allArchCount": 9,
+          "rejected": [
+            "routeros-7.25_ab434.npk (generic duplicate of routeros-arm64)"
+          ]
+        },
+        "absentRoots": [
+          "dude",
+          "openflow",
+          "tr069-client",
+          "user-manager"
+        ]
+      }
+    }
+  }
+}

@@ -1,9 +1,14 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-08-13T05:51:27.409Z",
+  "generatedAt": "2026-08-13T21:30:18.980Z",
   "rootPath": "docs",
   "latestVersion": "7.24rc4",
   "latestStableVersion": "7.23.3",
+  "nightly": {
+    "name": "nightly",
+    "nightlyVersion": "7.25_ab434",
+    "builtAt": "2026-08-13T21:30:18.740Z"
+  },
   "files": [
     {
       "name": "deep-inspect.future.schema.json",
@@ -107,6 +112,83 @@
     }
   ],
   "versions": [
+    {
+      "name": "nightly",
+      "path": "docs/nightly",
+      "type": "dir",
+      "files": [
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/nightly/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/nightly/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "nightly.json",
+          "path": "docs/nightly/nightly.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/nightly/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/nightly/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/nightly/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "app.json",
+              "path": "docs/nightly/extra/app.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/nightly/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/nightly/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/nightly/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/nightly/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/nightly/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/nightly/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
     {
       "name": "7.24rc4",
       "path": "docs/7.24rc4",
