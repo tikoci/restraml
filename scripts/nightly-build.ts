@@ -237,7 +237,24 @@ export function getArgsTotalFloor(arch: Arch, phase: Phase): number {
 }
 
 export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: string): string {
-  if (customSuffix) return customSuffix;
+  if (customSuffix) {
+    // Validate user-controlled suffix before it reaches deep-inspect.ts
+    // (which interpolates it into deep-inspect.<suffix>.json). Reject path
+    // traversal and confusing double-prefix names.
+    if (customSuffix.includes("/") || customSuffix.includes("\\") || customSuffix.includes("..")) {
+      fail(`--output-suffix must not contain path separators or ".." (got "${customSuffix}")`);
+    }
+    if (customSuffix.endsWith(".json")) {
+      fail(`--output-suffix must not include ".json" (got "${customSuffix}") — suffix is the part after "deep-inspect."`);
+    }
+    if (customSuffix.startsWith("deep-inspect.")) {
+      fail(`--output-suffix must not include "deep-inspect." prefix (got "${customSuffix}") — use the part after "deep-inspect." (e.g. "x86")`);
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(customSuffix)) {
+      fail(`--output-suffix must be a simple name ([A-Za-z0-9._-], got "${customSuffix}")`);
+    }
+    return customSuffix;
+  }
   const base = `nightly-quickchr-${arch}`;
   if (phase !== "all" && phase !== "extra") return `${base}-${phase}`;
   // extra and all both mean full set — keep suffix stable (no -extra) so existing

@@ -124,7 +124,16 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
     expect(buildOutputSuffix("arm64", "base")).toBe("nightly-quickchr-arm64-base");
     expect(buildOutputSuffix("arm64", "all")).toBe("nightly-quickchr-arm64");
     expect(buildOutputSuffix("x86", "base", "custom")).toBe("custom");
-    expect(buildOutputSuffix("x86", "extra", "deep-inspect.x86")).toBe("deep-inspect.x86");
+    expect(buildOutputSuffix("x86", "extra", "x86")).toBe("x86");
+  });
+
+  test("buildOutputSuffix rejects path traversal and confusing names", () => {
+    expect(() => buildOutputSuffix("x86", "all", "../evil")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "a/b")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "a\\b")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "deep-inspect.x86")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "foo.json")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "bad name")).toThrow();
   });
 
   test("outs.find fix — phase suffix prevents collision when tmpDir holds two crawls", () => {
