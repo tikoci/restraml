@@ -134,6 +134,7 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
     expect(() => buildOutputSuffix("x86", "all", "deep-inspect.x86")).toThrow();
     expect(() => buildOutputSuffix("x86", "all", "foo.json")).toThrow();
     expect(() => buildOutputSuffix("x86", "all", "bad name")).toThrow();
+    expect(() => buildOutputSuffix("x86", "all", "")).toThrow();
   });
 
   test("outs.find fix — phase suffix prevents collision when tmpDir holds two crawls", () => {
@@ -149,8 +150,24 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
     expect(outs.includes(expectedExtra)).toBe(true);
     // Old code: outs.find(f => f.startsWith("deep-inspect.")) → ambiguous (always picks first)
     expect(outs.find((f) => f.startsWith("deep-inspect."))).toBe("deep-inspect.nightly-quickchr-x86-base.json");
-    // New logic: select by expectedFile first
-    expect(outs.includes(expectedBase) ? expectedBase : outs.find((f) => f.startsWith(`deep-inspect.${baseSuffix}`))).toBe(expectedBase);
-    expect(outs.includes(expectedExtra) ? expectedExtra : outs.find((f) => f.startsWith(`deep-inspect.${extraSuffix}`))).toBe(expectedExtra);
+    // New logic: exact match only
+    expect(outs.includes(expectedBase) ? expectedBase : undefined).toBe(expectedBase);
+    expect(outs.includes(expectedExtra) ? expectedExtra : undefined).toBe(expectedExtra);
+  });
+
+  test("exact-match gate does not validate wrong phase when expected output missing", () => {
+    // Regression for coderabbit 3778267083: if extra output is absent but base
+    // output exists, the gate must not fall back to the base file.
+    const outsOnlyBase = ["deep-inspect.nightly-quickchr-x86-base.json", "nightly.json"];
+    const extraSuffix = buildOutputSuffix("x86", "extra");
+    const expectedExtra = `deep-inspect.${extraSuffix}.json`;
+    const deepFile = outsOnlyBase.includes(expectedExtra) ? expectedExtra : undefined;
+    expect(deepFile).toBeUndefined();
+    // And vice versa: only extra present, asking for base should miss
+    const outsOnlyExtra = ["deep-inspect.nightly-quickchr-x86.json", "nightly.json"];
+    const baseSuffix = buildOutputSuffix("x86", "base");
+    const expectedBase = `deep-inspect.${baseSuffix}.json`;
+    const deepFileBase = outsOnlyExtra.includes(expectedBase) ? expectedBase : undefined;
+    expect(deepFileBase).toBeUndefined();
   });
 });

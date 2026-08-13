@@ -237,7 +237,7 @@ export function getArgsTotalFloor(arch: Arch, phase: Phase): number {
 }
 
 export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: string): string {
-  if (customSuffix) {
+  if (customSuffix !== undefined) {
     // Validate user-controlled suffix before it reaches deep-inspect.ts
     // (which interpolates it into deep-inspect.<suffix>.json). Reject path
     // traversal and confusing double-prefix names.
@@ -714,7 +714,7 @@ async function main() {
         // Phase-aware so base crawl (28k) does not fail the extra floor (33k).
         try {
           const expectedFile = `deep-inspect.${outputSuffix}.json`;
-          const deepFile = outs.includes(expectedFile) ? expectedFile : outs.find((f) => f === expectedFile || f.startsWith(`deep-inspect.${outputSuffix}`)) ?? outs.find((f) => f.startsWith("deep-inspect."));
+          const deepFile = outs.includes(expectedFile) ? expectedFile : undefined;
           if (deepFile) {
             const deepData = JSON.parse(await Bun.file(join(tmpDir, deepFile)).text()) as { _meta?: { completionStats?: { argsTotal?: number } } };
             const argsTotal = deepData._meta?.completionStats?.argsTotal ?? 0;
