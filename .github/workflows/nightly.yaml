@@ -35,6 +35,9 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   discover:
     name: Discover nightly
@@ -338,6 +341,9 @@ jobs:
           echo "Assembling docs/nightly/ for $NIGHTLY_VER"
 
           # Base tree is canonical x86 base (routeros-only) — maps to docs/nightly/
+          # Clear the overwritten single-slot so a previous app.json (or other file)
+          # does not survive when a later run skips producing it.
+          rm -rf docs/nightly
           mkdir -p docs/nightly/extra
 
           # Base (x86)
