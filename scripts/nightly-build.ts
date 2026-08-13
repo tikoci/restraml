@@ -83,6 +83,7 @@ const { values } = parseArgs({
     arch: { type: "string", default: "x86" },
     phase: { type: "string", default: "all" },
     "base-version": { type: "string" },
+    "nightly-version": { type: "string" },
     channel: { type: "string", default: "stable" },
     "keep-running": { type: "boolean", default: false },
     "skip-collect": { type: "boolean", default: false },
@@ -117,6 +118,10 @@ Options:
                             Pinned to stable for nightly promotion; overridden by
                             --base-version.
   --base-version <ver>      Pin to an explicit RouterOS version instead of channel.
+  --nightly-version <ver>   Pin to a specific nightly version (e.g. 7.25_ab434).
+                            When set, the build uses that Box version instead of
+                            the latest discovered. Required in CI to pin all
+                            phases/jobs to the version from the discover job.
   --skip-collect            Skip heavy collection (rest2raml crawl + deep-inspect).
                             Does only shallow probes: /system/resource, /system/package,
                             /console/inspect child count. Aliases: --skip-crawl,
@@ -154,6 +159,10 @@ const PHASE = (() => {
 })();
 
 const BASE_VERSION: string | undefined = values["base-version"] as string | undefined;
+const PINNED_NIGHTLY_VERSION: string | undefined = values["nightly-version"] as string | undefined;
+if (PINNED_NIGHTLY_VERSION && !parseAb(PINNED_NIGHTLY_VERSION)) {
+  fail(`--nightly-version must be a nightly version like 7.25_ab434; got "${PINNED_NIGHTLY_VERSION}"`);
+}
 const CHANNEL = (values.channel as string) ?? "stable";
 const KEEP_RUNNING = Boolean(values["keep-running"]);
 const SKIP_COLLECT =
@@ -263,10 +272,10 @@ export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: strin
   return base;
 }
 
-async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
+async function discoverNightly(arch: Arch, pinVersion?: string): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
   const { token, resolvedFrom } = await resolveToken();
   const apiUrl = boxApiUrl(token);
-  log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch})`);
+  log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch}${pinVersion ? ` pin=${pinVersion}` : ""})`);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15_000);
   let res: Response;
@@ -282,9 +291,17 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
   const nightlyRe = /(\d+\.\d+(?:\.\d+)?_ab\d+)/;
   const versions = [...new Set(allFiles.map((f) => f.match(nightlyRe)?.[1]).filter(Boolean))] as string[];
   if (versions.length === 0) fail("no nightly version found in Box dirent list");
-  const nightlyVer = [...versions].sort(compareAb).at(-1);
+  let nightlyVer: string | undefined;
+  if (pinVersion) {
+    if (!versions.includes(pinVersion)) fail(`pinned nightly version ${pinVersion} not found in Box dirent list (available: ${versions.join(", ")})`);
+    nightlyVer = pinVersion;
+    log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → pinned ${nightlyVer}`);
+  } else {
+    nightlyVer = [...versions].sort(compareAb).at(-1);
+    if (!nightlyVer) fail("no nightly version found in Box dirent list");
+    log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
+  }
   if (!nightlyVer) fail("no nightly version found in Box dirent list");
-  log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
   const files = filterNpksByArch(allFiles, nightlyVer, arch);
   const rawRejected = allFiles.filter((f) => f.includes(nightlyVer) && !files.includes(f));
   // Narrow to plausible rejects (the one that actually matters for the bug is the generic routeros duplicate)
@@ -345,7 +362,7 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
+  const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH, PINNED_NIGHTLY_VERSION);
   const phaseFiles = getNpksForPhase(archFiles, PHASE);
   const outputSuffix = buildOutputSuffix(ARCH, PHASE, values["output-suffix"] as string | undefined);
   if (phaseFiles.length === 0) fail(`no ${ARCH} NPKs for phase ${PHASE} (arch filter yielded ${archFiles.length} before phase filter)`);
@@ -581,7 +598,6 @@ async function main() {
       outputSuffix,
       source: {
         shortUrl: MT_LV_URL,
-        token: nightlyToken,
         resolvedFrom: nightlyResolvedFrom,
         dirents: nightlyDirents.length,
       },
