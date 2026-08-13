@@ -29,12 +29,10 @@
   "dependencies": {
     "js-yaml": "^4.1.1"
   },
-  "optionalDependencies": {
-    "@tikoci/quickchr": "file:../quickchr"
-  },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
     "@biomejs/biome": "^2.0.0",
+    "@tikoci/quickchr": "^0.4.7",
     "actionlint": "^2.0.6",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",

@@ -82,7 +82,10 @@ jobs:
             echo "Discover attempt $attempt/$ATTEMPTS..."
             if OUT=$(bun scripts/nightly-build.ts --dry-run --arch x86 2>&1); then
               echo "$OUT"
-              NIGHTLY_VER=$(echo "$OUT" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?_ab[0-9]+' | head -1 || true)
+              # Read the machine-readable marker, NOT free-text log lines: when the
+              # Box share holds two ab builds mid-upload the log lists both, and a
+              # bare grep would pick the older one.
+              NIGHTLY_VER=$(echo "$OUT" | sed -n 's/^nightly-version=//p' | head -1 || true)
               if [ -z "$NIGHTLY_VER" ]; then
                 echo "::warning::Could not parse nightly version from dry-run output"
                 echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -131,9 +134,11 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
-    env:
-      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
-      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
+    # No MIKROTIK_* license secrets here: quickchr only licenses when passed
+    # license: "p1" (and reads MIKROTIK_WEB_ACCOUNT/PASSWORD, not the names
+    # deep-inspect-multi-arch.yaml uses). The account is currently out of trial
+    # licences anyway ("too many trial licences"), so nightly runs free-tier —
+    # same as the multi-arch workflow does in practice.
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -155,30 +160,36 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build x86 base (routeros-only)
+        # nightly_version can originate from a workflow_dispatch input, so it goes
+        # through env: rather than being interpolated into the shell body.
+        env:
+          NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
         run: |
           set -euo pipefail
           rm -rf /tmp/nightly-x86-base /tmp/nightly-x86-extra
           mkdir -p /tmp/nightly-x86-base
           echo "→ x86 base (phase=base) — routeros-x86 only"
-          bun scripts/nightly-build.ts --arch x86 --phase base --nightly-version "${{ needs.discover.outputs.nightly_version }}" --output-dir /tmp/nightly-x86-base --output-suffix nightly-quickchr-x86-base
+          bun scripts/nightly-build.ts --arch x86 --phase base --nightly-version "$NIGHTLY_VERSION" --output-dir /tmp/nightly-x86-base --output-suffix x86-base
           echo "→ x86 base done; staging"
           ls -lh /tmp/nightly-x86-base/
           test -f /tmp/nightly-x86-base/inspect.json
           test -f /tmp/nightly-x86-base/schema.raml
-          test -f /tmp/nightly-x86-base/deep-inspect.nightly-quickchr-x86-base.json
+          test -f /tmp/nightly-x86-base/deep-inspect.x86-base.json
           test -f /tmp/nightly-x86-base/openapi.json
 
       - name: Build x86 extra (full NPK set)
+        env:
+          NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/nightly-x86-extra
           echo "→ x86 extra (phase=extra) — full set"
-          bun scripts/nightly-build.ts --arch x86 --phase extra --nightly-version "${{ needs.discover.outputs.nightly_version }}" --output-dir /tmp/nightly-x86-extra --output-suffix nightly-quickchr-x86
+          bun scripts/nightly-build.ts --arch x86 --phase extra --nightly-version "$NIGHTLY_VERSION" --output-dir /tmp/nightly-x86-extra --output-suffix x86
           echo "→ x86 extra done; staging"
           ls -lh /tmp/nightly-x86-extra/
           test -f /tmp/nightly-x86-extra/inspect.json
           test -f /tmp/nightly-x86-extra/schema.raml
-          test -f /tmp/nightly-x86-extra/deep-inspect.nightly-quickchr-x86.json
+          test -f /tmp/nightly-x86-extra/deep-inspect.x86.json
           test -f /tmp/nightly-x86-extra/openapi.json
           if [ -f /tmp/nightly-x86-extra/app.json ]; then
             echo "✓ app.json present ($(jq 'length' /tmp/nightly-x86-extra/app.json) entries)"
@@ -190,11 +201,15 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== x86 base ==="
-          jq '._meta.completionStats.argsTotal' /tmp/nightly-x86-base/deep-inspect.nightly-quickchr-x86-base.json
+          jq '._meta.completionStats.argsTotal' /tmp/nightly-x86-base/deep-inspect.x86-base.json
           echo "=== x86 extra ==="
-          jq '._meta.completionStats.argsTotal' /tmp/nightly-x86-extra/deep-inspect.nightly-quickchr-x86.json
+          jq '._meta.completionStats.argsTotal' /tmp/nightly-x86-extra/deep-inspect.x86.json
           echo "=== nightly.json ==="
           cat /tmp/nightly-x86-extra/nightly.json | jq '{nightlyVersion, arch, phase, packageCount, builtAt}'
+          # Drop what the publish job never reads: downloaded NPKs (~100 MB of
+          # MikroTik binaries) and the suffixed OpenAPI duplicate of openapi.json.
+          rm -rf /tmp/nightly-x86-base/npks /tmp/nightly-x86-extra/npks
+          rm -f /tmp/nightly-x86-base/openapi.x86-base.json /tmp/nightly-x86-extra/openapi.x86.json
 
       - name: Upload x86 staging
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -209,7 +224,7 @@ jobs:
         if: always()
         run: |
           bunx --bun quickchr list || true
-          bunx --bun quickchr remove restraml-nightly-quickchr-x86 --force || true
+          bunx --bun quickchr remove restraml-nightly-x86 --force || true
 
   nightly-arm64:
     name: "arm64 nightly: ${{ needs.discover.outputs.nightly_version }}"
@@ -219,9 +234,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-    env:
-      MIKROTIK_ACCOUNT: ${{ secrets.MIKROTIK_ACCOUNT }}
-      MIKROTIK_PASSWORD: ${{ secrets.MIKROTIK_PASSWORD }}
+    # See the x86 job for why no MIKROTIK_* license secrets are wired here.
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -229,8 +242,13 @@ jobs:
       - name: Install QEMU for aarch64
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-arm qemu-efi-aarch64 > /dev/null
+          # qemu-utils is required on arm64: quickchr builds the per-machine EFI
+          # vars pflash with `qemu-img convert -f raw -O qcow2` on every aarch64
+          # launch (quickchr src/lib/qemu.ts prepareEfiVars). Without it the CHR
+          # never boots. The x86 boot disk stays raw and needs no conversion.
+          sudo apt-get install -y -qq qemu-system-arm qemu-efi-aarch64 qemu-utils > /dev/null
           qemu-system-aarch64 --version | head -1
+          qemu-img --version | head -1
 
       - name: Probe accelerator
         run: |
@@ -259,15 +277,17 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build arm64 extra (full NPK set, most informative)
+        env:
+          NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
         run: |
           set -euo pipefail
           rm -rf /tmp/nightly-arm64-extra
           mkdir -p /tmp/nightly-arm64-extra
           echo "→ arm64 extra (phase=extra) — full set (accel=${ARM_ACCEL:-unknown})"
-          bun scripts/nightly-build.ts --arch arm64 --phase extra --nightly-version "${{ needs.discover.outputs.nightly_version }}" --output-dir /tmp/nightly-arm64-extra --output-suffix nightly-quickchr-arm64
+          bun scripts/nightly-build.ts --arch arm64 --phase extra --nightly-version "$NIGHTLY_VERSION" --output-dir /tmp/nightly-arm64-extra --output-suffix arm64
           echo "→ arm64 extra done"
           ls -lh /tmp/nightly-arm64-extra/
-          test -f /tmp/nightly-arm64-extra/deep-inspect.nightly-quickchr-arm64.json
+          test -f /tmp/nightly-arm64-extra/deep-inspect.arm64.json
           test -f /tmp/nightly-arm64-extra/openapi.json
           test -f /tmp/nightly-arm64-extra/inspect.json
           test -f /tmp/nightly-arm64-extra/schema.raml
@@ -275,8 +295,11 @@ jobs:
       - name: Verify arm64 output
         run: |
           set -euo pipefail
-          jq '._meta.completionStats.argsTotal' /tmp/nightly-arm64-extra/deep-inspect.nightly-quickchr-arm64.json
+          jq '._meta.completionStats.argsTotal' /tmp/nightly-arm64-extra/deep-inspect.arm64.json
           cat /tmp/nightly-arm64-extra/nightly.json | jq '{nightlyVersion, arch, phase, packageCount, builtAt}'
+          # See the x86 job — NPKs and the suffixed OpenAPI duplicate are not published.
+          rm -rf /tmp/nightly-arm64-extra/npks
+          rm -f /tmp/nightly-arm64-extra/openapi.arm64.json
 
       - name: Upload arm64 staging
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -289,7 +312,7 @@ jobs:
         if: always()
         run: |
           bunx --bun quickchr list || true
-          bunx --bun quickchr remove restraml-nightly-quickchr-arm64 --force || true
+          bunx --bun quickchr remove restraml-nightly-arm64 --force || true
 
   publish-nightly:
     name: "Publish nightly ${{ needs.discover.outputs.nightly_version }}"
@@ -314,6 +337,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Artifact paths are relative to the least common ancestor of the uploaded
+      # files. The x86 job uploads two directories, so its archive keeps the
+      # nightly-x86-base/ and nightly-x86-extra/ prefixes; the arm64 job uploads
+      # one directory, so its archive is rooted *inside* it and must be unpacked
+      # into a matching directory here.
       - name: Download x86 staging
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -324,13 +352,21 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: nightly-arm64
-          path: /tmp/nightly-stage
+          path: /tmp/nightly-stage/nightly-arm64-extra
 
       - name: Verify staged artifacts
         run: |
           set -euo pipefail
           echo "=== Staged tree ==="
           find /tmp/nightly-stage -type f | sort
+          # Fail with a readable message if an artifact unpacked at an unexpected
+          # depth, instead of a bare "cat: no such file" three lines down.
+          for d in nightly-x86-base nightly-x86-extra nightly-arm64-extra; do
+            if [ ! -f "/tmp/nightly-stage/$d/nightly.json" ]; then
+              echo "::error::staged artifact layout unexpected — /tmp/nightly-stage/$d/nightly.json missing"
+              exit 1
+            fi
+          done
           echo "--- x86 base nightly.json ---"
           cat /tmp/nightly-stage/nightly-x86-base/nightly.json | jq .
           echo "--- x86 extra nightly.json ---"
@@ -339,10 +375,11 @@ jobs:
           cat /tmp/nightly-stage/nightly-arm64-extra/nightly.json | jq .
 
       - name: Assemble docs/nightly/
+        env:
+          NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
         run: |
           set -euo pipefail
-          NIGHTLY_VER="${{ needs.discover.outputs.nightly_version }}"
-          echo "Assembling docs/nightly/ for $NIGHTLY_VER"
+          echo "Assembling docs/nightly/ for $NIGHTLY_VERSION"
 
           # Base tree is canonical x86 base (routeros-only) — maps to docs/nightly/
           # Clear the overwritten single-slot so a previous app.json (or other file)
@@ -355,35 +392,27 @@ jobs:
           cp /tmp/nightly-stage/nightly-x86-base/schema.raml docs/nightly/schema.raml
           cp /tmp/nightly-stage/nightly-x86-base/openapi.json docs/nightly/openapi.json
           # Also publish base deep-inspect as deep-inspect.json for inspect parity (optional, but matches versioned shape)
-          cp /tmp/nightly-stage/nightly-x86-base/deep-inspect.nightly-quickchr-x86-base.json docs/nightly/deep-inspect.json
+          cp /tmp/nightly-stage/nightly-x86-base/deep-inspect.x86-base.json docs/nightly/deep-inspect.json
 
           # Extra (x86 full)
           cp /tmp/nightly-stage/nightly-x86-extra/inspect.json docs/nightly/extra/inspect.json
           cp /tmp/nightly-stage/nightly-x86-extra/schema.raml docs/nightly/extra/schema.raml
           cp /tmp/nightly-stage/nightly-x86-extra/openapi.json docs/nightly/extra/openapi.json
-          cp /tmp/nightly-stage/nightly-x86-extra/deep-inspect.nightly-quickchr-x86.json docs/nightly/extra/deep-inspect.x86.json
+          cp /tmp/nightly-stage/nightly-x86-extra/deep-inspect.x86.json docs/nightly/extra/deep-inspect.x86.json
 
           # Extra (arm64)
-          cp /tmp/nightly-stage/nightly-arm64-extra/deep-inspect.nightly-quickchr-arm64.json docs/nightly/extra/deep-inspect.arm64.json
+          cp /tmp/nightly-stage/nightly-arm64-extra/deep-inspect.arm64.json docs/nightly/extra/deep-inspect.arm64.json
           # arm64 openapi is not published as canonical extra/openapi.json (keep x86 as canonical)
 
-          # app.json — only from extra where container is present; validate warn-only
+          # app.json — only from extra where container is present. Published raw,
+          # unvalidated: nightly is expected to run ahead of the /app schema, and
+          # per-version schema generation for nightly is deferred (N6). The old
+          # block here only re-checked that our own committed schema was valid
+          # JSON Schema — it never looked at app.json — so it is gone rather than
+          # left in place implying coverage that does not exist.
           if [ -f /tmp/nightly-stage/nightly-x86-extra/app.json ]; then
             cp /tmp/nightly-stage/nightly-x86-extra/app.json docs/nightly/extra/app.json
-            echo "→ app.json: $(jq 'length' docs/nightly/extra/app.json) entries from x86 extra"
-            if ! bun -e '
-              import fs from "node:fs";
-              import Ajv from "ajv";
-              import addFormats from "ajv-formats";
-              const schema = JSON.parse(fs.readFileSync("docs/routeros-app-yaml-schema.latest.json","utf8"));
-              const ajv = new Ajv({allErrors:true, strict:false});
-              addFormats(ajv);
-              const valid = ajv.validateSchema(schema);
-              if (!valid) { console.error("root schema meta-invalid", ajv.errors); process.exit(1); }
-              console.log("✓ root app YAML schema meta-valid");
-            '; then
-              echo "::warning::root app schema meta-validation failed"
-            fi
+            echo "→ app.json: $(jq 'length' docs/nightly/extra/app.json) entries from x86 extra (published raw, not schema-validated)"
           else
             echo "::warning::no app.json from x86 extra — container package may be absent this build"
           fi
@@ -402,10 +431,19 @@ jobs:
 
       - name: Verify diff is not a relabeled copy
         run: |
+          set -euo pipefail
           ARM64_ONLY=$(jq '.counts.pathsOnlyB' docs/nightly/extra/diff-deep-inspect.json)
           X86_ONLY=$(jq '.counts.pathsOnlyA' docs/nightly/extra/diff-deep-inspect.json)
           echo "Paths only in arm64: $ARM64_ONLY"
           echo "Paths only in x86:   $X86_ONLY"
+          # Without this, a shape change that makes jq emit null turns the gate
+          # below into a silent pass ([ null -lt 500 ] errors, `if` reads false).
+          case "$ARM64_ONLY" in
+            ''|*[!0-9]*) echo "::error::pathsOnlyB is not a number ('$ARM64_ONLY') — diff JSON shape changed"; exit 1 ;;
+          esac
+          # Reference: full all_packages builds run ~1,561 arm64-only paths
+          # (docs/7.24rc2/extra/diff-deep-inspect.json); nightly's arm64 NPK set
+          # is larger than its x86 one, so 500 is a floor with real headroom.
           if [ "$ARM64_ONLY" -lt 500 ]; then
             echo "::error::arm64 has only $ARM64_ONLY unique paths (expected ≥500) — relabeled x86 or truncated crawl"
             exit 1
@@ -467,8 +505,10 @@ jobs:
           echo "✓ docs-index nightly $NIGHTLY"
 
       - name: Generate step summary
+        env:
+          NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
         run: |
-          echo "### Nightly ${{ needs.discover.outputs.nightly_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Nightly $NIGHTLY_VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Artifact | Size |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"

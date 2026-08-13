@@ -5,8 +5,9 @@
  * Boots a stable CHR via @tikoci/quickchr, discovers the current nightly
  * (mt.lv Box), downloads arch-specific NPKs, uploads via quickchr SCP,
  * reboots, and validates the version moves to the nightly build.
- * Single-slot `docs/nightly/` shape per #90 §6; one boot / two crawls
- * (base then extra) will be driven with --phase in N4.
+ * Single-slot `docs/nightly/` shape per #90 §6. `.github/workflows/nightly.yaml`
+ * drives this once per phase — a fresh CHR per `--phase`, each with its own
+ * `--output-dir`, rather than one boot with two crawls.
  *
  * Now arch-aware and CI-hardened:
  *   - `--arch x86|arm64` — x86 uses HVF on Intel, arm64 uses TCG (slow but viable)
@@ -127,11 +128,11 @@ Options:
                             /console/inspect child count. Aliases: --skip-crawl,
                             --skip-deep-inspect. Recommended for arm64/TCG.
   --output-dir <dir>        Where to write deep-inspect outputs when not skipped
-                            (default: mkdtemp nightly-quickchr-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
+                            (default: mkdtemp nightly-<ver>-<arch>-XXXXXX, or --output-dir to reuse).
   --output-suffix <str>     Override deep-inspect output suffix (default:
-                            nightly-quickchr-<arch>[-<phase>]).
+                            nightly-<arch>[-<phase>]).
   --machine-name <name>     Override quickchr machine name (default:
-                            restraml-nightly-quickchr-<arch>).
+                            restraml-nightly-<arch>).
   --keep-running            Leave CHR running after the run (for manual inspection).
   --dry-run                 Discover nightly + filter per-arch NPKs and exit (no QEMU).
   --help                    Show this help.
@@ -170,7 +171,7 @@ const SKIP_COLLECT =
 // cross-arch on this host = TCG = slower reboot/probe windows
 const NATIVE_HOST_ARCH: Record<Arch, string> = { x86: "x64", arm64: "arm64" };
 const IS_CROSS_ARCH = process.arch !== NATIVE_HOST_ARCH[ARCH];
-const MACHINE_NAME = (values["machine-name"] as string | undefined) ?? `restraml-nightly-quickchr-${ARCH}`;
+const MACHINE_NAME = (values["machine-name"] as string | undefined) ?? `restraml-nightly-${ARCH}`;
 const EXTRA_TIMEOUT_MS = IS_CROSS_ARCH ? 120_000 : 0; // extra headroom for TCG reboots
 
 function formatBytes(n: number): string {
@@ -223,10 +224,10 @@ export function compareAb(a: string, b: string): number {
 }
 
 export function getNpksForPhase(allArchNpks: string[], phase: Phase): string[] {
-  // base → routeros-* only (1 NPK); extra/all → full arch set (5 or 9)
-  // For N4's one-boot/two-crawls, N4 will call base then extra against the same
-  // CHR via two workflow steps; isolated extra=all (full set) remains valid as a
-  // standalone full upgrade, while phase-aware floors keep base from failing.
+  // base → routeros-* only (1 NPK); extra/all → full arch set (5 or 9).
+  // nightly.yaml runs base and extra as separate steps against separate CHRs, so
+  // extra=all (full set) is always a standalone full upgrade; the phase-aware
+  // floors are what keep the smaller base crawl from failing the extra gate.
   if (phase === "base") return allArchNpks.filter((f) => f.toLowerCase().startsWith("routeros-"));
   return allArchNpks;
 }
@@ -264,7 +265,9 @@ export function buildOutputSuffix(arch: Arch, phase: Phase, customSuffix?: strin
     }
     return customSuffix;
   }
-  const base = `nightly-quickchr-${arch}`;
+  // Suffix names the *artifact* (arch/phase), never the harness — nightly.json
+  // provenance is published to docs/, so "quickchr" must not leak into it.
+  const base = `nightly-${arch}`;
   if (phase !== "all" && phase !== "extra") return `${base}-${phase}`;
   // extra and all both mean full set — keep suffix stable (no -extra) so existing
   // single-crawl consumers keep the same file names; N4 can pass explicit
@@ -372,10 +375,15 @@ async function main() {
       mkdirSync(custom, { recursive: true });
       return custom;
     }
-    return mkdtempSync(join(tmpdir(), `nightly-quickchr-${nightlyVer}-${ARCH}-`));
+    return mkdtempSync(join(tmpdir(), `nightly-${nightlyVer}-${ARCH}-`));
   })();
 
   if (values["dry-run"]) {
+    // Stable, machine-readable marker for CI discovery. Do not remove or reword:
+    // .github/workflows/nightly.yaml greps `^nightly-version=` for this exact line.
+    // Scraping prose instead would pick the wrong version whenever the Box share
+    // holds two ab builds during the upload window (the log lists all of them).
+    log(`nightly-version=${nightlyVer}`);
     log(`\n--dry-run: would download ${phaseFiles.length} ${ARCH} NPK(s) for ${nightlyVer} [phase=${PHASE}, suffix=${outputSuffix}] to ${join(tmpDir, "npks")}`);
     for (const f of phaseFiles) log(`  ${f}`);
     if (PHASE !== "all") log(`  (all for ${ARCH}: ${archFiles.join(", ")})`);

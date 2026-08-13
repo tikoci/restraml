@@ -220,6 +220,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `scripts/test-ros-api.sh` | Integration + stress tests (ros-api-protocol) against local CHR |
 | `scripts/benchmark-qemu.sh` | REST vs native API timing benchmark against local CHR |
 | `scripts/deep-inspect-multi-arch.ts` | Per-arch deep-inspect orchestrator (quickchr, x86 + arm64) |
+| `scripts/nightly-build.ts` | Nightly (ab) driver: stable CHR → nightly NPK upgrade → crawl; artifact names must not carry harness names |
 | `scripts/diff-deep-inspect.ts` | Diff two deep-inspect.<arch>.json files (enum drift + path delta) |
 | `docs/index.html` | Main GitHub Pages SPA (reference for new pages) |
 | `docs/lookup.html` | RouterOS command search tool — fully event-driven, no submit buttons |
@@ -234,6 +235,7 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 | `.github/workflows/manual-using-extra-docker-in-docker.yaml` | Build: schema + extra packages |
 | `.github/workflows/appyamlschemas.yaml` | Build: validate and publish /app YAML schemas per-version |
 | `.github/workflows/deep-inspect-multi-arch.yaml` | Build: per-arch deep-inspect (x86 KVM + arm64 KVM/TCG fallback) with diff |
+| `.github/workflows/nightly.yaml` | Build: nightly (ab) single overwritten slot → `docs/nightly/` (see CLAUDE.md) |
 | `.github/workflows/manual-from-secrets.yaml` | Build: using a real RouterOS device |
 | `docs/restraml-shared.js` | Shared JS utilities for all tool pages (version parsing, theme, share modal) |
 | `docs/restraml-shared.css` | Shared CSS for all tool pages (fonts, logo, theme, guide, modal, utilities) |
