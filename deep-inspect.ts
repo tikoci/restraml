@@ -61,8 +61,6 @@ export interface DeepInspectMeta {
     pathsFailed: number;
     /** First up to 50 failed path strings (e.g. "/ip/address") for diagnosis. */
     failedPaths: string[];
-    /** Optional total of paths that were successfully crawled (includes dirs). */
-    pathsVisited?: number;
   };
   /** Per top-level root (first path segment) arg count census — e.g. { "ip": 4231 }.
    *  Derived from the crawled tree before enrichment. Lets a total shortfall (e.g.
@@ -593,7 +591,7 @@ export async function crawlInspectTree(
   try {
     children = await client.fetchChild(rpath, signal);
   } catch (err) {
-    const pathStr = `/${rpath.join("/")}` || "/";
+    const pathStr = `/${rpath.join("/")}`;
     recordCrawlFailure(crawlFailures, pathStr);
     console.error(`  ⚠ fetchChild failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
     return memo;

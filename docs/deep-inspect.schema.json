@@ -128,10 +128,6 @@
           "type": "array",
           "maxItems": 50,
           "items": { "type": "string" }
-        },
-        "pathsVisited": {
-          "type": "integer",
-          "minimum": 0
         }
       },
       "additionalProperties": false
