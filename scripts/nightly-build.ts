@@ -34,6 +34,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { QuickCHR } from "@tikoci/quickchr";
 
+// Public share-link token for https://mt.lv/nightly-build → box.mikrotik.com/d/<token>/
+// This is not a secret; it is embedded in the public redirect and the Box API URL.
 const PINNED_TOKEN = "5ce46054d5d2487e8755";
 const MT_LV_URL = "https://mt.lv/nightly-build";
 
@@ -43,7 +45,7 @@ async function resolveToken(): Promise<string> {
     const loc = res.headers.get("location") ?? res.headers.get("Location") ?? "";
     const m = loc.match(/\/d\/([a-f0-9]+)/);
     if (m?.[1]) {
-      console.log(`→ mt.lv nightly-build 302 → token ${m[1]}`);
+      console.log("→ mt.lv nightly-build resolved (302)");
       return m[1];
     }
   } catch (e) {
@@ -65,8 +67,7 @@ function log(s: string) {
   console.log(s);
 }
 function fail(msg: string): never {
-  console.error(`\n✖ ${msg}`);
-  process.exit(1);
+  throw new Error(`\n✖ ${msg}`);
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
@@ -136,9 +137,10 @@ const BASE_VERSION: string | undefined = values["base-version"] as string | unde
 const CHANNEL = (values.channel as string) ?? "stable";
 const KEEP_RUNNING = Boolean(values["keep-running"]);
 const SKIP_COLLECT =
-  Boolean(values["skip-collect"] ?? values["skip-crawl"] ?? values["skip-deep-inspect"]);
+  Boolean(values["skip-collect"] || values["skip-crawl"] || values["skip-deep-inspect"]);
 // cross-arch on this host = TCG = slower reboot/probe windows
-const IS_CROSS_ARCH = ARCH === "arm64" && process.arch === "x64";
+const NATIVE_HOST_ARCH: Record<Arch, string> = { x86: "x64", arm64: "arm64" };
+const IS_CROSS_ARCH = process.arch !== NATIVE_HOST_ARCH[ARCH];
 const MACHINE_NAME = (values["machine-name"] as string | undefined) ?? `restraml-nightly-quickchr-${ARCH}`;
 const EXTRA_TIMEOUT_MS = IS_CROSS_ARCH ? 120_000 : 0; // extra headroom for TCG reboots
 
@@ -338,6 +340,7 @@ async function main() {
       }
     } catch (e) {
       log(`  pre-upgrade packages: (query failed: ${String(e).slice(0, 200)})`);
+      throw e;
     }
 
     // ── upload nightly NPKs via quickchr SCP ──
@@ -437,6 +440,7 @@ async function main() {
       } else log(`  packages raw=${JSON.stringify(pkgs).slice(0, 800)}`);
     } catch (e) {
       log(`  package query failed: ${String(e).slice(0, 400)}`);
+      throw e;
     }
 
     // ── shallow probes (always, even when skipping heavy collection) ──
@@ -503,9 +507,10 @@ async function main() {
       });
       const out = await new Response(proc.stdout).text();
       const err = await new Response(proc.stderr).text();
-      await proc.exited;
+      const code = await proc.exited;
       log(`  rest2raml --version stdout: ${out.trim().slice(0, 500)}`);
       if (err) log(`  stderr: ${err.slice(0, 500)}`);
+      if (code !== 0) throw new Error(`rest2raml --version failed with exit code ${code}: ${err.slice(0, 500)}`);
     }
 
     try {
@@ -535,6 +540,7 @@ async function main() {
       const err = await new Response(proc.stderr).text();
       log(`  rest2raml exit=${code} stdout ${out.length} chars, stderr ${err.length} chars`);
       if (err) log(`  stderr preview: ${err.slice(0, 800)}`);
+      if (code !== 0) throw new Error(`rest2raml crawl failed with exit code ${code}: ${err.slice(0, 800)}`);
       const repoRootArtifacts = join(import.meta.dir, "..");
       const arts = readdirSync(repoRootArtifacts).filter((f) => f.startsWith("ros-"));
       log(`  artifacts: ${arts.join(", ")}`);
@@ -579,7 +585,7 @@ async function main() {
       log(`  deep-inspect exit=${code} in ${((Date.now() - tD0) / 1000).toFixed(1)}s`);
       log(`  stdout tail:\n${out.slice(-2000)}`);
       if (err) log(`  stderr tail:\n${err.slice(-1500)}`);
-      if (code !== 0) log(`  ⚠ deep-inspect failed (exit ${code}) — not destroying CHR so you can inspect`);
+      if (code !== 0) throw new Error(`deep-inspect failed with exit code ${code}: ${err.slice(-1500)}`);
       else {
         const outs = readdirSync(tmpDir).filter((f) => f.endsWith(".json"));
         for (const f of outs) {
@@ -637,7 +643,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
