@@ -1,0 +1,20 @@
+{
+  "dirent_list": [
+    {"file_name": "routeros-7.25_ab433.npk", "size": 21430272},
+    {"file_name": "routeros-x86-7.25_ab433.npk", "size": 21430272},
+    {"file_name": "container-7.25_ab433.npk", "size": 12345},
+    {"file_name": "container-arm64-7.25_ab433.npk", "size": 12345},
+    {"file_name": "iot-7.25_ab433.npk", "size": 1111},
+    {"file_name": "iot-arm64-7.25_ab433.npk", "size": 1111},
+    {"file_name": "rose-storage-7.25_ab433.npk", "size": 2222},
+    {"file_name": "rose-storage-arm64-7.25_ab433.npk", "size": 2222},
+    {"file_name": "wireless-7.25_ab433.npk", "size": 3333},
+    {"file_name": "wireless-arm64-7.25_ab433.npk", "size": 3333},
+    {"file_name": "wifi-qcom-7.25_ab433.npk", "size": 4444},
+    {"file_name": "wifi-qcom-arm64-7.25_ab433.npk", "size": 4444},
+    {"file_name": "zerotier-7.25_ab433.npk", "size": 5555},
+    {"file_name": "zerotier-arm64-7.25_ab433.npk", "size": 5555},
+    {"file_name": "routeros-7.25_ab432.npk", "size": 21400000},
+    {"file_name": "routeros-x86-7.25_ab432.npk", "size": 21400000}
+  ]
+}

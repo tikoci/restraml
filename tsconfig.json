@@ -10,5 +10,6 @@
     "allowImportingTsExtensions": true,
     "types": ["bun-types"]
   },
-  "include": ["*.ts", "fixtures/**/*.ts"]
+  "include": ["*.ts", "fixtures/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["scripts/native-api-investigation"]
 }
