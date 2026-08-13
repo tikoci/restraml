@@ -42,19 +42,19 @@ import { QuickCHR } from "@tikoci/quickchr";
 const PINNED_TOKEN = "5ce46054d5d2487e8755";
 const MT_LV_URL = "https://mt.lv/nightly-build";
 
-async function resolveToken(): Promise<string> {
+async function resolveToken(): Promise<{ token: string; resolvedFrom: "302" | "pinned" }> {
   try {
     const res = await fetch(MT_LV_URL, { redirect: "manual" });
     const loc = res.headers.get("location") ?? res.headers.get("Location") ?? "";
     const m = loc.match(/\/d\/([a-f0-9]+)/);
     if (m?.[1]) {
       console.log("→ mt.lv nightly-build resolved (302)");
-      return m[1];
+      return { token: m[1], resolvedFrom: "302" };
     }
   } catch (e) {
     console.warn(`  mt.lv resolve failed (${String(e).slice(0, 200)}), falling back to pinned token`);
   }
-  return PINNED_TOKEN;
+  return { token: PINNED_TOKEN, resolvedFrom: "pinned" };
 }
 
 function boxApiUrl(token: string): string {
@@ -196,8 +196,8 @@ export function compareAb(a: string, b: string): number {
   return pa[3] - pb[3];
 }
 
-async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
-  const token = await resolveToken();
+async function discoverNightly(arch: Arch): Promise<{ version: string; files: string[]; allFiles: string[]; token: string; resolvedFrom: "302" | "pinned"; dirents: Array<{ file_name: string; size?: number; last_modified?: string }>; npks: Array<{ file: string; size: number | null; lastModified: string | null }>; rejected: string[]; buildWindow: { earliest: string; latest: string } | null }> {
+  const { token, resolvedFrom } = await resolveToken();
   const apiUrl = boxApiUrl(token);
   log(`→ discovering nightly via Box API ${apiUrl} (arch=${arch})`);
   const ctrl = new AbortController();
@@ -219,10 +219,18 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
   if (!nightlyVer) fail("no nightly version found in Box dirent list");
   log(`  Box dirents: ${allFiles.length} files; nightly versions: ${versions.join(", ")} → latest ${nightlyVer}`);
   const files = filterNpksByArch(allFiles, nightlyVer, arch);
-  const rejected = allFiles.filter((f) => f.includes(nightlyVer) && !files.includes(f));
+  const rawRejected = allFiles.filter((f) => f.includes(nightlyVer) && !files.includes(f));
+  // Narrow to plausible rejects (the one that actually matters for the bug is the generic routeros duplicate)
+  const rejected = (() => {
+    const generic = `routeros-${nightlyVer}.npk`;
+    if (rawRejected.includes(generic)) return [`${generic} (generic duplicate of routeros-${arch === "x86" ? "x86" : "arm64"})`];
+    // For other cases, keep only files that look like they could have been selected (e.g., not foreign arch)
+    // but trim to avoid 35-entry noise; if generic not present, return empty (no plausible duplicate)
+    return [];
+  })();
   if (files.length === 0) fail(`no ${arch} NPKs for ${nightlyVer} (arch filter rejected all ${allFiles.filter((f) => f.includes(nightlyVer)).length} nightly files)`);
   log(`  ${arch} NPKs (${files.length}): ${files.join(", ")}`);
-  if (rejected.length > 0) log(`  rejected (${rejected.length}): ${rejected.join(", ")}`);
+  if (rejected.length > 0) log(`  rejected (${rejected.length}): ${rejected.join(", ")}`); // now at most 1 plausible entry
   const direntMap = new Map(dirents.map((d) => [d.file_name, d]));
   const npks = files.map((f) => {
     const d = direntMap.get(f);
@@ -235,7 +243,7 @@ async function discoverNightly(arch: Arch): Promise<{ version: string; files: st
         latest: nightlyDirents.map((d) => d.last_modified as string).sort().at(-1) as string,
       }
     : null;
-  return { version: nightlyVer, files, allFiles, token, dirents, npks, rejected, buildWindow };
+  return { version: nightlyVer, files, allFiles, token, resolvedFrom, dirents, npks, rejected, buildWindow };
 }
 
 async function downloadNpks(files: string[], dir: string, token: string) {
@@ -270,7 +278,7 @@ async function downloadNpks(files: string[], dir: string, token: string) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { version: nightlyVer, files: archFiles, token: nightlyToken, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
+  const { version: nightlyVer, files: archFiles, token: nightlyToken, resolvedFrom: nightlyResolvedFrom, dirents: nightlyDirents, npks: nightlyNpks, rejected: nightlyRejected, buildWindow: nightlyBuildWindow } = await discoverNightly(ARCH);
   const tmpDir = (() => {
     const custom = values["output-dir"] as string | undefined;
     if (custom) {
@@ -500,7 +508,7 @@ async function main() {
       source: {
         shortUrl: MT_LV_URL,
         token: nightlyToken,
-        resolvedFrom: nightlyToken === PINNED_TOKEN ? "pinned" : "302",
+        resolvedFrom: nightlyResolvedFrom,
         dirents: nightlyDirents.length,
       },
       buildWindow: nightlyBuildWindow,

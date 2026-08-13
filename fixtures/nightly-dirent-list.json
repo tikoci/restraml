@@ -1,1 +1,285 @@
-{"dirent_list":[{"size":295057,"last_modified":"2026-08-13T16:34:30+00:00","is_dir":false,"file_path":"/container-7.25_ab434-arm.npk","file_name":"container-7.25_ab434-arm.npk"},{"size":1159313,"last_modified":"2026-08-13T16:34:31+00:00","is_dir":false,"file_path":"/container-7.25_ab434-arm64.npk","file_name":"container-7.25_ab434-arm64.npk"},{"size":1147025,"last_modified":"2026-08-13T16:34:29+00:00","is_dir":false,"file_path":"/container-7.25_ab434.npk","file_name":"container-7.25_ab434.npk"},{"size":831633,"last_modified":"2026-08-13T16:36:05+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-arm.npk","file_name":"iot-7.25_ab434-arm.npk"},{"size":934033,"last_modified":"2026-08-13T16:36:06+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-arm64.npk","file_name":"iot-7.25_ab434-arm64.npk"},{"size":802961,"last_modified":"2026-08-13T16:36:08+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-mipsbe.npk","file_name":"iot-7.25_ab434-mipsbe.npk"},{"size":553105,"last_modified":"2026-08-13T16:36:10+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-mmips.npk","file_name":"iot-7.25_ab434-mmips.npk"},{"size":585873,"last_modified":"2026-08-13T16:36:11+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-ppc.npk","file_name":"iot-7.25_ab434-ppc.npk"},{"size":549009,"last_modified":"2026-08-13T16:36:09+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-smips.npk","file_name":"iot-7.25_ab434-smips.npk"},{"size":749713,"last_modified":"2026-08-13T16:36:07+00:00","is_dir":false,"file_path":"/iot-7.25_ab434-tile.npk","file_name":"iot-7.25_ab434-tile.npk"},{"size":594065,"last_modified":"2026-08-13T16:36:04+00:00","is_dir":false,"file_path":"/iot-7.25_ab434.npk","file_name":"iot-7.25_ab434.npk"},{"size":4391057,"last_modified":"2026-08-13T16:38:33+00:00","is_dir":false,"file_path":"/rose-storage-7.25_ab434-arm.npk","file_name":"rose-storage-7.25_ab434-arm.npk"},{"size":4554897,"last_modified":"2026-08-13T16:38:35+00:00","is_dir":false,"file_path":"/rose-storage-7.25_ab434-arm64.npk","file_name":"rose-storage-7.25_ab434-arm64.npk"},{"size":5202065,"last_modified":"2026-08-13T16:38:37+00:00","is_dir":false,"file_path":"/rose-storage-7.25_ab434-tile.npk","file_name":"rose-storage-7.25_ab434-tile.npk"},{"size":5292177,"last_modified":"2026-08-13T16:38:28+00:00","is_dir":false,"file_path":"/rose-storage-7.25_ab434.npk","file_name":"rose-storage-7.25_ab434.npk"},{"size":12439175,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-arm.npk","file_name":"routeros-7.25_ab434-arm.npk"},{"size":14053661,"last_modified":"2026-08-13T16:44:42+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-arm64.npk","file_name":"routeros-7.25_ab434-arm64.npk"},{"size":11521916,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-mipsbe.npk","file_name":"routeros-7.25_ab434-mipsbe.npk"},{"size":10872935,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-mmips.npk","file_name":"routeros-7.25_ab434-mmips.npk"},{"size":22189157,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-ppc.npk","file_name":"routeros-7.25_ab434-ppc.npk"},{"size":7241556,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-smips.npk","file_name":"routeros-7.25_ab434-smips.npk"},{"size":17036513,"last_modified":"2026-08-13T16:44:39+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434-tile.npk","file_name":"routeros-7.25_ab434-tile.npk"},{"size":20927372,"last_modified":"2026-08-13T16:44:45+00:00","is_dir":false,"file_path":"/routeros-7.25_ab434.npk","file_name":"routeros-7.25_ab434.npk"},{"size":20927372,"last_modified":"2026-08-13T16:44:45+00:00","is_dir":false,"file_path":"/routeros-x86-7.25_ab434.npk","file_name":"routeros-x86-7.25_ab434.npk"},{"size":5275793,"last_modified":"2026-08-13T16:40:01+00:00","is_dir":false,"file_path":"/wifi-mediatek-7.25_ab434-arm.npk","file_name":"wifi-mediatek-7.25_ab434-arm.npk"},{"size":3985553,"last_modified":"2026-08-13T16:40:03+00:00","is_dir":false,"file_path":"/wifi-mediatek-7.25_ab434-arm64.npk","file_name":"wifi-mediatek-7.25_ab434-arm64.npk"},{"size":10555537,"last_modified":"2026-08-13T16:41:41+00:00","is_dir":false,"file_path":"/wifi-qcom-7.25_ab434-arm.npk","file_name":"wifi-qcom-7.25_ab434-arm.npk"},{"size":11489425,"last_modified":"2026-08-13T16:41:43+00:00","is_dir":false,"file_path":"/wifi-qcom-7.25_ab434-arm64.npk","file_name":"wifi-qcom-7.25_ab434-arm64.npk"},{"size":2691217,"last_modified":"2026-08-13T16:42:38+00:00","is_dir":false,"file_path":"/wifi-qcom-ac-7.25_ab434-arm.npk","file_name":"wifi-qcom-ac-7.25_ab434-arm.npk"},{"size":16601233,"last_modified":"2026-08-13T16:39:38+00:00","is_dir":false,"file_path":"/wifi-qcom-be-7.25_ab434-arm64.npk","file_name":"wifi-qcom-be-7.25_ab434-arm64.npk"},{"size":1876113,"last_modified":"2026-08-13T16:38:52+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-arm.npk","file_name":"wireless-7.25_ab434-arm.npk"},{"size":864401,"last_modified":"2026-08-13T16:38:54+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-arm64.npk","file_name":"wireless-7.25_ab434-arm64.npk"},{"size":1413265,"last_modified":"2026-08-13T16:38:57+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-mipsbe.npk","file_name":"wireless-7.25_ab434-mipsbe.npk"},{"size":1413265,"last_modified":"2026-08-13T16:38:59+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-mmips.npk","file_name":"wireless-7.25_ab434-mmips.npk"},{"size":2781329,"last_modified":"2026-08-13T16:39:01+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-ppc.npk","file_name":"wireless-7.25_ab434-ppc.npk"},{"size":675985,"last_modified":"2026-08-13T16:38:58+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-smips.npk","file_name":"wireless-7.25_ab434-smips.npk"},{"size":1519761,"last_modified":"2026-08-13T16:38:55+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434-tile.npk","file_name":"wireless-7.25_ab434-tile.npk"},{"size":1163409,"last_modified":"2026-08-13T16:38:50+00:00","is_dir":false,"file_path":"/wireless-7.25_ab434.npk","file_name":"wireless-7.25_ab434.npk"},{"size":770193,"last_modified":"2026-08-13T16:35:17+00:00","is_dir":false,"file_path":"/zerotier-7.25_ab434-arm.npk","file_name":"zerotier-7.25_ab434-arm.npk"},{"size":868497,"last_modified":"2026-08-13T16:35:18+00:00","is_dir":false,"file_path":"/zerotier-7.25_ab434-arm64.npk","file_name":"zerotier-7.25_ab434-arm64.npk"}]}
+{
+  "dirent_list": [
+    {
+      "size": 295057,
+      "last_modified": "2026-08-13T16:34:30+00:00",
+      "is_dir": false,
+      "file_path": "/container-7.25_ab434-arm.npk",
+      "file_name": "container-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 1159313,
+      "last_modified": "2026-08-13T16:34:31+00:00",
+      "is_dir": false,
+      "file_path": "/container-7.25_ab434-arm64.npk",
+      "file_name": "container-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 1147025,
+      "last_modified": "2026-08-13T16:34:29+00:00",
+      "is_dir": false,
+      "file_path": "/container-7.25_ab434.npk",
+      "file_name": "container-7.25_ab434.npk"
+    },
+    {
+      "size": 831633,
+      "last_modified": "2026-08-13T16:36:05+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-arm.npk",
+      "file_name": "iot-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 934033,
+      "last_modified": "2026-08-13T16:36:06+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-arm64.npk",
+      "file_name": "iot-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 802961,
+      "last_modified": "2026-08-13T16:36:08+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-mipsbe.npk",
+      "file_name": "iot-7.25_ab434-mipsbe.npk"
+    },
+    {
+      "size": 553105,
+      "last_modified": "2026-08-13T16:36:10+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-mmips.npk",
+      "file_name": "iot-7.25_ab434-mmips.npk"
+    },
+    {
+      "size": 585873,
+      "last_modified": "2026-08-13T16:36:11+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-ppc.npk",
+      "file_name": "iot-7.25_ab434-ppc.npk"
+    },
+    {
+      "size": 549009,
+      "last_modified": "2026-08-13T16:36:09+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-smips.npk",
+      "file_name": "iot-7.25_ab434-smips.npk"
+    },
+    {
+      "size": 749713,
+      "last_modified": "2026-08-13T16:36:07+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434-tile.npk",
+      "file_name": "iot-7.25_ab434-tile.npk"
+    },
+    {
+      "size": 594065,
+      "last_modified": "2026-08-13T16:36:04+00:00",
+      "is_dir": false,
+      "file_path": "/iot-7.25_ab434.npk",
+      "file_name": "iot-7.25_ab434.npk"
+    },
+    {
+      "size": 4391057,
+      "last_modified": "2026-08-13T16:38:33+00:00",
+      "is_dir": false,
+      "file_path": "/rose-storage-7.25_ab434-arm.npk",
+      "file_name": "rose-storage-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 4554897,
+      "last_modified": "2026-08-13T16:38:35+00:00",
+      "is_dir": false,
+      "file_path": "/rose-storage-7.25_ab434-arm64.npk",
+      "file_name": "rose-storage-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 5202065,
+      "last_modified": "2026-08-13T16:38:37+00:00",
+      "is_dir": false,
+      "file_path": "/rose-storage-7.25_ab434-tile.npk",
+      "file_name": "rose-storage-7.25_ab434-tile.npk"
+    },
+    {
+      "size": 5292177,
+      "last_modified": "2026-08-13T16:38:28+00:00",
+      "is_dir": false,
+      "file_path": "/rose-storage-7.25_ab434.npk",
+      "file_name": "rose-storage-7.25_ab434.npk"
+    },
+    {
+      "size": 12439175,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-arm.npk",
+      "file_name": "routeros-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 14053661,
+      "last_modified": "2026-08-13T16:44:42+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-arm64.npk",
+      "file_name": "routeros-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 11521916,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-mipsbe.npk",
+      "file_name": "routeros-7.25_ab434-mipsbe.npk"
+    },
+    {
+      "size": 10872935,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-mmips.npk",
+      "file_name": "routeros-7.25_ab434-mmips.npk"
+    },
+    {
+      "size": 22189157,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-ppc.npk",
+      "file_name": "routeros-7.25_ab434-ppc.npk"
+    },
+    {
+      "size": 7241556,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-smips.npk",
+      "file_name": "routeros-7.25_ab434-smips.npk"
+    },
+    {
+      "size": 17036513,
+      "last_modified": "2026-08-13T16:44:39+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434-tile.npk",
+      "file_name": "routeros-7.25_ab434-tile.npk"
+    },
+    {
+      "size": 20927372,
+      "last_modified": "2026-08-13T16:44:45+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-7.25_ab434.npk",
+      "file_name": "routeros-7.25_ab434.npk"
+    },
+    {
+      "size": 20927372,
+      "last_modified": "2026-08-13T16:44:45+00:00",
+      "is_dir": false,
+      "file_path": "/routeros-x86-7.25_ab434.npk",
+      "file_name": "routeros-x86-7.25_ab434.npk"
+    },
+    {
+      "size": 5275793,
+      "last_modified": "2026-08-13T16:40:01+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-mediatek-7.25_ab434-arm.npk",
+      "file_name": "wifi-mediatek-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 3985553,
+      "last_modified": "2026-08-13T16:40:03+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-mediatek-7.25_ab434-arm64.npk",
+      "file_name": "wifi-mediatek-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 10555537,
+      "last_modified": "2026-08-13T16:41:41+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-qcom-7.25_ab434-arm.npk",
+      "file_name": "wifi-qcom-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 11489425,
+      "last_modified": "2026-08-13T16:41:43+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-qcom-7.25_ab434-arm64.npk",
+      "file_name": "wifi-qcom-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 2691217,
+      "last_modified": "2026-08-13T16:42:38+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-qcom-ac-7.25_ab434-arm.npk",
+      "file_name": "wifi-qcom-ac-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 16601233,
+      "last_modified": "2026-08-13T16:39:38+00:00",
+      "is_dir": false,
+      "file_path": "/wifi-qcom-be-7.25_ab434-arm64.npk",
+      "file_name": "wifi-qcom-be-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 1876113,
+      "last_modified": "2026-08-13T16:38:52+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-arm.npk",
+      "file_name": "wireless-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 864401,
+      "last_modified": "2026-08-13T16:38:54+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-arm64.npk",
+      "file_name": "wireless-7.25_ab434-arm64.npk"
+    },
+    {
+      "size": 1413265,
+      "last_modified": "2026-08-13T16:38:57+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-mipsbe.npk",
+      "file_name": "wireless-7.25_ab434-mipsbe.npk"
+    },
+    {
+      "size": 1413265,
+      "last_modified": "2026-08-13T16:38:59+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-mmips.npk",
+      "file_name": "wireless-7.25_ab434-mmips.npk"
+    },
+    {
+      "size": 2781329,
+      "last_modified": "2026-08-13T16:39:01+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-ppc.npk",
+      "file_name": "wireless-7.25_ab434-ppc.npk"
+    },
+    {
+      "size": 675985,
+      "last_modified": "2026-08-13T16:38:58+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-smips.npk",
+      "file_name": "wireless-7.25_ab434-smips.npk"
+    },
+    {
+      "size": 1519761,
+      "last_modified": "2026-08-13T16:38:55+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434-tile.npk",
+      "file_name": "wireless-7.25_ab434-tile.npk"
+    },
+    {
+      "size": 1163409,
+      "last_modified": "2026-08-13T16:38:50+00:00",
+      "is_dir": false,
+      "file_path": "/wireless-7.25_ab434.npk",
+      "file_name": "wireless-7.25_ab434.npk"
+    },
+    {
+      "size": 770193,
+      "last_modified": "2026-08-13T16:35:17+00:00",
+      "is_dir": false,
+      "file_path": "/zerotier-7.25_ab434-arm.npk",
+      "file_name": "zerotier-7.25_ab434-arm.npk"
+    },
+    {
+      "size": 868497,
+      "last_modified": "2026-08-13T16:35:18+00:00",
+      "is_dir": false,
+      "file_path": "/zerotier-7.25_ab434-arm64.npk",
+      "file_name": "zerotier-7.25_ab434-arm64.npk"
+    }
+  ],
+  "_comment": "Real capture from https://box.mikrotik.com/api/v2.1/share-links/5ce46054d5d2487e8755/dirents/?path=/ \u2014 2026-08-13T16:34:29Z \u2192 16:44:45Z, 40 files, 7.25_ab434"
+}
