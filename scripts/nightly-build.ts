@@ -594,6 +594,8 @@ async function main() {
         allArchCount: nightlyNpks.length,
         rejected: nightlyRejected,
       },
+      // Roots nightly can never supply (Box share has no NPKs for these) — see #90 §1.2
+      absentRoots: ["dude", "openflow", "tr069-client", "user-manager"],
     };
     try {
       writeFileSync(join(tmpDir, "nightly.json"), JSON.stringify(nightlyProvenance, null, 2) + "\n");
@@ -666,6 +668,23 @@ async function main() {
           log(`    stat ${a} failed: ${String(e).slice(0, 200)}`);
         }
       }
+      // Stage rest2raml outputs into tmpDir with stable names so the
+      // workflow can collect per-phase artifacts without root collisions.
+      // Each --phase run gets its own tmpDir, so base and extra do not overwrite.
+      try {
+        const inspectSrc = join(repoRootArtifacts, "ros-inspect-all.json");
+        const ramlSrc = join(repoRootArtifacts, "ros-rest-all.raml");
+        if (existsSync(inspectSrc)) {
+          await Bun.write(join(tmpDir, "inspect.json"), Bun.file(inspectSrc));
+          log(`  staged → ${join(tmpDir, "inspect.json")}`);
+        }
+        if (existsSync(ramlSrc)) {
+          await Bun.write(join(tmpDir, "schema.raml"), Bun.file(ramlSrc));
+          log(`  staged → ${join(tmpDir, "schema.raml")}`);
+        }
+      } catch (e) {
+        log(`  stage rest2raml outputs failed: ${String(e).slice(0, 300)}`);
+      }
     }
 
     log(`\n→ running deep-inspect (enrichment) — can take minutes${IS_CROSS_ARCH ? " [longer under TCG]" : ""}`);
@@ -730,6 +749,39 @@ async function main() {
         } catch (e) {
           if (e instanceof Error && e.message.includes("deep-inspect argsTotal")) throw e;
           log(`  argsTotal check failed: ${String(e).slice(0, 300)}`);
+        }
+        // Stage OpenAPI with stable name for publish; deep-inspect already wrote
+        // openapi.<suffix>.json — copy to openapi.json in the same tmpDir.
+        try {
+          const openapiSuffixed = join(tmpDir, `openapi.${outputSuffix}.json`);
+          const openapiStable = join(tmpDir, "openapi.json");
+          if (existsSync(openapiSuffixed) && !existsSync(openapiStable)) {
+            await Bun.write(openapiStable, Bun.file(openapiSuffixed));
+            log(`  staged → ${openapiStable}`);
+          }
+        } catch (e) {
+          log(`  stage openapi failed: ${String(e).slice(0, 300)}`);
+        }
+        // Fetch /app for extra phases (container package present in nightly 5/9 set).
+        // Base phase has no container — skip. On 404/400 skip quietly (pre-7.22).
+        if (PHASE !== "base") {
+          try {
+            const appData: unknown = await chr.rest("/app");
+            if (Array.isArray(appData)) {
+              const dest = join(tmpDir, "app.json");
+              writeFileSync(dest, JSON.stringify(appData, null, 2) + "\n");
+              log(`  /app → ${dest} (${(appData as unknown[]).length} entries)`);
+            } else {
+              log(`  /app returned non-array: ${JSON.stringify(appData).slice(0, 300)}`);
+            }
+          } catch (e) {
+            const msg = String(e);
+            if (msg.includes("404") || msg.includes("400") || msg.includes("Not Found")) {
+              log(`  /app not available on this build (skip): ${msg.slice(0, 300)}`);
+            } else {
+              log(`  /app fetch failed (warn, not fatal): ${msg.slice(0, 500)}`);
+            }
+          }
         }
       }
     }
