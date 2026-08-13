@@ -126,6 +126,7 @@
         },
         "failedPaths": {
           "type": "array",
+          "maxItems": 50,
           "items": { "type": "string" }
         },
         "pathsVisited": {

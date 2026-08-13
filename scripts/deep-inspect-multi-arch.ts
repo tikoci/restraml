@@ -216,8 +216,15 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
   });
 
   const exitCode = await proc.exited;
-  if (exitCode !== 0) {
+  // deep-inspect.ts exits 2 for crawl-stage truncation (writes _meta.crawlStats
+  // before exiting). That is an incomplete artifact — we still want to read
+  // its _meta (so checkAnomalies can surface crawlFailed/census) and run
+  // chr.destroy() before failing. Only truly unexpected exits should throw here.
+  if (exitCode !== 0 && exitCode !== 2) {
     throw new Error(`${arch}: deep-inspect.ts exited with code ${exitCode}`);
+  }
+  if (exitCode === 2) {
+    console.warn(`⚠ ${arch}: deep-inspect.ts exited 2 (crawl incomplete) — reading _meta for diagnostics before cleanup.`);
   }
 
   // Post-crawl load snapshot (best-effort) — informational, not load-bearing.

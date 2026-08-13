@@ -568,12 +568,24 @@ export function setCrawlRequestTimeout(ms: number | undefined) {
  *  in `crawlFailures` (and surfaced in `_meta.crawlStats`) so CI can treat
  *  any failure as a hard error instead of silently shrinking `argsTotal` (#96).
  */
+export interface CrawlFailures {
+  count: number;
+  /** Sample of failed path strings, capped at 50 for _meta.crawlStats.failedPaths. */
+  paths: string[];
+}
+
+export function recordCrawlFailure(failures: CrawlFailures | undefined, path: string): void {
+  if (!failures) return;
+  failures.count++;
+  if (failures.paths.length < 50) failures.paths.push(path);
+}
+
 export async function crawlInspectTree(
   client: IRouterOSClient,
   rpath: string[] = [],
   skipPaths: Set<string> = new Set(CRASH_PATHS as unknown as string[]),
   _depth = 0,
-  crawlFailures?: string[],
+  crawlFailures?: CrawlFailures,
 ): Promise<InspectNode> {
   const memo: InspectNode = {};
   const signal = CRAWL_REQUEST_TIMEOUT_MS ? AbortSignal.timeout(CRAWL_REQUEST_TIMEOUT_MS) : undefined;
@@ -582,10 +594,7 @@ export async function crawlInspectTree(
     children = await client.fetchChild(rpath, signal);
   } catch (err) {
     const pathStr = `/${rpath.join("/")}` || "/";
-    if (crawlFailures) {
-      if (crawlFailures.length < 50) crawlFailures.push(pathStr);
-      // count overflow beyond 50 as extra without storing each string
-    }
+    recordCrawlFailure(crawlFailures, pathStr);
     console.error(`  ⚠ fetchChild failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
     return memo;
   }
@@ -622,7 +631,7 @@ export async function crawlInspectTree(
       Object.assign(node, childTree);
     } catch (err) {
       const pathStr = `/${newpath.join("/")}`;
-      if (crawlFailures && crawlFailures.length < 50) crawlFailures.push(pathStr);
+      recordCrawlFailure(crawlFailures, pathStr);
       console.error(`  ⚠ crawl failed for ${pathStr}: ${err instanceof Error ? err.message : err}`);
     }
   }
@@ -1316,7 +1325,7 @@ async function main() {
   // Load or crawl the inspect tree
   let inspectTree: InspectNode;
   let version = "unknown";
-  const crawlFailures: string[] = [];
+  const crawlFailures: CrawlFailures = { count: 0, paths: [] };
 
   if (opts.live) {
     if (!client) {
@@ -1339,9 +1348,12 @@ async function main() {
     }
 
     inspectTree = await crawlInspectTree(client, pathArgs, skipPaths, 0, crawlFailures);
-    if (crawlFailures.length > 0) {
-      console.error(`\n⚠ Crawl had ${crawlFailures.length} fetchChild failure(s) — subtrees were dropped:`);
-      for (const p of crawlFailures) console.error(`    ${p}`);
+    if (crawlFailures.count > 0) {
+      console.error(`\n⚠ Crawl had ${crawlFailures.count} fetchChild failure(s) — subtrees were dropped:`);
+      for (const p of crawlFailures.paths) console.error(`    ${p}`);
+      if (crawlFailures.count > crawlFailures.paths.length) {
+        console.error(`    ...and ${crawlFailures.count - crawlFailures.paths.length} more (capped at 50 sampled)`);
+      }
       console.error("  → _meta.crawlStats records this. Treat as a failed crawl (#96).");
     }
   } else if (opts.inspectFile) {
@@ -1424,10 +1436,10 @@ async function main() {
     crashPathsCrashed: crashPathResults.filter((r) => !r.safe).map((r) => r.path),
     completionStats,
     // Crawl-stage failures: previously silent shrinkage of argsTotal is now
-    // visible and checked by CI/orchestrator. Empty array = healthy crawl.
+    // visible and checked by CI/orchestrator. Empty = healthy crawl.
     crawlStats: {
-      pathsFailed: crawlFailures.length,
-      failedPaths: crawlFailures.slice(0, 50),
+      pathsFailed: crawlFailures.count,
+      failedPaths: crawlFailures.paths.slice(0, 50),
     },
     census,
   };
@@ -1470,8 +1482,11 @@ async function main() {
   // Fail loudly on crawl-stage truncation (#96) — a dropped subtree must
   // not be mistaken for a small upstream delta. The written _meta.crawlStats
   // preserves diagnostics for the artifact.
-  if (crawlFailures.length > 0) {
-    console.error(`\n✗ Crawl incomplete: ${crawlFailures.length} path(s) failed (see _meta.crawlStats.failedPaths).`);
+  if (crawlFailures.count > 0) {
+    console.error(`\n✗ Crawl incomplete: ${crawlFailures.count} path(s) failed (see _meta.crawlStats.failedPaths).`);
+    if (crawlFailures.paths.length > 0) {
+      console.error(`  Sample: ${crawlFailures.paths.slice(0, 5).join(", ")}${crawlFailures.count > 5 ? " …" : ""}`);
+    }
     console.error("  → NOT a schema delta — investigate REST/timeout/harness before merging.");
     process.exit(2);
   }
