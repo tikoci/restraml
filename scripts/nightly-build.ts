@@ -180,6 +180,13 @@ function formatBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MiB`;
 }
 
+export function isSafeNpkFilename(file: string): boolean {
+  // Guard Box-derived file names before they reach the file system.
+  // Reject path separators, traversal segments, and anything outside the
+  // expected NPK basename charset; empty and wrong-extension values fail the regex.
+  return !file.includes("/") && !file.includes("\\") && !file.includes("..") && /^[A-Za-z0-9._-]+\.npk$/.test(file);
+}
+
 // ── Nightly discovery (arch-aware) ───────────────────────────────────────────
 
 export function filterNpksByArch(files: string[], nightlyVer: string, arch: Arch): string[] {
@@ -337,6 +344,9 @@ async function downloadNpks(files: string[], dir: string, token: string) {
   mkdirSync(dir, { recursive: true });
   log(`→ downloading ${files.length} NPKs to ${dir}`);
   for (const file of files) {
+    if (!isSafeNpkFilename(file)) {
+      fail(`Refusing to download unsafe file name "${file}"`);
+    }
     const url = boxDlUrl(token, file);
     const dest = join(dir, file);
     if (existsSync(dest)) {
@@ -621,7 +631,10 @@ async function main() {
       // Roots nightly can never supply (Box share has no NPKs for these) — see #90 §1.2
       absentRoots: ["dude", "openflow", "tr069-client", "user-manager"],
     };
+    // Validate network-derived nightlyVer before writing provenance (sanitizer for CodeQL)
+    if (!parseAb(nightlyVer)) fail(`Invalid nightly version "${nightlyVer}" for provenance`);
     try {
+      // lgtm[js/http-to-file-access] -- nightlyVer is validated Box metadata (parseAb); only nightly.json basename is fixed, parent directory is from configured --output-dir / mkdtemp
       writeFileSync(join(tmpDir, "nightly.json"), JSON.stringify(nightlyProvenance, null, 2) + "\n");
       log(`  provenance → ${join(tmpDir, "nightly.json")}`);
     } catch (e) {

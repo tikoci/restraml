@@ -634,8 +634,10 @@
                 : `Every release note section after ${range.older} up to ${range.newer}, so the API diff has human upgrade context.`
         }
 
-        function getChangelogVersionsInRange(range) {
-            // Use shared helper which always excludes synthetic nightly (no CHANGELOG on download.mikrotik.com)
+        function getDiffChangelogVersionsInRange(range) {
+            // Delegate to shared helper which always excludes synthetic nightly (no CHANGELOG on download.mikrotik.com)
+            // Use window.* to reach the shared implementation from restraml-shared.js;
+            // this wrapper is named differently to avoid shadowing that global.
             if (typeof window.getChangelogVersionsInRange === 'function') {
                 // Shared helper is available (N5) — it already excludes nightly
                 return window.getChangelogVersionsInRange(range, _diffVersions, _diffShowAll)
@@ -716,9 +718,10 @@
             }
         }
 
-        async function fetchChangelogSectionsForVersion(version) {
+        async function fetchDiffChangelogSectionsForVersion(version) {
             if (isNightly(version)) {
                 // Synthetic section from nightly.json — shared helper handles caching
+                // Use window.* to reach the shared implementation; this wrapper is renamed to avoid shadowing it.
                 if (typeof window.fetchChangelogSectionsForVersion === 'function') {
                     return window.fetchChangelogSectionsForVersion(version)
                 }
@@ -772,7 +775,7 @@
             changelogRangeCount.textContent = ''
 
             try {
-                const versions = getChangelogVersionsInRange(range)
+                const versions = getDiffChangelogVersionsInRange(range)
                 // Synthetic nightly section when the range touches the nightly slot
                 let nightlySections = []
                 if (isNightly(range.newer) || isNightly(range.older)) {
@@ -784,7 +787,7 @@
                 }
                 const sectionGroups = await Promise.all(
                     versions.map(async version => {
-                        const sections = await fetchChangelogSectionsForVersion(version)
+                        const sections = await fetchDiffChangelogSectionsForVersion(version)
                         const matchingSections = sections.filter(section => section.version === version)
                         const selectedSections = matchingSections.length > 0
                             ? matchingSections
