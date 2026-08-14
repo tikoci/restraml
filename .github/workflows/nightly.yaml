@@ -131,7 +131,16 @@ jobs:
     needs: discover
     if: needs.discover.outputs.changed == 'true' && needs.discover.outputs.nightly_version != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 55 min, not 40: this job is the long pole because it runs two phases
+    # (base then extra) on one runner. First green run (7.25_ab434, run
+    # 31743491114) took 30.2 min, leaving under 10 min of headroom. The
+    # realistic way that gets eaten is a slow MikroTik CDN day on the stable
+    # CHR image: the download is paid once per cold runner (70 s observed —
+    # phase 1 booted in 95.9 s, phase 2 in 24.2 s from quickchr's image cache),
+    # so a bad CDN day inflates the one leg the job cannot skip. Extra budget
+    # is free on a job that normally finishes early; a timeout here costs a
+    # whole nightly. arm64 stays at 60 (used 21.7 min).
+    timeout-minutes: 55
     permissions:
       contents: read
     # No MIKROTIK_* license secrets here: quickchr only licenses when passed

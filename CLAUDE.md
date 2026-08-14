@@ -1004,6 +1004,19 @@ Rules that are easy to get wrong:
   fails the install outright. To iterate against a local quickchr working copy, use
   `bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
   dependency to `package.json`.
+- **The slot keeps `openapi.json` and `schema.raml`.** They are ~27 MB of the ~35 MB base slot, so
+  dropping them was considered for storage — but `docs/openapi.html` is a live consumer of the
+  slot's `openapi.json` (`openapi.html?version=nightly&nightly=true` loads it), and `schema.raml`
+  stays for parity with every versioned build. Consecutive `ab` builds are near-identical, so the single-slot git delta
+  is small (~4.5 MiB of objects for the first ~85 MB publish). If RAML generation is ever retired
+  repo-wide, the nightly slot follows that decision — it is not a nightly-specific call.
+- **`/app` is validated offline against the root `*.latest.json`**, never per-version. Minting
+  `docs/nightly/routeros-app-yaml-schema.json` would create a stable `$id` URL whose content
+  changes daily, breaking schema identity and editor caching. The validation step runs in
+  `publish-nightly` *after* `nightly.json` is aggregated (so the filed issue embeds real
+  provenance) and is `continue-on-error` — a drift issue is the early-warning signal for the next
+  beta/RC promotion, not a publish gate. `app.json` publishes either way as the debuggable raw
+  artifact.
 
 ### `auto.yaml` — `skip_versions` Input
 
