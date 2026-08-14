@@ -527,6 +527,7 @@ jobs:
 
       - name: Create GitHub issue for nightly /app validation failures
         if: steps.validate-nightly-app.outputs.exit_code == '2'
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           APP_YAML_FAILURES_FILE: ${{ runner.temp }}/app-yaml-failures-nightly.txt
@@ -576,14 +577,21 @@ jobs:
               `[View run logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
             ].join('\n')
 
-            // Idempotency: avoid duplicate issues on reruns of the same nightly version
+            // Idempotency: avoid duplicate issues on reruns of the same nightly version.
+            // Use listForRepo + local title match instead of search (immune to
+            // search-index lag and fragile query quoting for titles with \`:\`, \`/app\`, \`(vs latest)\`).
             let existingIssue = null
             try {
-              const q = `repo:${context.repo.owner}/${context.repo.repo} "${title}" in:title is:open`
-              const search = await github.rest.search.issuesAndPullRequests({ q })
-              if (search.data.total_count > 0) existingIssue = search.data.items[0]
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'nightly,app-yaml-schema',
+                per_page: 100
+              })
+              existingIssue = openIssues.find(i => i.title === title) || null
             } catch (e) {
-              console.log(`Search failed, falling back to create: ${e.message}`)
+              console.log(`List failed, falling back to create: ${e.message}`)
             }
 
             if (existingIssue) {

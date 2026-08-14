@@ -158,8 +158,8 @@ async function main() {
 
   const version = assertSafeVersion(versionArg)
 
-  // Allow --app-json to point anywhere; validate that the path stays readable.
-  // No path-traversal guard needed beyond existence check — it is a read, not a write.
+  // --app-json is a read-only input; existence/readability is checked via
+  // the try/catch around fs.readFileSync when the file is loaded (L296).
 
   // --- Load base schemas ---
   const singleSchema = JSON.parse(fs.readFileSync(SINGLE_SCHEMA_PATH, "utf8"))
