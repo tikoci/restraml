@@ -636,7 +636,7 @@
 
         function getChangelogVersionsInRange(range) {
             // Use shared helper which always excludes synthetic nightly (no CHANGELOG on download.mikrotik.com)
-            if (typeof window.getChangelogVersionsInRange === 'function' && window.getChangelogVersionsInRange.length === 3) {
+            if (typeof window.getChangelogVersionsInRange === 'function') {
                 // Shared helper is available (N5) — it already excludes nightly
                 return window.getChangelogVersionsInRange(range, _diffVersions, _diffShowAll)
             }
@@ -722,7 +722,8 @@
                 if (typeof window.fetchChangelogSectionsForVersion === 'function') {
                     return window.fetchChangelogSectionsForVersion(version)
                 }
-                const nightlyData = getCachedNightlyJson() || await fetchNightlyJson()
+                const cached = getCachedNightlyJson()
+                const nightlyData = (cached && !cached._partial) ? cached : await fetchNightlyJson()
                 if (nightlyData) return createNightlySyntheticSections(nightlyData)
                 return [{
                     version: 'nightly',
@@ -776,7 +777,8 @@
                 let nightlySections = []
                 if (isNightly(range.newer) || isNightly(range.older)) {
                     try {
-                        const nightlyData = getCachedNightlyJson() || await fetchNightlyJson()
+                        const cached = getCachedNightlyJson()
+                        const nightlyData = (cached && !cached._partial) ? cached : await fetchNightlyJson()
                         if (nightlyData) nightlySections = createNightlySyntheticSections(nightlyData)
                     } catch (e) { console.warn('Failed to load nightly synthetic changelog', e) }
                 }
@@ -796,7 +798,7 @@
                 )
 
                 const flattenedSections = [...nightlySections, ...sectionGroups.flat()]
-                if (!flattenedSections.length && versions.length === 0 && nightlySections.length === 0) {
+                if (!flattenedSections.length && versions.length === 0) {
                     throw new Error(`No built RouterOS versions found between ${range.older} and ${range.newer}`)
                 }
 

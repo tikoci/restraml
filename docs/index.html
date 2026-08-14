@@ -536,7 +536,10 @@
                             row.style.display = _schemaShowNightly ? '' : 'none'
                         }
                     })
-                    // Also refresh diff dropdowns so nightly appears there
+                    // Sync the diff nightly toggle so nightly appears in the dropdowns
+                    _diffShowNightly = _schemaShowNightly
+                    const diffNightly = document.getElementById('diffShowNightly')
+                    if (diffNightly) diffNightly.checked = _diffShowNightly
                     rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
                     rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
                     writeQueryParams()
@@ -645,7 +648,7 @@
             if (compare2.value) params.set('compare2', compare2.value)
             if (!diffextra.checked) params.set('extra', 'false')
             if (_diffShowAll) params.set('testing', 'true')
-            if (_diffShowNightly) params.set('nightly', 'true')
+            if (_diffShowNightly || _schemaShowNightly) params.set('nightly', 'true')
             const qs = params.toString()
             history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
         }
@@ -857,26 +860,23 @@
                 required: ['version'],
             },
             execute: async ({ version, query }) => {
-                // Nightly: synthetic section from nightly.json
+                // Nightly: synthetic section from nightly.json via shared helper
                 if (isNightly(version)) {
                     try {
-                        const nightlyData = getCachedNightlyJson() || await fetchNightlyJson()
-                        if (nightlyData) {
-                            const sections = createNightlySyntheticSections(nightlyData)
-                            const q = query ? query.toLowerCase() : ''
-                            const allEntries = sections.flatMap(s => s.entries)
-                            const filtered = q ? allEntries.filter(e => e.raw.toLowerCase().includes(q) || e.subsystem.toLowerCase().includes(q) || e.text.toLowerCase().includes(q)) : allEntries
-                            return JSON.stringify({
-                                version,
-                                releaseDate: nightlyData.builtAt,
-                                nightlyVersion: nightlyData.nightlyVersion,
-                                entries: filtered.map(e => ({ subsystem: e.subsystem, text: e.text, important: e.important })),
-                                totalEntries: allEntries.length,
-                                matchedEntries: filtered.length,
-                                source: 'https://mt.lv/nightly-build',
-                            })
-                        }
-                        return JSON.stringify({ error: 'Nightly not yet published', fallbackUrl: 'https://mt.lv/nightly-build' })
+                        const sections = await fetchChangelogSectionsForVersion(version)
+                        const nightlyData = getCachedNightlyJson()
+                        const q = query ? query.toLowerCase() : ''
+                        const allEntries = sections.flatMap(s => s.entries)
+                        const filtered = q ? allEntries.filter(e => e.raw.toLowerCase().includes(q) || e.subsystem.toLowerCase().includes(q) || e.text.toLowerCase().includes(q)) : allEntries
+                        return JSON.stringify({
+                            version,
+                            releaseDate: nightlyData?.builtAt || null,
+                            nightlyVersion: nightlyData?.nightlyVersion || null,
+                            entries: filtered.map(e => ({ subsystem: e.subsystem, text: e.text, important: e.important })),
+                            totalEntries: allEntries.length,
+                            matchedEntries: filtered.length,
+                            source: 'https://mt.lv/nightly-build',
+                        })
                     } catch (e) {
                         return JSON.stringify({ error: e.message, fallbackUrl: 'https://mt.lv/nightly-build' })
                     }

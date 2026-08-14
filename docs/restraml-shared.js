@@ -233,9 +233,10 @@ function getChangelogUrl(version) {
  */
 function fetchNightlyJson() {
     if (_nightlyJsonPromise) return _nightlyJsonPromise
-    _nightlyJsonPromise = _fetchNightlyJsonInner()
-    _nightlyJsonPromise.finally(() => { _nightlyJsonPromise = null })
-    return _nightlyJsonPromise
+    const p = _fetchNightlyJsonInner()
+    _nightlyJsonPromise = p
+    p.finally(() => { if (_nightlyJsonPromise === p) _nightlyJsonPromise = null }).catch(() => {})
+    return p
 }
 
 function _fetchNightlyJsonInner() {
@@ -356,8 +357,10 @@ function createNightlySyntheticSections(nightlyData) {
             text: `extra/ is partial — absent roots ${absent.join(', ')} have no nightly NPKs on Box, so diff vs release extra shows them as "removed"`,
         })
     }
+    const boxToken = nightlyData.source?.token
+    const boxUrl = boxToken ? ` → https://box.mikrotik.com/d/${boxToken}/` : ''
     entries.push({
-        raw: `*) source - Box share https://mt.lv/nightly-build → https://box.mikrotik.com/d/${nightlyData.source?.token || '5ce46054d5d2487e8755'}/`,
+        raw: `*) source - Box share https://mt.lv/nightly-build${boxUrl}`,
         important: false,
         secure: false,
         subsystem: 'source',
@@ -443,7 +446,7 @@ function renderChangelogSections(sections, query, contentEl, itemCountEl) {
  */
 async function fetchChangelogSectionsForVersion(version) {
     if (isNightly(version)) {
-        const nightlyData = _nightlyJsonData || await fetchNightlyJson()
+        const nightlyData = (_nightlyJsonData && !_nightlyJsonData._partial) ? _nightlyJsonData : await fetchNightlyJson()
         if (nightlyData) return createNightlySyntheticSections(nightlyData)
         // Fallback synthetic when nightly.json hasn't been fetched yet
         return [{
@@ -553,10 +556,12 @@ function _fetchVersionListInner() {
             if (data.nightly && typeof data.nightly.nightlyVersion === 'string') {
                 // Seed _nightlyJsonData with the minimal nightly fields so badge
                 // can render even before nightly.json is fetched.
+                // Marked _partial so consumers that need full provenance still fetch nightly.json.
                 if (!_nightlyJsonData) {
                     _nightlyJsonData = {
                         nightlyVersion: data.nightly.nightlyVersion,
                         builtAt: data.nightly.builtAt,
+                        _partial: true,
                     }
                 }
             }
@@ -859,7 +864,7 @@ function initChangelogModal(opts) {
     searchEl.addEventListener('input', () => {
         if (_rawText) renderChangelogContent(_rawText, _version, searchEl.value.trim(), contentEl, itemCountEl)
         // For nightly synthetic sections we re-render via sections
-        if (!_rawText && _version === 'nightly' && _nightlyJsonData) {
+        if (!_rawText && isNightly(_version) && _nightlyJsonData) {
             const sections = createNightlySyntheticSections(_nightlyJsonData)
             renderChangelogSections(sections, searchEl.value.trim(), contentEl, itemCountEl)
         }
@@ -908,7 +913,7 @@ function initChangelogModal(opts) {
         // Nightly: synthetic section from nightly.json (no 404)
         if (isNightlyVersion) {
             try {
-                const nightlyData = _nightlyJsonData || await fetchNightlyJson()
+                const nightlyData = (_nightlyJsonData && !_nightlyJsonData._partial) ? _nightlyJsonData : await fetchNightlyJson()
                 if (nightlyData) {
                     // Update title/subtitle with fresh nightly data
                     titleEl.textContent = `RouterOS nightly (${nightlyData.nightlyVersion}) — Release Notes`

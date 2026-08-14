@@ -262,8 +262,8 @@
                     <mark>include testing</mark> adds beta and RC builds to the version list
                     and automatically enables all-version scanning.
                     <mark>include nightly</mark> shows the single overwritten slot
-                    <code>nightly (7.25_ab434)</code> from
-                    <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — badge includes age; its
+                    <code>nightly</code> from
+                    <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — badge includes version and age; its
                     <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc., see <code>nightly.json</code>).
                 </p>
             </article>
@@ -404,7 +404,7 @@
             allVersions.forEach(name => {
                 const show = shouldShowVersion(name, showTesting, showNightly)
                 if (show) {
-                    const label = formatVersionLabel(name)
+                    const label = formatVersionLabelWithAge(name)
                     versionSelect.appendChild(new Option(label, name))
                 }
             })
@@ -437,7 +437,10 @@
             if (files.some(file => file.name === 'deep-inspect.json')) {
                 return 'deep-inspect.json'
             }
-            // Nightly extra stores per-arch deep-inspect files (deep-inspect.x86.json etc.)
+            // Nightly extra stores per-arch deep-inspect files; prefer x86 (canonical) when both exist,
+            // otherwise fall back to any variant (e.g. arm64). Do not rely on manifest order.
+            const x86Variant = files.find(file => file.name === 'deep-inspect.x86.json')
+            if (x86Variant) return x86Variant.name
             const deepInspectVariant = files.find(file => file.name.startsWith('deep-inspect.') && file.name.endsWith('.json'))
             if (deepInspectVariant) return deepInspectVariant.name
             return 'inspect.json'
@@ -641,7 +644,7 @@
             const tdVer = document.createElement('td')
             const link = document.createElement('a')
             link.href = getChangelogUrl(ver)
-            link.textContent = formatVersionLabel(ver)
+            link.textContent = formatVersionLabelWithAge(ver)
             link.dataset.changelogVersion = ver
             if (result.sourceFile) {
                 link.title = `Lookup used ${result.sourceFile}`
@@ -776,7 +779,7 @@
                 // Single version
                 const ver = versionsToCheck[0]
                 const verb = foundCount > 0 ? 'Found' : 'Not found'
-                const verLabel = formatVersionLabel(ver)
+                const verLabel = formatVersionLabelWithAge(ver)
                 summary = `<p>${verb} in <strong>${verLabel}</strong> (${schemaLabel} schema) &mdash; ` +
                     `<code>${normalizedPath}</code>${attrPart}</p>`
             } else {
