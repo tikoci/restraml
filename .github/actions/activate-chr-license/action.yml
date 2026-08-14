@@ -1,0 +1,176 @@
+name: Activate CHR trial license
+description: >
+  Apply a p1 trial license to a running CHR, detect real failures in the response
+  body, and raise a standing GitHub issue when licensing degrades to free tier.
+
+# Why this is not a bare curl: POST /rest/system/license/renew answers HTTP 200
+# for BOTH outcomes. The body is a progress array whose last element carries the
+# verdict:
+#   success  [... {".section":"5","status":"done"}]
+#   failure  [... {".section":"5","status":"ERROR: Licensing Error: too many trial licences"}]
+# The previous inline `curl ... && echo "License activated"` therefore reported
+# success on every run, including the ones that were actually running free-tier
+# at 1 Mbit/s. Parse the body, never the exit code.
+#
+# Degradation is never fatal: a free-tier CHR produces a CORRECT crawl, just a
+# slower one. It is a cost/latency signal, not a correctness one.
+
+inputs:
+  account:
+    description: MikroTik web account. Step no-ops when empty.
+    required: false
+    default: ""
+  password:
+    description: MikroTik web account password.
+    required: false
+    default: ""
+  rest-url:
+    description: Base REST URL of the running CHR.
+    required: false
+    default: http://admin:@localhost:9180/rest
+  level:
+    description: License level to request.
+    required: false
+    default: p1
+  timeout:
+    description: curl timeout in seconds. Raise this for TCG-emulated guests.
+    required: false
+    default: "10"
+  arch:
+    description: Architecture label, used only in log and issue text.
+    required: true
+  github-token:
+    description: Token used to raise the standing degradation issue. Empty disables issue filing.
+    required: false
+    default: ""
+
+outputs:
+  degraded:
+    description: Empty when the license applied; otherwise the reason reported by RouterOS.
+    value: ${{ steps.renew.outputs.degraded }}
+
+runs:
+  using: composite
+  steps:
+    - name: Renew CHR license
+      id: renew
+      shell: bash
+      env:
+        MT_ACCOUNT: ${{ inputs.account }}
+        MT_PASSWORD: ${{ inputs.password }}
+        REST_URL: ${{ inputs.rest-url }}
+        LEVEL: ${{ inputs.level }}
+        CURL_TIMEOUT: ${{ inputs.timeout }}
+        ARCH: ${{ inputs.arch }}
+      run: |
+        set -uo pipefail
+
+        if [ -z "$MT_ACCOUNT" ]; then
+          echo "No MikroTik account configured — running free tier (1 Mbit/s)."
+          echo "degraded=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        RESP=$(curl -sS -m "$CURL_TIMEOUT" -X POST "${REST_URL}/system/license/renew" \
+          -H 'Content-Type: application/json' \
+          -d "$(jq -nc --arg a "$MT_ACCOUNT" --arg p "$MT_PASSWORD" --arg l "$LEVEL" \
+                '{account:$a,password:$p,level:$l}')" 2>/dev/null) || RESP=""
+
+        # Last progress row carries the verdict; tolerate a bare object too.
+        STATUS=$(printf '%s' "$RESP" | jq -r '
+          if type == "array" and length > 0 then (.[-1].status // "")
+          elif type == "object" then (.status // "")
+          else "" end' 2>/dev/null) || STATUS=""
+
+        if [ "$STATUS" = "done" ]; then
+          echo "✓ License activated (${LEVEL} trial) on ${ARCH}."
+          echo "degraded=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        REASON="${STATUS:-no usable response from /system/license/renew}"
+        echo "::warning::${ARCH}: license activation failed (${REASON}) — continuing at free tier (1 Mbit/s). Output stays correct, enrichment is slower."
+        {
+          echo "### ⚠ ${ARCH}: CHR licensing degraded to free tier"
+          echo ""
+          echo "\`${REASON}\`"
+          echo ""
+          echo "The crawl is still correct — only slower (1 Mbit/s)."
+        } >> "$GITHUB_STEP_SUMMARY"
+        echo "degraded=${REASON}" >> "$GITHUB_OUTPUT"
+
+    - name: Raise standing licensing issue
+      if: steps.renew.outputs.degraded != '' && inputs.github-token != ''
+      continue-on-error: true
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+      env:
+        DEGRADED_REASON: ${{ steps.renew.outputs.degraded }}
+        ARCH: ${{ inputs.arch }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          // Deliberately create-if-absent WITHOUT commenting on reruns. Unlike the
+          // nightly /app failures — which are version-specific and episodic — an
+          // exhausted trial pool is a persistent condition, so a daily comment would
+          // be pure noise. The open issue is the standing signal; per-run detail
+          // lives in the job summary. Both arch jobs may reach here: the first
+          // creates, the rest find it and skip.
+          const title = 'deep-inspect multi-arch: CHR trial licensing degraded to free tier'
+          const reason = process.env.DEGRADED_REASON || '(unknown)'
+          const arch = process.env.ARCH || 'unknown'
+          const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+
+          let existing = null
+          try {
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci,licensing',
+              per_page: 100,
+            })
+            existing = open.find(i => i.title === title) || null
+          } catch (e) {
+            console.log(`List failed, falling back to create: ${e.message}`)
+          }
+
+          if (existing) {
+            console.log(`Standing issue #${existing.number} already open — not commenting (persistent condition).`)
+            return
+          }
+
+          const body = [
+            `## CHR trial licensing is degrading to free tier`,
+            '',
+            `\`deep-inspect-multi-arch.yaml\` could not apply a **p1** trial license. RouterOS reported:`,
+            '',
+            '```',
+            reason,
+            '```',
+            '',
+            `First observed on the **${arch}** job in [this run](${runUrl}).`,
+            '',
+            '### Impact',
+            '',
+            'Builds still produce **correct** output — a free-tier CHR is throttled to 1 Mbit/s,',
+            'so enrichment is slower and timing baselines in `docs/deep-inspect.md` no longer',
+            'compare like-for-like. This is a cost/latency signal, not a correctness one, and it',
+            'is deliberately **not** a build failure.',
+            '',
+            '### To resolve',
+            '',
+            '- Point `MIKROTIK_ACCOUNT` / `MIKROTIK_PASSWORD` at an account with trials available, or',
+            '- accept free-tier runs and close this issue.',
+            '',
+            'This issue is raised once and left open as a standing signal — reruns do **not**',
+            'add comments. Per-run detail is in each job summary.',
+          ].join('\n')
+
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title,
+            body,
+            labels: ['ci', 'licensing'],
+          })
+          console.log(`Created standing licensing issue (first seen on ${arch}).`)

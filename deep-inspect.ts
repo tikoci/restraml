@@ -1120,6 +1120,7 @@ interface CliOptions {
   apiHost?: string;
   apiPort: number;
   requestTimeout?: number;
+  requireRoots: string[];
 }
 
 function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
@@ -1141,6 +1142,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       "api-host": { type: "string" },
       "api-port": { type: "string", default: "8728" },
       "request-timeout": { type: "string" },
+      "require-roots": { type: "string" },
     },
     strict: true,
     allowPositionals: true,
@@ -1186,6 +1188,13 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
 
   const requestTimeoutParsed = validatePositiveInteger(values["request-timeout"], "request-timeout", 1);
 
+  // Comma-separated top-level roots that MUST appear in the census. Leading
+  // slashes are tolerated so `--require-roots /container,/iot` also works.
+  const requireRoots = (values["require-roots"] ?? "")
+    .split(",")
+    .map((r) => r.trim().replace(/^\/+/, ""))
+    .filter((r) => r.length > 0);
+
   const [, , ...pathArgs] = positionals;
 
   return {
@@ -1205,6 +1214,7 @@ function parseCliArgs(): { opts: CliOptions; pathArgs: string[] } {
       apiHost: values["api-host"],
       apiPort,
       requestTimeout: requestTimeoutParsed,
+      requireRoots,
     },
     pathArgs,
   };
@@ -1228,6 +1238,11 @@ Options:
   --skip-completion       Skip completion data fetching
   --test-crash-paths      Test CRASH_PATHS for safety (requires live router)
   --request-timeout <ms>  Per-request timeout in ms (e.g. 120000 for slow TCG emulation)
+  --require-roots <list>  Comma-separated top-level roots that must exist in the
+                          census, e.g. "container,iot,dude". Exits 2 naming any
+                          that are missing — catches packages that installed but
+                          never activated (#96). Only pass this when those
+                          packages are expected to be present.
   --transport <mode>      Transport: rest (default), auto, or native
   --api-host <host>       Native API host (default: derived from URLBASE)
   --api-port <port>       Native API port (default: 8728)
@@ -1387,6 +1402,22 @@ async function main() {
     const top3 = Object.entries(census).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([k, v]) => `/${k}=${v}`).join(", ");
     console.log(`Census (top roots): ${top3 || "<empty>"}`);
+  }
+
+  // --require-roots is the gate that catches "packages installed but never
+  // activated" (#96) at its source. A package whose menu never appears leaves a
+  // census key missing, while /system/package still counts it and argsTotal only
+  // sags — so a package-count gate passes and the argsTotal floor fires
+  // thousands of args late, naming nothing. Fail here instead, before enrichment
+  // spends minutes on a tree that is already known-incomplete.
+  const missingRoots = opts.requireRoots.filter((r) => !census[r]);
+  if (missingRoots.length > 0) {
+    console.error(`\n✗ Required root(s) missing from the crawled tree: ${missingRoots.map((r) => `/${r}`).join(" ")}`);
+    console.error("  → Package menus are absent. The usual cause is packages that are installed");
+    console.error("    but never activated — verify the post-upload reboot actually happened (#96).");
+    console.error("  → NOT a schema delta. Do not lower the requirement to make this pass.");
+    console.error(`\n  Census (${Object.keys(census).length} roots): ${Object.keys(census).sort().map((k) => `/${k}`).join(" ")}`);
+    process.exit(2);
   }
 
   // Test CRASH_PATHS (if requested and not already done in --live mode)

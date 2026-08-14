@@ -172,7 +172,10 @@ default, resolved the failures.
 1. RAM: 256 MB to 1024 MB.
 2. Prefer KVM with TCG fallback instead of KVM-or-bust.
 3. Adaptive timeouts: curl 3s/15s, sleep 5s/10s, boot 120s/300s based on KVM/TCG.
-4. Package install via REST `/execute`, avoiding SCP so both KVM and TCG paths work.
+4. ~~Package install via REST `/execute`, avoiding SCP so both KVM and TCG paths
+   work.~~
+   **Reverted in August 2026 — see the #96 postmortem below.** SCP was never the
+   problem, this change was unnecessary, and it later broke the job for three weeks.
 5. `--request-timeout` of 30s for KVM and 120s for TCG deep-inspect calls.
 
 ### CI anti-patterns learned
@@ -192,7 +195,63 @@ must see them before changing workflows.
    crawl is not `--inspect-file`, `--skip-completion`, or deriving ARM64 output
    from x86.
 6. **Give extra-package jobs enough RAM.** Use 1024 MB for any job that installs
-   all packages.
+   all packages. Note quickchr only defaults to 1024 MB for *cross-arch*
+   emulation; an arm64 guest on a native arm64 runner gets 512 MB, so pass
+   `mem: 1024` explicitly.
+
+## ARM64 package-activation postmortem (#96, August 2026)
+
+The arm64 job failed every run from 2026-07-28 to 2026-08-14 at
+`argsTotal < 30000`, blocking publication of 7.24rc3, 7.23.3 and 7.24rc4.
+
+**Root cause:** the package-activation reboot stopped happening. The signal is a
+line that stops appearing in the `Wait for package activation reboot` step:
+
+| Run | Version | Down-detected | `argsTotal` |
+|---|---|---|---|
+| 30334675878 | 7.24rc2 | `REST went down after 21s.` | 36,793 |
+| 31670987516 | 7.24rc4 | *(none — loop exhausted)* | 28,748 |
+| 31763454996 | 7.23.3 | *(none — loop exhausted)* | short |
+
+Without the reboot the packages stay installed-but-inactive, so `/app`,
+`/caps-man`, `/container`, `/dude`, `/iot`, `/openflow`, `/tr069-client` and
+`/user-manager` never enter the tree — the entire ~8,000-arg shortfall.
+
+**Why it stopped:** the job depended on `/system/package/apply-changes` to
+trigger the reboot, dispatched fire-and-forget through `POST /rest/execute`.
+MikroTik's Packages manual documents `apply-changes` as prompting
+(`Apply scheduled changes and reboot device? [y/N]:`), defaulting to no. The
+workflow file itself was unchanged since May, so this is drift against an
+unchanged fragile script, not a regression we introduced. Also confirmed *not*:
+licensing (7.23.3 failed with a valid fresh trial), the crawl
+(`fetchChild failed for` appears 0x, `argsFailed: 0`), TCG (the last green run
+was also TCG), and upstream RouterOS (local quickchr arm64 at 7.24rc4 is
+identical to 7.24rc2 — 36,793 args, 0 path delta).
+
+**Why the mechanism existed at all:** it was collateral damage. Commit `6e1dd58`
+swapped SCP for `/rest/execute` mid-debugging and deleted the explicit
+`POST /system/reboot` in the same change. SCP was never the failing step — in the
+SCP-era run 24553141540 the steps read `Install extra packages via SCP: success`,
+`Reboot CHR and wait for extra packages: failure`, and that failure was fixed
+three commits later by `7052106` (RAM). The fork survived unvalidated for four
+months.
+
+**Fix:** both arches now use one mechanism — `all_packages-<arch>` zip, SCP to
+flash root, explicit `POST /system/reboot`.
+
+**Why no gate caught it:** the `>=10 packages` check counted 19 *inactive*
+packages and passed; `/system/package` lists packages regardless of activation.
+The `argsTotal >= 30000` floor was the only thing that fired, ~8,000 args late
+and naming nothing. Replaced by `deep-inspect.ts --require-roots`, which reads
+`_meta.census` and fails immediately naming the missing roots. The multi-arch
+workflow requires `container,iot,dude,user-manager,tr069-client,openflow` — all
+six are present in every published versioned artifact back to 7.20.8 on both
+arches. Nightly deliberately does not use this list: its NPK set carries no
+`dude`, `openflow`, `tr069-client` or `user-manager` (see `absentRoots`).
+
+`diff-deep-inspect.ts` additionally reports root-menu drift between the two
+arches. That one is report-only — `/blink` and `/zerotier` are legitimately
+arm64-only.
 
 ### Boot timing reference
 

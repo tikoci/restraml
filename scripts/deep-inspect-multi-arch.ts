@@ -38,7 +38,7 @@
 
 import { parseArgs } from "node:util";
 import { QuickCHR, type Arch, type Channel } from "@tikoci/quickchr";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ── CLI ────────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ interface Opts {
   version?: string;
   outputDir: string;
   keepRunning: boolean;
+  requireRoots: string;
 }
 
 function parseCli(): Opts {
@@ -60,6 +61,10 @@ function parseCli(): Opts {
       version: { type: "string" },
       "output-dir": { type: "string", default: "." },
       "keep-running": { type: "boolean", default: false },
+      // Mirrors the REQUIRED_ROOTS env in deep-inspect-multi-arch.yaml. This
+      // script always starts CHRs with installAllPackages, so all six menus are
+      // expected; a missing one means the packages never activated (#96).
+      "require-roots": { type: "string", default: "container,iot,dude,user-manager,tr069-client,openflow" },
       help: { type: "boolean", default: false },
     },
     strict: true,
@@ -91,6 +96,7 @@ function parseCli(): Opts {
     version: values.version,
     outputDir: values["output-dir"] ?? ".",
     keepRunning: values["keep-running"] ?? false,
+    requireRoots: values["require-roots"] ?? "",
   };
 }
 
@@ -107,6 +113,9 @@ Options:
   --version <ver>      Specific RouterOS version (overrides --channel)
   --output-dir <dir>   Where to write deep-inspect.<arch>.json (default: .)
   --keep-running       Leave CHRs running after crawl (for post-mortem)
+  --require-roots <l>  Comma-separated roots that must exist in the census
+                       (default: container,iot,dude,user-manager,tr069-client,openflow).
+                       Pass "" to disable. See #96.
   --help               Show this help
 
 Output files (one per arch):
@@ -203,6 +212,7 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
     opts.outputDir,
     "--transport",
     "rest",
+    ...(opts.requireRoots ? ["--require-roots", opts.requireRoots] : []),
   ];
 
   console.log(`\nRunning: bun ${deepInspectArgs.join(" ")}`);
@@ -227,6 +237,18 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
     console.warn(`⚠ ${arch}: deep-inspect.ts exited 2 (crawl incomplete) — reading _meta for diagnostics before cleanup.`);
   }
 
+  // --require-roots exits 2 *before* the artifact is written (the tree is known
+  // bad, so there is nothing worth writing). Everything the operator needs is
+  // already on stderr, so surface that rather than an ENOENT from readFileSync.
+  const deepInspectPath = join(opts.outputDir, `deep-inspect.${arch}.json`);
+  if (exitCode === 2 && !existsSync(deepInspectPath)) {
+    if (!opts.keepRunning) await chr.destroy();
+    throw new Error(
+      `${arch}: deep-inspect.ts exited 2 without writing ${deepInspectPath} — ` +
+      "required package roots were missing from the crawled tree (see the census above, #96).",
+    );
+  }
+
   // Post-crawl load snapshot (best-effort) — informational, not load-bearing.
   // Proof-of-life for queryLoad(); the real retry/load correlation work wants
   // in-crawl sampling — a future improvement, not yet scheduled.
@@ -236,7 +258,6 @@ async function runArch(arch: Arch, opts: Opts): Promise<ArchResult> {
   }
 
   // Read the output file and extract _meta to check for anomalies.
-  const deepInspectPath = join(opts.outputDir, `deep-inspect.${arch}.json`);
   const deepInspect = JSON.parse(readFileSync(deepInspectPath, "utf-8")) as {
     _meta: {
       version: string;

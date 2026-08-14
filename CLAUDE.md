@@ -964,7 +964,7 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
-| `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs with extra packages in parallel, runs live deep-inspect crawl on each, diffs results, publishes `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
+| `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs in parallel. Both arches install extra packages identically — `all_packages-<arch>` zip → SCP → **explicit** reboot — then run a live deep-inspect crawl gated on `--require-roots`, diff results, and publish `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
 | `nightly.yaml` | Daily cron (06:00 UTC) + manual | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 | `codeql.yml` | Push + PR + weekly schedule | Runs repository-managed CodeQL for JavaScript/TypeScript and GitHub Actions, using repo path ignores for generated versioned docs artifacts |
@@ -1084,11 +1084,33 @@ instead of being duplicated here. Current decision buckets:
 ## Reference Notes / Known-Broken or Incomplete
 
 ### `deep-inspect-multi-arch.yaml` — ARM64 CI (RESOLVED)
-The arm64 CI job now works under both KVM (when available) and TCG (software
-emulation). Previous failures were caused by **insufficient RAM** (256 MB), not
+The arm64 CI job works under both KVM (when available) and TCG (software
+emulation). The April 2026 failures were caused by **insufficient RAM** (256 MB), not
 TCG being inherently slow. Any workflow that installs all extra packages should
 use 1024 MB RAM. See `docs/deep-inspect.md` for the full postmortem, measured
 baselines, and implementation details.
+
+**Both arches install extra packages the same way** — download
+`all_packages-<arch>-{ver}.zip`, SCP the NPKs to flash root, then issue an
+**explicit** `POST /system/reboot`. Keep it that way. Between April and August 2026
+the arm64 job instead fired a `/rest/execute` script ending in
+`/system/package/apply-changes`; that broke silently and cost three weeks of
+missed builds (#96). See the anti-pattern below.
+
+### `/system/package/apply-changes` prompts — never rely on it to reboot
+MikroTik's Packages manual documents it as interactive:
+
+```
+/system/package/apply-changes
+Apply scheduled changes and reboot device? [y/N]:
+```
+
+The default is **N**. Ending a fire-and-forget REST script on it means the reboot
+may simply never happen — and the failure is invisible: `/system/package` still
+lists every package (they are installed, just inactive), so package-count gates
+pass, and only the crawl notices, thousands of args later. **Trigger package
+activation with an explicit `/system/reboot`, and always assert the CHR actually
+went down.** See #96.
 
 ### Native API `/console/inspect` Completion Non-Determinism
 RouterOS 7.22.1 (and likely all 7.x) returns non-deterministic results for `request=completion`
@@ -1109,9 +1131,12 @@ These rules apply to **all agents working on CI workflows** in this repository:
    takes 10× longer than the measured baseline, the timeout is not the problem. ARM64 TCG on
    x86_64 boots in ~20s, not 600s. See `docs/deep-inspect.md` for measured timing baselines.
 
-2. **Always verify extra packages are actually installed.** After any reboot step that activates
-   packages, `GET /rest/system/package` must show >10 packages. If it shows only `["routeros"]`,
-   the job MUST fail — not continue with base-only output.
+2. **Verify packages are ACTIVE, not merely listed.** `GET /rest/system/package` counts packages
+   that are installed but never activated, so a `>10` count proves nothing — in #96 it returned
+   19 while eight package menus were missing from the tree. Assert on the property you actually
+   care about: the **menus exist**. `deep-inspect.ts --require-roots container,iot,dude,…` fails
+   immediately and names the missing roots (it reads `_meta.census`). Keep the count check as a
+   cheap smoke test, but never as the gate.
 
 3. **Check the output, not just the exit code.** A green CI badge means nothing if the arm64
    file has 577 args instead of 36,023. Add assertions for expected arg counts and diff ranges.
@@ -1125,7 +1150,10 @@ These rules apply to **all agents working on CI workflows** in this repository:
 
 6. **Give QEMU enough RAM.** 256 MB is fine for base RouterOS under KVM, but with 17 extra
    packages under TCG, it causes memory pressure that inflates REST calls from ~70ms to ~10s+.
-   Use 1024 MB for any job that installs extra packages (matches quickchr's default).
+   Use 1024 MB for any job that installs extra packages. Note quickchr only defaults to 1024 MB
+   for **cross-arch** emulation (`defaultMem` → `isCrossArchEmulation`); an arm64 guest on a
+   native arm64 runner gets **512 MB**, so pass `mem: 1024` explicitly as
+   `scripts/nightly-build.ts` does.
    This RAM/REST-stall behaviour is a **separate issue** from the `/console/inspect path=do`
    hang tracked as MikroTik **SUP-127641**. The `do`-path hang on 7.20.8 reproduces identically
    at 128 MB **and** 512 MB (confirmed April 2026 via `bun scripts/test-crash-path-memory.ts`) —
@@ -1140,7 +1168,20 @@ These rules apply to **all agents working on CI workflows** in this repository:
    | aarch64 → aarch64 | KVM/TCG | <5s / ~25s |
    | aarch64 → x86_64 | TCG | >300s — NOT VIABLE |
 
----
+   GitHub's `ubuntu-24.04-arm` runners do **not** expose usable KVM — the accel probe has
+   reported TCG on every observed run, including the green ones. TCG there is fine:
+   `_meta.enrichmentDurationMs` across 19 published arm64 builds is 271–378 s.
+
+8. **A step that can silently do nothing must fail, not warn.** #96 rotted for three weeks
+   because the arm64 "wait for reboot" loop fell through its 60 s window with *no output at
+   all* and the job carried on. If a step's whole purpose is to make something happen, assert
+   that it happened and `exit 1` otherwise. A `::warning::` nobody reads is not a gate.
+
+9. **Never leave two jobs doing the same thing two different ways.** The x86 and arm64 jobs
+   used different package-install mechanisms for four months; only one of them rotted, and the
+   divergence is what hid it. When you debug one arch, do not "temporarily" fork its mechanism —
+   that fork becomes permanent and unvalidated. (In #96 the fork was introduced by `6e1dd58`
+   while the actual bug being chased was RAM, fixed separately by `7052106`.)
 
 ## Environment Variables
 

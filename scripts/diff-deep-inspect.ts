@@ -61,6 +61,7 @@ interface DeepInspect {
       argsTimedOut: number;
       argsBlankOnRetry: number;
     };
+    census?: Record<string, number>;
   };
   [key: string]: unknown;
 }
@@ -88,6 +89,15 @@ interface TypeMismatch {
   bType: NodeType | undefined;
 }
 
+/** Top-level roots present in one file and absent in the other.
+ *  Report-only: some asymmetry is legitimate (/blink is arm64-only, and the
+ *  nightly NPK set carries no dude/openflow/tr069-client/user-manager). It is
+ *  still the fastest way to see a whole package menu go missing (#96). */
+interface CensusDrift {
+  onlyInA: string[];
+  onlyInB: string[];
+}
+
 interface DiffReport {
   a: { label: string; path: string; meta: DeepInspect["_meta"] };
   b: { label: string; path: string; meta: DeepInspect["_meta"] };
@@ -110,6 +120,7 @@ interface DiffReport {
   completionDrift: CompletionDrift[];
   completionPayloadDrift: CompletionPayloadDrift[];
   typeMismatches: TypeMismatch[];
+  censusDrift: CensusDrift;
 }
 
 function completionPayloadFieldDrift(a: CompletionEntry, b: CompletionEntry): string[] {
@@ -300,6 +311,19 @@ function diff(
 
   const pathsBoth = [...mapA.keys()].filter((k) => mapB.has(k)).length;
 
+  // Fall back to the tree's own top-level keys when _meta.census is absent —
+  // artifacts published before #97 have no census but the roots are still there.
+  const rootsOf = (d: DeepInspect): string[] =>
+    d._meta.census
+      ? Object.keys(d._meta.census)
+      : Object.keys(d).filter((k) => !k.startsWith("_"));
+  const rootsA = new Set(rootsOf(a));
+  const rootsB = new Set(rootsOf(b));
+  const censusDrift: CensusDrift = {
+    onlyInA: [...rootsA].filter((r) => !rootsB.has(r)).sort(),
+    onlyInB: [...rootsB].filter((r) => !rootsA.has(r)).sort(),
+  };
+
   return {
     a: { label: aLabel, path: aPath, meta: a._meta },
     b: { label: bLabel, path: bPath, meta: b._meta },
@@ -322,6 +346,7 @@ function diff(
     completionDrift,
     completionPayloadDrift,
     typeMismatches,
+    censusDrift,
   };
 }
 
@@ -372,6 +397,18 @@ function textReport(r: DiffReport, opts: Opts): string {
   lines.push(`  completion payload drift: ${c.completionPayloadDrift} arg(s) with shared keys but differing style/preference/desc`);
   lines.push(`  type mismatches : ${c.typeMismatches}`);
   lines.push("");
+
+  const cd = r.censusDrift;
+  if (cd.onlyInA.length > 0 || cd.onlyInB.length > 0) {
+    lines.push("━━━ Root Menu Drift ━━━");
+    lines.push("  (whole top-level menus present on one side only — report, not a verdict)");
+    if (cd.onlyInA.length > 0) lines.push(`    only in ${A}: ${cd.onlyInA.map((x) => `/${x}`).join(" ")}`);
+    if (cd.onlyInB.length > 0) lines.push(`    only in ${B}: ${cd.onlyInB.map((x) => `/${x}`).join(" ")}`);
+    lines.push("  Some asymmetry is legitimate (/blink is arm64-only; the nightly NPK set");
+    lines.push("  carries no dude/openflow/tr069-client/user-manager). But a package menu");
+    lines.push("  missing on one arch only usually means its packages never activated (#96).");
+    lines.push("");
+  }
 
   if (c.typeMismatches > 0) {
     lines.push("━━━ Type Mismatches ━━━");
