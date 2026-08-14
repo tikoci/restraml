@@ -511,19 +511,23 @@ jobs:
           bun appyamlvalidate.js nightly --no-schema-write --app-json docs/nightly/extra/app.json
           EXIT_CODE=$?
           echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
-          if [ $EXIT_CODE -eq 1 ]; then
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✓ nightly /app validation clean"
+            exit 0
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "::warning::Nightly /app validation: $EXIT_CODE — some apps do not conform to latest schema (issue will be filed)"
+            exit 0
+          elif [ $EXIT_CODE -eq 1 ]; then
             echo "::error::JSON Schema meta-validation failed — schemas are invalid"
             exit 1
+          else
+            echo "::error::Unexpected validator exit code $EXIT_CODE — failing (expected 0, 1, or 2)"
+            exit 1
           fi
-          if [ $EXIT_CODE -eq 2 ]; then
-            echo "::warning::Nightly /app validation: $EXIT_CODE — some apps do not conform to latest schema (issue will be filed)"
-          fi
-          # Exit 0 and 2 are both publish-able; the issue is the signal, not a gate.
-          exit 0
 
       - name: Create GitHub issue for nightly /app validation failures
         if: steps.validate-nightly-app.outputs.exit_code == '2'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           APP_YAML_FAILURES_FILE: ${{ runner.temp }}/app-yaml-failures-nightly.txt
           NIGHTLY_VERSION: ${{ needs.discover.outputs.nightly_version }}
@@ -544,6 +548,7 @@ jobs:
             } catch (e) {}
             // Count failures from the details file (one per line starting with "- `")
             const failCount = failureDetails.split('\n').filter(l => l.trim().startsWith('- `')).length
+            const title = `Nightly ${nightlyVersion}: /app YAML schema validation failures (vs latest)`
             const body = [
               `## Nightly ${nightlyVersion}: /app YAML schema validation failures (vs \`latest\`)`,
               '',
@@ -571,14 +576,41 @@ jobs:
               `[View run logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
             ].join('\n')
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Nightly ${nightlyVersion}: /app YAML schema validation failures (vs latest)`,
-              body,
-              labels: ['bug', 'app-yaml-schema', 'nightly'],
-            })
-            console.log(`Created GitHub issue for nightly ${nightlyVersion} — ${failCount} failures`)
+            // Idempotency: avoid duplicate issues on reruns of the same nightly version
+            let existingIssue = null
+            try {
+              const q = `repo:${context.repo.owner}/${context.repo.repo} "${title}" in:title is:open`
+              const search = await github.rest.search.issuesAndPullRequests({ q })
+              if (search.data.total_count > 0) existingIssue = search.data.items[0]
+            } catch (e) {
+              console.log(`Search failed, falling back to create: ${e.message}`)
+            }
+
+            if (existingIssue) {
+              const issueNumber = existingIssue.number
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: [
+                  `Rerun for **${nightlyVersion}** — still failing (${failCount} of ${nightlyMeta}):`,
+                  '',
+                  failureDetails,
+                  '',
+                  `[View run logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+                ].join('\n')
+              })
+              console.log(`Updated existing issue #${issueNumber} for nightly ${nightlyVersion} — ${failCount} failures (rerun)`)
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'app-yaml-schema', 'nightly'],
+              })
+              console.log(`Created GitHub issue for nightly ${nightlyVersion} — ${failCount} failures`)
+            }
 
       - name: Upload nightly /app validation failures
         if: always() && steps.validate-nightly-app.outputs.exit_code == '2'
