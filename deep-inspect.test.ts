@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { join } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
   filterCompletions,
@@ -782,6 +782,83 @@ describe("CLI: --request-timeout validation", () => {
 
   test("accepts timeout of 1", async () => {
     const { exitCode } = await runDeepInspect([...baseArgs, "--request-timeout", "1"]);
+    expect(exitCode).toBe(0);
+  });
+});
+
+// The gate that would have caught #96 at its source. A package that installs but
+// never activates leaves its whole menu out of the tree while /system/package
+// still counts it, so a package-count gate passes and the argsTotal floor fires
+// thousands of args late naming nothing. --require-roots fails immediately,
+// naming the roots.
+describe("CLI: --require-roots census gate", () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = mkdtempSync(join(tmpdir(), "restraml-test-")); });
+  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+
+  // fixtures/sample-inspect.json roots: certificate convert interface ip system
+  const baseArgs = () => [
+    "--inspect-file", "fixtures/sample-inspect.json",
+    "--skip-completion", "--skip-openapi",
+    "--output-dir", tmpDir,
+  ];
+
+  test("passes when every required root is present", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs(), "--require-roots", "ip,interface,system"]);
+    expect(exitCode).toBe(0);
+  });
+
+  test("exits 2 and names the missing roots", async () => {
+    const { exitCode, stderr } = await runDeepInspect([...baseArgs(), "--require-roots", "ip,container,dude"]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("/container");
+    expect(stderr).toContain("/dude");
+    // Present roots must not be reported as missing.
+    expect(stderr).not.toContain("missing from the crawled tree: /ip");
+  });
+
+  test("prints the full census so the shortfall is diagnosable from the log alone", async () => {
+    const { stderr } = await runDeepInspect([...baseArgs(), "--require-roots", "container"]);
+    expect(stderr).toContain("/certificate");
+    expect(stderr).toContain("/system");
+  });
+
+  test("writes no artifact when the gate fails", async () => {
+    await runDeepInspect([...baseArgs(), "--require-roots", "container"]);
+    expect(existsSync(join(tmpDir, "deep-inspect.json"))).toBe(false);
+  });
+
+  test("tolerates leading slashes", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs(), "--require-roots", "/ip,/interface"]);
+    expect(exitCode).toBe(0);
+  });
+
+  // Census values are arg COUNTS, and ~10 real roots have zero args (console
+  // verbs like break/continue/exit/quit/undo). A truthiness check would report
+  // those as "missing from the crawled tree" while they are plainly present.
+  test("a root with zero args counts as present, not missing", async () => {
+    const fixture = join(tmpDir, "zero-arg-root.json");
+    writeFileSync(fixture, JSON.stringify({
+      quit: { _type: "cmd" },
+      ip: { _type: "dir", address: { _type: "cmd", numbers: { _type: "arg" } } },
+    }));
+    const { exitCode, stderr } = await runDeepInspect([
+      "--inspect-file", fixture,
+      "--skip-completion", "--skip-openapi",
+      "--output-dir", tmpDir,
+      "--require-roots", "quit,ip",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stderr).not.toContain("Required root(s) missing");
+  });
+
+  test("is opt-in — absent flag never gates", async () => {
+    const { exitCode } = await runDeepInspect(baseArgs());
+    expect(exitCode).toBe(0);
+  });
+
+  test("empty value is treated as no requirement", async () => {
+    const { exitCode } = await runDeepInspect([...baseArgs(), "--require-roots", ""]);
     expect(exitCode).toBe(0);
   });
 });
