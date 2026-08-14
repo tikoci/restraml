@@ -349,15 +349,10 @@ async function main() {
     console.log(`Fetched ${apps.length} built-in /app entries from router`)
 
     // Save raw /app JSON to docs/<version>/app.json for reference and debugging
-    // (skip when --no-schema-write? No — offline nightly already has the file;
-    // live path still writes as before unless suppressed.)
-    if (!noSchemaWrite) {
-      const appJsonPathLive = resolveDocsPath(version, "app.json")
-      writeJsonFile(appJsonPathLive, apps)
-      console.log(`Written: ${appJsonPathLive}`)
-    } else {
-      console.log(`Skipping app.json write (--no-schema-write) — ${apps.length} entries fetched`)
-    }
+    // Always write — --no-schema-write only suppresses per-version schema files.
+    const appJsonPathLive = resolveDocsPath(version, "app.json")
+    writeJsonFile(appJsonPathLive, apps)
+    console.log(`Written: ${appJsonPathLive}`)
   } catch (err) {
     console.error(`::warning::Failed to fetch /app list: ${err.message}`)
     console.log("Skipping live /app YAML validation due to fetch error")

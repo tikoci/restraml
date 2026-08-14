@@ -419,6 +419,81 @@ jobs:
           fi
 
           ls -lh docs/nightly/ docs/nightly/extra/
+      - name: Diff x86 vs arm64 extra
+        run: |
+          set -euo pipefail
+          echo "=== Text diff (x86 vs arm64 extra) ==="
+          bun scripts/diff-deep-inspect.ts docs/nightly/extra/deep-inspect.x86.json docs/nightly/extra/deep-inspect.arm64.json | tee /tmp/diff.txt
+          echo ""
+          echo "=== JSON diff ==="
+          bun scripts/diff-deep-inspect.ts docs/nightly/extra/deep-inspect.x86.json docs/nightly/extra/deep-inspect.arm64.json --json > docs/nightly/extra/diff-deep-inspect.json
+          echo "diff-deep-inspect.json: $(du -h docs/nightly/extra/diff-deep-inspect.json | cut -f1)"
+
+      - name: Verify diff is not a relabeled copy
+        run: |
+          set -euo pipefail
+          ARM64_ONLY=$(jq '.counts.pathsOnlyB' docs/nightly/extra/diff-deep-inspect.json)
+          X86_ONLY=$(jq '.counts.pathsOnlyA' docs/nightly/extra/diff-deep-inspect.json)
+          echo "Paths only in arm64: $ARM64_ONLY"
+          echo "Paths only in x86:   $X86_ONLY"
+          # Without this, a shape change that makes jq emit null turns the gate
+          # below into a silent pass ([ null -lt 500 ] errors, `if` reads false).
+          case "$ARM64_ONLY" in
+            ''|*[!0-9]*) echo "::error::pathsOnlyB is not a number ('$ARM64_ONLY') — diff JSON shape changed"; exit 1 ;;
+          esac
+          # Reference: full all_packages builds run ~1,561 arm64-only paths
+          # (docs/7.24rc2/extra/diff-deep-inspect.json); nightly's arm64 NPK set
+          # is larger than its x86 one, so 500 is a floor with real headroom.
+          if [ "$ARM64_ONLY" -lt 500 ]; then
+            echo "::error::arm64 has only $ARM64_ONLY unique paths (expected ≥500) — relabeled x86 or truncated crawl"
+            exit 1
+          fi
+
+      - name: Generate aggregated nightly.json
+        run: |
+          set -euo pipefail
+          bun -e '
+          import fs from "node:fs";
+          const r = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
+          const xBase = r("/tmp/nightly-stage/nightly-x86-base/nightly.json");
+          const xExtra = r("/tmp/nightly-stage/nightly-x86-extra/nightly.json");
+          const aExtra = r("/tmp/nightly-stage/nightly-arm64-extra/nightly.json");
+          // nightlyVersion must agree; take max by compareAb if they differ (race where Box rolled between jobs)
+          const versions = [xExtra.nightlyVersion, aExtra.nightlyVersion];
+          const parseAb = (v) => { const m = v.match(/^(\d+)\.(\d+)(?:\.(\d+))?_ab(\d+)$/); return m ? [Number(m[1]), Number(m[2]), Number(m[3]??0), Number(m[4])] : null; };
+          const compareAb = (a,b) => { const pa=parseAb(a), pb=parseAb(b); if(!pa&&!pb) return a.localeCompare(b); if(!pa) return 1; if(!pb) return -1; for(let i=0;i<4;i++) if(pa[i]!==pb[i]) return pa[i]-pb[i]; return 0; };
+          const nightlyVersion = [...versions].sort(compareAb).at(-1);
+          // buildWindow: earliest = min, latest = max across both arches
+          const windows = [xExtra.buildWindow, aExtra.buildWindow].filter(Boolean);
+          const allTimes = windows.flatMap(w => [w.earliest, w.latest]).filter(Boolean).sort();
+          const buildWindow = allTimes.length ? { earliest: allTimes[0], latest: allTimes[allTimes.length-1] } : null;
+          // provenance: take source from xExtra (token etc) — they should match
+          const source = xExtra.source ?? aExtra.source;
+          const baseVersion = xExtra.baseVersion ?? xBase.baseVersion;
+          const builtAt = new Date().toISOString();
+          // Use the most recent builtAt among provenances? No — use publish time
+          const aggregated = {
+            nightlyVersion,
+            builtAt,
+            baseVersion,
+            source,
+            buildWindow,
+            packages: {
+              x86: { count: xExtra.packageCount, names: xExtra.packageNames, npks: xExtra.packages?.npks ?? [], phaseFiles: xExtra.phaseFiles },
+              arm64: { count: aExtra.packageCount, names: aExtra.packageNames, npks: aExtra.packages?.npks ?? [], phaseFiles: aExtra.phaseFiles },
+              rejected: xExtra.packages?.rejected ?? aExtra.packages?.rejected ?? [],
+            },
+            absentRoots: xExtra.absentRoots ?? ["dude","openflow","tr069-client","user-manager"],
+            // Full provenance per arch for debugging
+            provenance: { x86: { base: xBase, extra: xExtra }, arm64: { extra: aExtra } },
+          };
+          fs.mkdirSync("docs/nightly", { recursive: true });
+          fs.writeFileSync("docs/nightly/nightly.json", JSON.stringify(aggregated, null, 2) + "\n");
+          console.log(JSON.stringify(aggregated, null, 2));
+          // Also update nightlyVersion in discover output check for next run — already done
+          '
+          cat docs/nightly/nightly.json | jq .
+
 
       - name: Validate nightly /app YAMLs against latest schema (N6)
         id: validate-nightly-app
@@ -507,86 +582,11 @@ jobs:
 
       - name: Upload nightly /app validation failures
         if: always() && steps.validate-nightly-app.outputs.exit_code == '2'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nightly-app-yaml-failures-${{ needs.discover.outputs.nightly_version }}
           path: ${{ runner.temp }}/app-yaml-failures-nightly.txt
           retention-days: 14
-
-      - name: Diff x86 vs arm64 extra
-        run: |
-          set -euo pipefail
-          echo "=== Text diff (x86 vs arm64 extra) ==="
-          bun scripts/diff-deep-inspect.ts docs/nightly/extra/deep-inspect.x86.json docs/nightly/extra/deep-inspect.arm64.json | tee /tmp/diff.txt
-          echo ""
-          echo "=== JSON diff ==="
-          bun scripts/diff-deep-inspect.ts docs/nightly/extra/deep-inspect.x86.json docs/nightly/extra/deep-inspect.arm64.json --json > docs/nightly/extra/diff-deep-inspect.json
-          echo "diff-deep-inspect.json: $(du -h docs/nightly/extra/diff-deep-inspect.json | cut -f1)"
-
-      - name: Verify diff is not a relabeled copy
-        run: |
-          set -euo pipefail
-          ARM64_ONLY=$(jq '.counts.pathsOnlyB' docs/nightly/extra/diff-deep-inspect.json)
-          X86_ONLY=$(jq '.counts.pathsOnlyA' docs/nightly/extra/diff-deep-inspect.json)
-          echo "Paths only in arm64: $ARM64_ONLY"
-          echo "Paths only in x86:   $X86_ONLY"
-          # Without this, a shape change that makes jq emit null turns the gate
-          # below into a silent pass ([ null -lt 500 ] errors, `if` reads false).
-          case "$ARM64_ONLY" in
-            ''|*[!0-9]*) echo "::error::pathsOnlyB is not a number ('$ARM64_ONLY') — diff JSON shape changed"; exit 1 ;;
-          esac
-          # Reference: full all_packages builds run ~1,561 arm64-only paths
-          # (docs/7.24rc2/extra/diff-deep-inspect.json); nightly's arm64 NPK set
-          # is larger than its x86 one, so 500 is a floor with real headroom.
-          if [ "$ARM64_ONLY" -lt 500 ]; then
-            echo "::error::arm64 has only $ARM64_ONLY unique paths (expected ≥500) — relabeled x86 or truncated crawl"
-            exit 1
-          fi
-
-      - name: Generate aggregated nightly.json
-        run: |
-          set -euo pipefail
-          bun -e '
-          import fs from "node:fs";
-          const r = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
-          const xBase = r("/tmp/nightly-stage/nightly-x86-base/nightly.json");
-          const xExtra = r("/tmp/nightly-stage/nightly-x86-extra/nightly.json");
-          const aExtra = r("/tmp/nightly-stage/nightly-arm64-extra/nightly.json");
-          // nightlyVersion must agree; take max by compareAb if they differ (race where Box rolled between jobs)
-          const versions = [xExtra.nightlyVersion, aExtra.nightlyVersion];
-          const parseAb = (v) => { const m = v.match(/^(\d+)\.(\d+)(?:\.(\d+))?_ab(\d+)$/); return m ? [Number(m[1]), Number(m[2]), Number(m[3]??0), Number(m[4])] : null; };
-          const compareAb = (a,b) => { const pa=parseAb(a), pb=parseAb(b); if(!pa&&!pb) return a.localeCompare(b); if(!pa) return 1; if(!pb) return -1; for(let i=0;i<4;i++) if(pa[i]!==pb[i]) return pa[i]-pb[i]; return 0; };
-          const nightlyVersion = [...versions].sort(compareAb).at(-1);
-          // buildWindow: earliest = min, latest = max across both arches
-          const windows = [xExtra.buildWindow, aExtra.buildWindow].filter(Boolean);
-          const allTimes = windows.flatMap(w => [w.earliest, w.latest]).filter(Boolean).sort();
-          const buildWindow = allTimes.length ? { earliest: allTimes[0], latest: allTimes[allTimes.length-1] } : null;
-          // provenance: take source from xExtra (token etc) — they should match
-          const source = xExtra.source ?? aExtra.source;
-          const baseVersion = xExtra.baseVersion ?? xBase.baseVersion;
-          const builtAt = new Date().toISOString();
-          // Use the most recent builtAt among provenances? No — use publish time
-          const aggregated = {
-            nightlyVersion,
-            builtAt,
-            baseVersion,
-            source,
-            buildWindow,
-            packages: {
-              x86: { count: xExtra.packageCount, names: xExtra.packageNames, npks: xExtra.packages?.npks ?? [], phaseFiles: xExtra.phaseFiles },
-              arm64: { count: aExtra.packageCount, names: aExtra.packageNames, npks: aExtra.packages?.npks ?? [], phaseFiles: aExtra.phaseFiles },
-              rejected: xExtra.packages?.rejected ?? aExtra.packages?.rejected ?? [],
-            },
-            absentRoots: xExtra.absentRoots ?? ["dude","openflow","tr069-client","user-manager"],
-            // Full provenance per arch for debugging
-            provenance: { x86: { base: xBase, extra: xExtra }, arm64: { extra: aExtra } },
-          };
-          fs.mkdirSync("docs/nightly", { recursive: true });
-          fs.writeFileSync("docs/nightly/nightly.json", JSON.stringify(aggregated, null, 2) + "\n");
-          console.log(JSON.stringify(aggregated, null, 2));
-          // Also update nightlyVersion in discover output check for next run — already done
-          '
-          cat docs/nightly/nightly.json | jq .
 
       - name: Rebuild docs-index.json
         run: bun scripts/build-docs-index.mjs
