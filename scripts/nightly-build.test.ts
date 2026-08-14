@@ -6,6 +6,7 @@ import {
   getArgsTotalFloor,
   getExpectedMinPackageCount,
   getNpksForPhase,
+  isSafeNpkFilename,
   parseAb,
 } from "./nightly-build.ts";
 
@@ -172,5 +173,48 @@ describe("phase-aware helpers (N3.5 — per-phase gates)", () => {
     const expectedBase = `deep-inspect.${baseSuffix}.json`;
     const deepFileBase = outsOnlyExtra.includes(expectedBase) ? expectedBase : undefined;
     expect(deepFileBase).toBeUndefined();
+  });
+});
+
+describe("isSafeNpkFilename — CodeQL js/http-to-file-access guard (PR #102)", () => {
+  test("accepts valid NPK basenames from real Box fixture", () => {
+    // Every file in the real fixture is a valid basename — the guard must not reject them.
+    for (const f of allFiles.filter((n) => n.endsWith(".npk"))) {
+      expect(isSafeNpkFilename(f)).toBe(true);
+    }
+    expect(isSafeNpkFilename("routeros-x86-7.25_ab434.npk")).toBe(true);
+    expect(isSafeNpkFilename("container-7.25_ab434.npk")).toBe(true);
+    expect(isSafeNpkFilename("wireless-7.25_ab434-arm64.npk")).toBe(true);
+    expect(isSafeNpkFilename("my-file_123.npk")).toBe(true);
+    expect(isSafeNpkFilename("a1_B2-C3.npk")).toBe(true);
+  });
+
+  test("rejects path separators and traversal", () => {
+    expect(isSafeNpkFilename("a/b.npk")).toBe(false);
+    expect(isSafeNpkFilename("a\\b.npk")).toBe(false);
+    expect(isSafeNpkFilename("../evil.npk")).toBe(false);
+    expect(isSafeNpkFilename("..\\evil.npk")).toBe(false);
+    expect(isSafeNpkFilename("../../etc/passwd")).toBe(false);
+    expect(isSafeNpkFilename("dir/../routeros.npk")).toBe(false);
+    expect(isSafeNpkFilename("/absolute.npk")).toBe(false);
+  });
+
+  test("rejects invalid characters, wrong extensions, and empty", () => {
+    expect(isSafeNpkFilename("bad name.npk")).toBe(false); // space
+    expect(isSafeNpkFilename("bad$name.npk")).toBe(false);
+    expect(isSafeNpkFilename("file.txt")).toBe(false);
+    expect(isSafeNpkFilename("file.npk.exe")).toBe(false);
+    expect(isSafeNpkFilename("file")).toBe(false);
+    expect(isSafeNpkFilename("")).toBe(false);
+    expect(isSafeNpkFilename(".npk")).toBe(false); // no basename
+    expect(isSafeNpkFilename("a/b\\c..npk")).toBe(false);
+  });
+
+  test("filterNpksByArch output is always safe", () => {
+    const x86 = filterNpksByArch(allFiles, VER, "x86");
+    const arm64 = filterNpksByArch(allFiles, VER, "arm64");
+    for (const f of [...x86, ...arm64]) {
+      expect(isSafeNpkFilename(f)).toBe(true);
+    }
   });
 });
