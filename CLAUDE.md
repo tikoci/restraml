@@ -1005,9 +1005,9 @@ Rules that are easy to get wrong:
   `bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
   dependency to `package.json`.
 - **The slot keeps `openapi.json` and `schema.raml`.** They are ~27 MB of the ~35 MB base slot, so
-  dropping them was considered for storage — but `openapi.json` is a live consumer
-  (`openapi.html?version=nightly&nightly=true` serves it), and `schema.raml` stays for parity with
-  every versioned build. Consecutive `ab` builds are near-identical, so the single-slot git delta
+  dropping them was considered for storage — but `docs/openapi.html` is a live consumer of the
+  slot's `openapi.json` (`openapi.html?version=nightly&nightly=true` loads it), and `schema.raml`
+  stays for parity with every versioned build. Consecutive `ab` builds are near-identical, so the single-slot git delta
   is small (~4.5 MiB of objects for the first ~85 MB publish). If RAML generation is ever retired
   repo-wide, the nightly slot follows that decision — it is not a nightly-specific call.
 - **`/app` is validated offline against the root `*.latest.json`**, never per-version. Minting
