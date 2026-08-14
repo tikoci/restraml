@@ -433,6 +433,10 @@
                 <input id="includeTesting" type="checkbox">
                 <code>testing</code>
             </label>
+            <label class="toggle-label">
+                <input id="includeNightly" type="checkbox">
+                <code>nightly</code>
+            </label>
             <span id="actions-group">
                 <span id="cors-note">Test requests (<a id="toggle-test-request" href="#">hide</a>) requires CORS.</span>
                 <a id="openapi-download" href="#" download hidden>Download Schema</a>
@@ -488,6 +492,7 @@
         const versionSelect = document.getElementById('version-select');
         const extraCheck = document.getElementById('includeExtra');
         const testingCheck = document.getElementById('includeTesting');
+        const nightlyCheck = document.getElementById('includeNightly');
         const scalarStatus = document.getElementById('scalar-status');
         const toggleTestLink = document.getElementById('toggle-test-request');
         const downloadAnchor = document.getElementById('openapi-download');
@@ -534,12 +539,24 @@
                 for (const opt of versionSelect.options) {
                     if (opt.value === v) { versionSelect.value = v; break; }
                 }
+                // Auto-enable nightly if version is nightly
+                if (v === 'nightly' && nightlyCheck && !nightlyCheck.checked) {
+                    nightlyCheck.checked = true
+                    rebuildVersionSelect()
+                    for (const opt of versionSelect.options) {
+                        if (opt.value === v) { versionSelect.value = v; break; }
+                    }
+                }
             }
             if (params.has('extra')) {
                 extraCheck.checked = params.get('extra') !== 'false';
             }
             if (params.has('testing')) {
                 testingCheck.checked = params.get('testing') === 'true';
+                rebuildVersionSelect();
+            }
+            if (params.has('nightly')) {
+                nightlyCheck.checked = params.get('nightly') === 'true';
                 rebuildVersionSelect();
             }
         }
@@ -549,6 +566,7 @@
             if (versionSelect.value) params.set('version', versionSelect.value);
             if (!extraCheck.checked) params.set('extra', 'false');
             if (testingCheck.checked) params.set('testing', 'true');
+            if (nightlyCheck.checked) params.set('nightly', 'true');
             const qs = params.toString();
             const url = qs ? `${location.pathname}?${qs}` : location.pathname;
             history.replaceState(null, '', url);
@@ -572,7 +590,7 @@
             const filtered = allVersions
                 .filter(v => versionHasOpenApi(v, false) || versionHasOpenApi(v, true))
                 .map(v => v.name);
-            rebuildSelect(versionSelect, filtered, testingCheck.checked);
+            rebuildSelect(versionSelect, filtered, { includeTesting: testingCheck.checked, includeNightly: nightlyCheck.checked });
         }
 
         // --- Check if openapi.json exists for a version+subdir ---
@@ -691,6 +709,15 @@
             if (!versionSelect.value && versionSelect.options.length > 1) {
                 versionSelect.selectedIndex = 1;
             }
+            writeQueryParams();
+            loadScalar();
+        });
+        nightlyCheck.addEventListener('change', () => {
+            rebuildVersionSelect();
+            if (!versionSelect.value && versionSelect.options.length > 1) {
+                versionSelect.selectedIndex = 1;
+            }
+            writeQueryParams();
             loadScalar();
         });
 
@@ -710,10 +737,13 @@
             }
         });
 
-        fetchVersionList().then(versions => {
+        Promise.all([fetchVersionList(), fetchNightlyJson().catch(() => null)]).then(([versions]) => {
             allVersions = versions;
             rebuildVersionSelect();
             readQueryParams();
+            // Second rebuild after nightly badge may be available
+            rebuildVersionSelect();
+            if (nightlyCheck.checked) readQueryParams();
 
             // Auto-select: use query param, or default to first version with openapi
             if (!versionSelect.value && versionSelect.options.length > 1) {
@@ -728,6 +758,10 @@
         }).catch(err => {
             scalarStatus.innerHTML = `<p>Failed to load version list: ${err.message}</p>`;
         });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNightlyJson().then(() => rebuildVersionSelect()).catch(() => {})
+        })
 
         // --- WebMCP: get_openapi_schema_url tool ---
         const _wmcp = registerWebMCPTools();

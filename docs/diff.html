@@ -320,6 +320,10 @@
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
+                    <label class="ml-1">
+                        <input id="diffShowNightly" type="checkbox" role="switch">
+                        include <code>nightly</code>
+                    </label>
                 </ul>
             </nav>
 
@@ -488,6 +492,19 @@
                         most admins think in terminal.
                     </small>
                 </div>
+                <hr>
+                <div class="behind-curtain">
+                    <small>
+                        <b>Nightly note</b> &mdash; <code>nightly</code> is the single
+                        overwritten slot at <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a>
+                        (<code>docs/nightly/</code>, badge <code>nightly (7.25_ab434)</code> &middot; age).
+                        Its <code>extra/</code> is partial &mdash; no nightly NPKs exist for
+                        <code>dude</code>, <code>user-manager</code>, <code>openflow</code>,
+                        <code>tr069-client</code>, so a diff vs release extra shows those roots as
+                        &ldquo;removed&rdquo; &mdash; not a real removal, just absent from the Box share.
+                        See <code>nightly.json</code> for exact packages and build window.
+                    </small>
+                </div>
                 <footer>
                     <small>
                         💬 <a href="https://github.com/tikoci/restraml/issues/new/choose">Open an issue on GitHub</a>
@@ -582,6 +599,7 @@
         // All collected versions for diff dropdowns (sorted at insertion time)
         const _diffVersions = []
         let _diffShowAll = false
+        let _diffShowNightly = false
         const _changelogCache = {}
         let _loadedRangeSections = null
         let _loadedRangeKey = null
@@ -617,9 +635,14 @@
         }
 
         function getChangelogVersionsInRange(range) {
+            // Use shared helper which always excludes synthetic nightly (no CHANGELOG on download.mikrotik.com)
+            if (typeof window.getChangelogVersionsInRange === 'function') {
+                // Shared helper is available (N5) — it already excludes nightly
+                return window.getChangelogVersionsInRange(range, _diffVersions, _diffShowAll)
+            }
             const candidateVersions = _diffShowAll
-                ? _diffVersions
-                : _diffVersions.filter(version => !isPreRelease(version))
+                ? _diffVersions.filter(v => !isNightly(v))
+                : _diffVersions.filter(v => !isNightly(v) && !isTestingPreRelease(v))
 
             return candidateVersions.filter(version => {
                 if (range.older === range.newer) return version === range.newer
@@ -694,6 +717,22 @@
         }
 
         async function fetchChangelogSectionsForVersion(version) {
+            if (isNightly(version)) {
+                // Synthetic section from nightly.json — shared helper handles caching
+                if (typeof window.fetchChangelogSectionsForVersion === 'function') {
+                    return window.fetchChangelogSectionsForVersion(version)
+                }
+                const cached = getCachedNightlyJson()
+                const nightlyData = (cached && !cached._partial) ? cached : await fetchNightlyJson()
+                if (nightlyData) return createNightlySyntheticSections(nightlyData)
+                return [{
+                    version: 'nightly',
+                    date: new Date().toLocaleDateString('en-CA'),
+                    heading: `What's new in nightly (synthetic):`,
+                    entries: [{ raw: '*) nightly - Nightly build from mt.lv/nightly-build (see nightly.json)', important: false, secure: false, subsystem: 'nightly', text: 'Nightly build from mt.lv/nightly-build — see docs/nightly/nightly.json' }],
+                    sourceUrl: 'https://mt.lv/nightly-build',
+                }]
+            }
             if (_changelogCache[version]) return _changelogCache[version]
 
             const request = fetch(`https://download.mikrotik.com/routeros/${version}/CHANGELOG`)
@@ -701,7 +740,11 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`)
                     return response.text()
                 })
-                .then(text => parseChangelogSections(text))
+                .then(text => {
+                    const secs = parseChangelogSections(text)
+                    for (const s of secs) s.sourceUrl = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
+                    return secs
+                })
 
             _changelogCache[version] = request
             try {
@@ -730,6 +773,15 @@
 
             try {
                 const versions = getChangelogVersionsInRange(range)
+                // Synthetic nightly section when the range touches the nightly slot
+                let nightlySections = []
+                if (isNightly(range.newer) || isNightly(range.older)) {
+                    try {
+                        const cached = getCachedNightlyJson()
+                        const nightlyData = (cached && !cached._partial) ? cached : await fetchNightlyJson()
+                        if (nightlyData) nightlySections = createNightlySyntheticSections(nightlyData)
+                    } catch (e) { console.warn('Failed to load nightly synthetic changelog', e) }
+                }
                 const sectionGroups = await Promise.all(
                     versions.map(async version => {
                         const sections = await fetchChangelogSectionsForVersion(version)
@@ -745,7 +797,7 @@
                     })
                 )
 
-                const flattenedSections = sectionGroups.flat()
+                const flattenedSections = [...nightlySections, ...sectionGroups.flat()]
                 if (!flattenedSections.length && versions.length === 0) {
                     throw new Error(`No built RouterOS versions found between ${range.older} and ${range.newer}`)
                 }
@@ -758,7 +810,8 @@
                 changelogRangeStatus.hidden = true
                 changelogRangeContent.hidden = false
                 changelogRangeCount.textContent = ''
-                const fallbackUrl = escapeHtml(`https://download.mikrotik.com/routeros/${range.newer}/CHANGELOG`)
+                const fallbackHref = isNightly(range.newer) ? 'https://mt.lv/nightly-build' : `https://download.mikrotik.com/routeros/${range.newer}/CHANGELOG`
+                const fallbackUrl = escapeHtml(fallbackHref)
                 changelogRangeContent.innerHTML = `
                     <p style="text-align:center; padding:2rem 1rem">
                         <span style="font-size:2rem">📋</span><br><br>
@@ -787,6 +840,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const diffShowAll = document.getElementById('diffShowAll')
+            const diffShowNightly = document.getElementById('diffShowNightly')
 
             // Process queued builddir events that fired before DOMContentLoaded
             if (_pendingBuildDirs.length) {
@@ -798,11 +852,22 @@
             }
             document.removeEventListener('builddir', _earlyBuilddirListener)
 
-            diffShowAll.addEventListener('change', () => {
-                _diffShowAll = diffShowAll.checked
-                rebuildSelect(compare1, _diffVersions, _diffShowAll)
-                rebuildSelect(compare2, _diffVersions, _diffShowAll)
-            })
+            if (diffShowAll) {
+                diffShowAll.addEventListener('change', () => {
+                    _diffShowAll = diffShowAll.checked
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    writeQueryParams()
+                })
+            }
+            if (diffShowNightly) {
+                diffShowNightly.addEventListener('change', () => {
+                    _diffShowNightly = diffShowNightly.checked
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    writeQueryParams()
+                })
+            }
         })
 
         // Populate diff dropdowns from builddir events
@@ -812,8 +877,8 @@
                 _diffVersions.push(file.name)
                 _diffVersions.sort(compareVersions)
             }
-            rebuildSelect(compare1, _diffVersions, _diffShowAll)
-            rebuildSelect(compare2, _diffVersions, _diffShowAll)
+            rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+            rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
         })
 
         // -----------------------------------------------------------------
@@ -1078,14 +1143,31 @@
                 })
         }
 
-        // Fetch version list (cached in localStorage by shared JS)
-        fetchVersionList()
-            .then(data => {
+        // Fetch version list (cached in localStorage by shared JS) + nightly badge
+        Promise.all([fetchVersionList(), fetchNightlyJson().catch(() => null)])
+            .then(([data]) => {
                 data.forEach(f => document.dispatchEvent(new CustomEvent('builddir', { detail: f })))
+                // Refresh nightly labels once badge data is available
+                if (getCachedNightlyJson()) {
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                }
                 // Apply URL query params after all version options are populated
                 applyQueryParams()
+                // Re-apply after query may have enabled nightly
+                if (getCachedNightlyJson()) {
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                }
             })
             .catch(err => console.error('Error fetching version list:', err))
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNightlyJson().then(() => {
+                rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+            }).catch(() => {})
+        })
 
         // -----------------------------------------------------------------
         // Query string: read initial params & write on change
@@ -1096,6 +1178,7 @@
             if (compare2.value) params.set('compare2', compare2.value)
             if (!diffextra.checked) params.set('extra', 'false')
             if (_diffShowAll) params.set('testing', 'true')
+            if (_diffShowNightly) params.set('nightly', 'true')
             const fmt = document.getElementById('diffFormat').value
             if (fmt !== 'side-by-side') params.set('format', fmt)
             const ctx = document.getElementById('diffContext').value
@@ -1116,6 +1199,7 @@
             const q2 = params.get('compare2')
             const extra = params.get('extra')
             const testing = params.get('testing')
+            const nightly = params.get('nightly')
             const fmt = params.get('format')
             const ctx = params.get('context')
             const hunks = params.get('hunks')
@@ -1123,12 +1207,28 @@
             const changelogFilter = params.get('changelogFilter')
             const changelogSort = params.get('changelogSort')
             const diffShowAll = document.getElementById('diffShowAll')
+            const diffShowNightly = document.getElementById('diffShowNightly')
 
+            let needsRebuild = false
             if (testing === 'true' && !_diffShowAll) {
                 _diffShowAll = true
-                diffShowAll.checked = true
-                rebuildSelect(compare1, _diffVersions, true)
-                rebuildSelect(compare2, _diffVersions, true)
+                if (diffShowAll) diffShowAll.checked = true
+                needsRebuild = true
+            }
+            if (nightly === 'true' && !_diffShowNightly) {
+                _diffShowNightly = true
+                if (diffShowNightly) diffShowNightly.checked = true
+                needsRebuild = true
+            }
+            // Auto-enable nightly if query asks for it explicitly
+            if ([q1, q2].some(v => v === 'nightly') && !_diffShowNightly) {
+                _diffShowNightly = true
+                if (diffShowNightly) diffShowNightly.checked = true
+                needsRebuild = true
+            }
+            if (needsRebuild) {
+                rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
             }
             if (extra === 'false') diffextra.checked = false
 

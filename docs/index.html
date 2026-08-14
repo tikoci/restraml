@@ -146,6 +146,10 @@
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
+                    <label class="ml-1">
+                        <input id="diffShowNightly" type="checkbox" role="switch">
+                        include <code>nightly</code>
+                    </label>
                 </ul>
             </nav>
 
@@ -213,6 +217,10 @@
                         <input id="schemaShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
+                    <label class="ml-1">
+                        <input id="schemaShowNightly" type="checkbox" role="switch">
+                        include <code>nightly</code>
+                    </label>
                 </ul>
             </nav>
             <article>
@@ -221,7 +229,8 @@
                     <code>extra-packages.zip</code> available for X86.</i><br>
                 <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small><br>
                 <small>🔍 <strong>OpenAPI 3</strong> schemas power the <a href="openapi.html">API Explorer</a> — an interactive browser for the RouterOS REST API with enriched descriptions.</small><br>
-                <small>📋 <strong><code>/app</code> YAML</strong> columns (7.22+) provide per-version JSON Schema files for validating RouterOS <code>/app</code> container YAML — <i>/app</i> for single-app definitions, <i>store</i> for <code>app-store-urls=</code> arrays. See the callout below for version-independent <i>latest</i> links.</small>
+                <small>📋 <strong><code>/app</code> YAML</strong> columns (7.22+) provide per-version JSON Schema files for validating RouterOS <code>/app</code> container YAML — <i>/app</i> for single-app definitions, <i>store</i> for <code>app-store-urls=</code> arrays. See the callout below for version-independent <i>latest</i> links.</small><br>
+                <small>🌙 <strong><code>nightly</code></strong> is the Box share at <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — single overwritten slot <code>docs/nightly/</code> with badge <code>nightly (7.25_ab434)</code> &middot; age. Its <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc.), see <code>nightly.json</code> for packages and build window.</small>
             </article>
             <table>
                 <thead>
@@ -350,6 +359,33 @@
         // Changelog / Release Notes modal
         // -----------------------------------------------------------------
         const filerows = document.getElementById('filerows')
+        let _schemaShowAll = false
+        let _schemaShowNightly = false
+
+        // Helper to refresh nightly badge labels after nightly.json loads
+        function refreshNightlyLabels() {
+            document.querySelectorAll('.row-ver[data-version="nightly"] .cell-vername a').forEach(a => {
+                a.textContent = formatVersionLabelWithAge('nightly')
+                a.href = getChangelogUrl('nightly')
+                const cached = getCachedNightlyJson()
+                if (cached?.nightlyVersion) {
+                    const age = formatRelativeAge(cached.builtAt)
+                    if (age) a.title = `Nightly ${cached.nightlyVersion} · built ${age}`
+                }
+            })
+            // Update selects if they contain nightly
+            if (typeof _diffVersions !== 'undefined' && _diffVersions.includes('nightly')) {
+                const c1 = document.getElementById('compare1')
+                const c2 = document.getElementById('compare2')
+                if (c1 && c2) {
+                    const v1 = c1.value, v2 = c2.value
+                    rebuildSelect(c1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(c2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    if (v1) c1.value = v1
+                    if (v2) c2.value = v2
+                }
+            }
+        }
 
         // initChangelogModal wires up all modal event handlers and returns showChangelog.
         // getVersions() returns _diffVersions (which includes/excludes testing per _diffShowAll).
@@ -377,10 +413,16 @@
 
             // Version label — keeps CHANGELOG URL as fallback href (right-click → open in tab),
             // but JS intercepts left-click to show the inline modal instead.
+            // For nightly show `nightly (7.25_ab434)` with age; nightly.json badge.
             const cellver = verrow.querySelector('.cell-vername a')
-            cellver.href = `https://download.mikrotik.com/routeros/${file.name}/CHANGELOG`
-            cellver.textContent = file.name
+            const isNightlyRow = isNightly(file.name)
+            cellver.href = getChangelogUrl(file.name)
+            cellver.textContent = isNightlyRow ? formatVersionLabelWithAge(file.name) : file.name
             cellver.dataset.changelogVersion = file.name
+            if (isNightlyRow && getCachedNightlyJson()?.nightlyVersion) {
+                const age = formatRelativeAge(getCachedNightlyJson().builtAt)
+                if (age) cellver.title = `Nightly ${getCachedNightlyJson().nightlyVersion} · built ${age}`
+            }
 
             // Helper: populate a cell with base/extra download links
             function makeVerCellExtra(schematype, schemafile, opts = { base: true }) {
@@ -397,8 +439,9 @@
             }
 
             makeVerCellExtra('raml', 'schema.raml')
-            // OpenAPI with docs shipped from 7.22.1+; older versions only have oas2.json
-            const hasOpenApi = compareVersions(file.name, '7.22.1') <= 0
+            // OpenAPI with docs shipped from 7.22.1+; older versions only have oas2.json.
+            // Nightly always has OpenAPI.
+            const hasOpenApi = isNightly(file.name) || compareVersions(file.name, '7.22.1') <= 0
             if (hasOpenApi) {
                 makeVerCellExtra('openapi', 'openapi.json')
             }
@@ -419,8 +462,8 @@
                 openapiCell.appendChild(exploreLink)
             }
 
-            // /app YAML schema links (7.22+)
-            const hasAppYaml = compareVersions(file.name, '7.22') <= 0
+            // /app YAML schema links (7.22+). Suppressed for nightly — only app.json is published there (N6).
+            const hasAppYaml = !isNightly(file.name) && compareVersions(file.name, '7.22') <= 0
             const appYamlCell = verrow.querySelector('.cell-appyaml')
             if (hasAppYaml) {
                 const wrap = document.createElement('small')
@@ -441,37 +484,67 @@
                 wrap.appendChild(label)
                 wrap.appendChild(links)
                 appYamlCell.appendChild(wrap)
+            } else if (isNightlyRow) {
+                appYamlCell.innerHTML = '<small style="opacity:0.6">n/a<br><span style="font-size:0.8em">see nightly/app.json</span></small>'
             }
 
-            // SNMP MIB link
-            verrow.querySelector('.cell-mib a').href =
-                `https://download.mikrotik.com/routeros/${file.name}/mikrotik.mib`
+            // SNMP MIB link — nightly has no MIB on download.mikrotik.com
+            const mibCell = verrow.querySelector('.cell-mib')
+            const mibUrl = getMibUrl(file.name)
+            if (mibUrl) {
+                mibCell.querySelector('a').href = mibUrl
+            } else {
+                mibCell.innerHTML = '<small style="opacity:0.6"><mark>SNMP</mark> n/a<br><span style="font-size:0.8em">Box share</span></small>'
+            }
 
             // Tag row with version name for filtering
             const tr = verrow.querySelector('.row-ver')
             tr.dataset.version = file.name
 
-            // Hide pre-release rows by default
-            if (isPreRelease(file.name)) {
-                tr.style.display = 'none'
+            // Hide pre-release rows by default (testing and nightly separately)
+            if (isNightly(file.name)) {
+                if (!_schemaShowNightly) tr.style.display = 'none'
+            } else if (isTestingPreRelease(file.name)) {
+                if (!_schemaShowAll) tr.style.display = 'none'
             }
 
             filerows.appendChild(verrow)
         })
 
         // -----------------------------------------------------------------
-        // "include testing" toggle for schema downloads table
+        // "include testing/nightly" toggles for schema downloads table
         // -----------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
             const schemaShowAll = document.getElementById('schemaShowAll')
-            schemaShowAll.addEventListener('change', () => {
-                const show = schemaShowAll.checked
-                document.querySelectorAll('#filerows .row-ver').forEach(row => {
-                    if (isPreRelease(row.dataset.version)) {
-                        row.style.display = show ? '' : 'none'
-                    }
+            const schemaShowNightly = document.getElementById('schemaShowNightly')
+            if (schemaShowAll) {
+                schemaShowAll.addEventListener('change', () => {
+                    _schemaShowAll = schemaShowAll.checked
+                    document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                        if (isTestingPreRelease(row.dataset.version)) {
+                            row.style.display = _schemaShowAll ? '' : 'none'
+                        }
+                    })
+                    writeQueryParams()
                 })
-            })
+            }
+            if (schemaShowNightly) {
+                schemaShowNightly.addEventListener('change', () => {
+                    _schemaShowNightly = schemaShowNightly.checked
+                    document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                        if (isNightly(row.dataset.version)) {
+                            row.style.display = _schemaShowNightly ? '' : 'none'
+                        }
+                    })
+                    // Sync the diff nightly toggle so nightly appears in the dropdowns
+                    _diffShowNightly = _schemaShowNightly
+                    const diffNightly = document.getElementById('diffShowNightly')
+                    if (diffNightly) diffNightly.checked = _diffShowNightly
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    writeQueryParams()
+                })
+            }
         })
 
         // -----------------------------------------------------------------
@@ -499,11 +572,13 @@
         // All collected versions for diff dropdowns (sorted at insertion time)
         const _diffVersions = []
         let _diffShowAll = false
+        let _diffShowNightly = false
 
-        // "include testing" toggle for diff dropdowns
+        // "include testing/nightly" toggles for diff dropdowns
         // Uses rebuildSelect() instead of option.hidden for Safari compatibility.
         document.addEventListener('DOMContentLoaded', () => {
             const diffShowAll = document.getElementById('diffShowAll')
+            const diffShowNightly = document.getElementById('diffShowNightly')
 
             // Process any queued builddir events that fired before DOMContentLoaded
             if (_pendingBuildDirs.length) {
@@ -519,11 +594,31 @@
             // Remove the early listener now that we've processed queued events
             document.removeEventListener('builddir', _earlyBuilddirListener)
 
-            diffShowAll.addEventListener('change', () => {
-                _diffShowAll = diffShowAll.checked
-                rebuildSelect(compare1, _diffVersions, _diffShowAll)
-                rebuildSelect(compare2, _diffVersions, _diffShowAll)
-            })
+            if (diffShowAll) {
+                diffShowAll.addEventListener('change', () => {
+                    _diffShowAll = diffShowAll.checked
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    writeQueryParams()
+                })
+            }
+            if (diffShowNightly) {
+                diffShowNightly.addEventListener('change', () => {
+                    _diffShowNightly = diffShowNightly.checked
+                    // Sync schema nightly toggle for consistent table visibility
+                    const schemaNightly = document.getElementById('schemaShowNightly')
+                    if (schemaNightly) {
+                        schemaNightly.checked = _diffShowNightly
+                        _schemaShowNightly = _diffShowNightly
+                        document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                            if (isNightly(row.dataset.version)) row.style.display = _diffShowNightly ? '' : 'none'
+                        })
+                    }
+                    rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                    writeQueryParams()
+                })
+            }
         })
 
         // Populate diff dropdowns from builddir events
@@ -534,8 +629,8 @@
                 _diffVersions.sort(compareVersions)
             }
             // Rebuild both selects with current filter state
-            rebuildSelect(compare1, _diffVersions, _diffShowAll)
-            rebuildSelect(compare2, _diffVersions, _diffShowAll)
+            rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+            rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
         })
 
         // Update "Show/Hide JSON Diff" toggle label based on open state
@@ -553,6 +648,7 @@
             if (compare2.value) params.set('compare2', compare2.value)
             if (!diffextra.checked) params.set('extra', 'false')
             if (_diffShowAll) params.set('testing', 'true')
+            if (_diffShowNightly || _schemaShowNightly) params.set('nightly', 'true')
             const qs = params.toString()
             history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
         }
@@ -563,18 +659,34 @@
             const q2 = params.get('compare2')
             const extra = params.get('extra')
             const testing = params.get('testing')
+            const nightly = params.get('nightly')
             const diffShowAll = document.getElementById('diffShowAll')
+            const diffShowNightly = document.getElementById('diffShowNightly')
             const schemaShowAll = document.getElementById('schemaShowAll')
+            const schemaShowNightly = document.getElementById('schemaShowNightly')
 
-            // Apply "testing" flag first so pre-release versions are available
+            // Apply "testing" and "nightly" flags first so those versions are available
+            let needsRebuild = false
             if (testing === 'true' && !_diffShowAll) {
                 _diffShowAll = true
-                diffShowAll.checked = true
-                schemaShowAll.checked = true
-                rebuildSelect(compare1, _diffVersions, true)
-                rebuildSelect(compare2, _diffVersions, true)
+                if (diffShowAll) diffShowAll.checked = true
+                if (schemaShowAll) { schemaShowAll.checked = true; _schemaShowAll = true }
+                needsRebuild = true
+            }
+            if (nightly === 'true' && !_diffShowNightly) {
+                _diffShowNightly = true
+                _schemaShowNightly = true
+                if (diffShowNightly) diffShowNightly.checked = true
+                if (schemaShowNightly) schemaShowNightly.checked = true
+                needsRebuild = true
+            }
+            // Legacy: ?testing=true without nightly implied nightly previously — keep nightly hidden unless explicitly requested
+            if (needsRebuild) {
+                rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
                 document.querySelectorAll('#filerows .row-ver').forEach(row => {
-                    if (isPreRelease(row.dataset.version)) row.style.display = ''
+                    if (isTestingPreRelease(row.dataset.version) && _diffShowAll) row.style.display = ''
+                    if (isNightly(row.dataset.version) && _diffShowNightly) row.style.display = ''
                 })
             }
 
@@ -588,6 +700,21 @@
             if (q2 && [...compare2.options].some(o => o.value === q2)) {
                 compare2.value = q2
                 needsCompare = true
+            }
+            // If compare params include nightly but toggle wasn't set via query, auto-enable nightly
+            const needsNightly = [q1, q2].some(v => v === 'nightly')
+            if (needsNightly && !_diffShowNightly) {
+                _diffShowNightly = true
+                _schemaShowNightly = true
+                if (diffShowNightly) diffShowNightly.checked = true
+                if (schemaShowNightly) schemaShowNightly.checked = true
+                rebuildSelect(compare1, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                rebuildSelect(compare2, _diffVersions, { includeTesting: _diffShowAll, includeNightly: _diffShowNightly })
+                document.querySelectorAll('#filerows .row-ver').forEach(row => {
+                    if (isNightly(row.dataset.version)) row.style.display = ''
+                })
+                if (q1 && [...compare1.options].some(o => o.value === q1)) compare1.value = q1
+                if (q2 && [...compare2.options].some(o => o.value === q2)) compare2.value = q2
             }
             if (needsCompare && compare1.value && compare2.value) {
                 document.dispatchEvent(new Event('vercompare'))
@@ -648,6 +775,7 @@
                     if (compare2.value) dparams.set('compare2', compare2.value)
                     if (!diffextra.checked) dparams.set('extra', 'false')
                     if (_diffShowAll) dparams.set('testing', 'true')
+                    if (_diffShowNightly) dparams.set('nightly', 'true')
                     diffToolLink.href = 'diff.html?' + dparams.toString()
                     diffToolLinkP.hidden = false
                 }
@@ -691,16 +819,25 @@
         // -----------------------------------------------------------------
         // Main: fetch version list (cached in localStorage by shared JS)
         // -----------------------------------------------------------------
-        fetchVersionList()
-            .then(versionDirs => {
+        Promise.all([fetchVersionList(), fetchNightlyJson().catch(() => null)])
+            .then(([versionDirs]) => {
                 versionDirs.forEach(file => {
                     file.pagesUrl = `${pagesUrl}/${file.path.replace('docs/', '')}`
                     document.dispatchEvent(new CustomEvent('builddir', { detail: file }))
                 })
+                // Refresh nightly badges now that nightly.json is cached (if published)
+                refreshNightlyLabels()
                 // Apply URL query params after all version options are populated
                 applyQueryParams()
+                // Second refresh after query params may have enabled nightly
+                refreshNightlyLabels()
             })
             .catch(error => console.error('Error fetching build list from GitHub:', error))
+
+        // Re-attempt nightly refresh once DOM is ready (covers early builddir queue)
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNightlyJson().then(() => refreshNightlyLabels()).catch(() => {})
+        })
 
         // --- WebMCP: get_routeros_changelog tool ---
         const _wmcp = registerWebMCPTools()
@@ -723,7 +860,28 @@
                 required: ['version'],
             },
             execute: async ({ version, query }) => {
-                const url = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
+                // Nightly: synthetic section from nightly.json via shared helper
+                if (isNightly(version)) {
+                    try {
+                        const sections = await fetchChangelogSectionsForVersion(version)
+                        const nightlyData = getCachedNightlyJson()
+                        const q = query ? query.toLowerCase() : ''
+                        const allEntries = sections.flatMap(s => s.entries)
+                        const filtered = q ? allEntries.filter(e => e.raw.toLowerCase().includes(q) || e.subsystem.toLowerCase().includes(q) || e.text.toLowerCase().includes(q)) : allEntries
+                        return JSON.stringify({
+                            version,
+                            releaseDate: nightlyData?.builtAt || null,
+                            nightlyVersion: nightlyData?.nightlyVersion || null,
+                            entries: filtered.map(e => ({ subsystem: e.subsystem, text: e.text, important: e.important })),
+                            totalEntries: allEntries.length,
+                            matchedEntries: filtered.length,
+                            source: 'https://mt.lv/nightly-build',
+                        })
+                    } catch (e) {
+                        return JSON.stringify({ error: e.message, fallbackUrl: 'https://mt.lv/nightly-build' })
+                    }
+                }
+                const url = getChangelogUrl(version)
                 try {
                     const resp = await fetch(url)
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)

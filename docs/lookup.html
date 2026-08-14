@@ -183,6 +183,12 @@
                             include <code>testing</code>
                         </label>
                     </li>
+                    <li>
+                        <label>
+                            <input id="includeNightly" type="checkbox" role="switch">
+                            include <code>nightly</code>
+                        </label>
+                    </li>
                 </ul>
             </nav>
         </section>
@@ -255,6 +261,10 @@
                     <mark>check all versions</mark> scans every published release at once.
                     <mark>include testing</mark> adds beta and RC builds to the version list
                     and automatically enables all-version scanning.
+                    <mark>include nightly</mark> shows the single overwritten slot
+                    <code>nightly</code> from
+                    <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — badge includes version and age; its
+                    <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc., see <code>nightly.json</code>).
                 </p>
             </article>
 
@@ -359,6 +369,7 @@
         const versionSelect = document.getElementById('version-select')
         const checkAllVersions = document.getElementById('checkAllVersions')
         const includeTesting = document.getElementById('includeTesting')
+        const includeNightly = document.getElementById('includeNightly')
         const includeExtra = document.getElementById('includeExtra')
         const resultsSection = document.getElementById('results-section')
         const resultsSummary = document.getElementById('results-summary')
@@ -388,10 +399,13 @@
         function rebuildVersionSelect() {
             const current = versionSelect.value
             while (versionSelect.options.length > 0) versionSelect.remove(0)
-            const showAll = includeTesting.checked
+            const showTesting = includeTesting.checked
+            const showNightly = includeNightly.checked
             allVersions.forEach(name => {
-                if (showAll || !isPreRelease(name)) {
-                    versionSelect.appendChild(new Option(name, name))
+                const show = shouldShowVersion(name, showTesting, showNightly)
+                if (show) {
+                    const label = formatVersionLabelWithAge(name)
+                    versionSelect.appendChild(new Option(label, name))
                 }
             })
             // Restore prior selection or default to newest
@@ -423,6 +437,12 @@
             if (files.some(file => file.name === 'deep-inspect.json')) {
                 return 'deep-inspect.json'
             }
+            // Nightly extra stores per-arch deep-inspect files; prefer x86 (canonical) when both exist,
+            // otherwise fall back to any variant (e.g. arm64). Do not rely on manifest order.
+            const x86Variant = files.find(file => file.name === 'deep-inspect.x86.json')
+            if (x86Variant) return x86Variant.name
+            const deepInspectVariant = files.find(file => file.name.startsWith('deep-inspect.') && file.name.endsWith('.json'))
+            if (deepInspectVariant) return deepInspectVariant.name
             return 'inspect.json'
         }
 
@@ -623,11 +643,15 @@
             // right-click / middle-click falls back to the CHANGELOG URL.
             const tdVer = document.createElement('td')
             const link = document.createElement('a')
-            link.href = `https://download.mikrotik.com/routeros/${ver}/CHANGELOG`
-            link.textContent = ver
+            link.href = getChangelogUrl(ver)
+            link.textContent = formatVersionLabelWithAge(ver)
             link.dataset.changelogVersion = ver
             if (result.sourceFile) {
                 link.title = `Lookup used ${result.sourceFile}`
+            }
+            if (isNightly(ver) && getCachedNightlyJson()?.nightlyVersion) {
+                const age = formatRelativeAge(getCachedNightlyJson().builtAt)
+                if (age) link.title = (link.title ? link.title + ' — ' : '') + `nightly ${getCachedNightlyJson().nightlyVersion} · ${age}`
             }
             tdVer.appendChild(link)
             tr.appendChild(tdVer)
@@ -676,11 +700,12 @@
 
             const lookAll = checkAllVersions.checked
             const showTesting = includeTesting.checked
+            const showNightly = includeNightly.checked
             const useExtra = includeExtra.checked
 
             // Determine which versions to check
             const versionsToCheck = lookAll
-                ? allVersions.filter(v => showTesting || !isPreRelease(v))
+                ? allVersions.filter(v => shouldShowVersion(v, showTesting, showNightly))
                 : [versionSelect.value].filter(Boolean)
 
             if (versionsToCheck.length === 0) return
@@ -748,20 +773,22 @@
             // Build a smart summary sentence
             const schemaLabel = useExtra ? 'extra-packages' : 'base'
             const testingNote = showTesting ? ' (including testing)' : ''
+            const nightlyNote = showNightly ? ' + nightly' : ''
             let summary
             if (!lookAll) {
                 // Single version
                 const ver = versionsToCheck[0]
                 const verb = foundCount > 0 ? 'Found' : 'Not found'
-                summary = `<p>${verb} in <strong>${ver}</strong> (${schemaLabel} schema) &mdash; ` +
+                const verLabel = formatVersionLabelWithAge(ver)
+                summary = `<p>${verb} in <strong>${verLabel}</strong> (${schemaLabel} schema) &mdash; ` +
                     `<code>${normalizedPath}</code>${attrPart}</p>`
             } else {
                 // All versions
-                const allCount = allVersions.filter(v => showTesting || !isPreRelease(v)).length
+                const allCount = allVersions.filter(v => shouldShowVersion(v, showTesting, showNightly)).length
                 const scopeLabel = checkedCount === allCount
-                    ? `all ${checkedCount} ${showTesting ? 'stable and testing' : 'stable'} versions`
+                    ? `all ${checkedCount} ${showTesting ? 'stable and testing' : 'stable'}${showNightly ? ' + nightly' : ''} versions`
                     : `${checkedCount} version${checkedCount !== 1 ? 's' : ''}`
-                summary = `<p>Found in <strong>${foundCount}</strong> of ${scopeLabel}${testingNote} ` +
+                summary = `<p>Found in <strong>${foundCount}</strong> of ${scopeLabel}${testingNote}${nightlyNote} ` +
                     `(${schemaLabel} schema) &mdash; <code>${normalizedPath}</code>${attrPart}</p>`
             }
             if (attrStr && enrichedCount > 0) {
@@ -830,17 +857,33 @@
             }
             rebuildVersionSelect()
             triggerLookup(true)
+            writeQueryParams()
+        })
+
+        // "Include nightly" toggle → also implies all versions, rebuild, lookup
+        includeNightly.addEventListener('change', () => {
+            if (includeNightly.checked && !checkAllVersions.checked) {
+                checkAllVersions.checked = true
+                versionSelect.disabled = true
+            }
+            rebuildVersionSelect()
+            triggerLookup(true)
+            writeQueryParams()
         })
 
         // -----------------------------------------------------------------
         // Bootstrap: fetch version list (cached in localStorage by shared JS)
         // -----------------------------------------------------------------
-        fetchVersionList()
-            .then(data => {
+        Promise.all([fetchVersionList(), fetchNightlyJson().catch(() => null)])
+            .then(([data]) => {
                 setVersionEntries(data)
-                // Apply query params before rebuilding select (so testing flag is set)
+                // Refresh nightly badge once available
+                if (getCachedNightlyJson()) rebuildVersionSelect()
+                // Apply query params before rebuilding select (so testing/nightly flags are set)
                 const qVersion = applyQueryParams()
                 rebuildVersionSelect()
+                // Second refresh after query may have enabled nightly
+                if (getCachedNightlyJson()) rebuildVersionSelect()
                 // Apply specific version if requested (after options are built)
                 if (qVersion && [...versionSelect.options].some(o => o.value === qVersion)) {
                     versionSelect.value = qVersion
@@ -852,6 +895,10 @@
                 versionSelect.innerHTML = '<option value="" disabled selected>Failed to load versions</option>'
                 console.error('Error fetching version list:', err)
             })
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNightlyJson().then(() => rebuildVersionSelect()).catch(() => {})
+        })
 
         // -----------------------------------------------------------------
         // Query string: read initial params & write on change
@@ -868,6 +915,7 @@
                 params.set('version', versionSelect.value)
             }
             if (includeTesting.checked) params.set('testing', 'true')
+            if (includeNightly.checked) params.set('nightly', 'true')
             if (includeExtra.checked) params.set('extra', 'true')
             const qs = params.toString()
             history.replaceState(null, '', qs ? '?' + qs : window.location.pathname)
@@ -881,6 +929,7 @@
             const version = params.get('version')
             const allVersionsParam = params.get('allVersions')
             const testing = params.get('testing')
+            const nightly = params.get('nightly')
             const extra = params.get('extra')
 
             if (path !== null) {
@@ -892,7 +941,18 @@
                 includeTesting.checked = true
                 checkAllVersions.checked = true
                 versionSelect.disabled = true
+            }
+            if (nightly === 'true') {
+                includeNightly.checked = true
+                checkAllVersions.checked = true
+                versionSelect.disabled = true
             } else if (allVersionsParam === 'true') {
+                checkAllVersions.checked = true
+                versionSelect.disabled = true
+            }
+            // Auto-enable nightly if version param is nightly
+            if (version === 'nightly' && !includeNightly.checked) {
+                includeNightly.checked = true
                 checkAllVersions.checked = true
                 versionSelect.disabled = true
             }
