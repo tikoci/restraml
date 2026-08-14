@@ -1410,7 +1410,10 @@ async function main() {
   // sags — so a package-count gate passes and the argsTotal floor fires
   // thousands of args late, naming nothing. Fail here instead, before enrichment
   // spends minutes on a tree that is already known-incomplete.
-  const missingRoots = opts.requireRoots.filter((r) => !census[r]);
+  // Key presence, not truthiness: a census value is an arg COUNT, and ~10 roots
+  // legitimately have zero args (console verbs like break/continue/exit/quit/undo).
+  // The question here is "did the menu appear at all", not "does it carry args".
+  const missingRoots = opts.requireRoots.filter((r) => !Object.hasOwn(census, r));
   if (missingRoots.length > 0) {
     console.error(`\n✗ Required root(s) missing from the crawled tree: ${missingRoots.map((r) => `/${r}`).join(" ")}`);
     console.error("  → Package menus are absent. The usual cause is packages that are installed");

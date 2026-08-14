@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
   filterCompletions,
@@ -831,6 +831,25 @@ describe("CLI: --require-roots census gate", () => {
   test("tolerates leading slashes", async () => {
     const { exitCode } = await runDeepInspect([...baseArgs(), "--require-roots", "/ip,/interface"]);
     expect(exitCode).toBe(0);
+  });
+
+  // Census values are arg COUNTS, and ~10 real roots have zero args (console
+  // verbs like break/continue/exit/quit/undo). A truthiness check would report
+  // those as "missing from the crawled tree" while they are plainly present.
+  test("a root with zero args counts as present, not missing", async () => {
+    const fixture = join(tmpDir, "zero-arg-root.json");
+    writeFileSync(fixture, JSON.stringify({
+      quit: { _type: "cmd" },
+      ip: { _type: "dir", address: { _type: "cmd", numbers: { _type: "arg" } } },
+    }));
+    const { exitCode, stderr } = await runDeepInspect([
+      "--inspect-file", fixture,
+      "--skip-completion", "--skip-openapi",
+      "--output-dir", tmpDir,
+      "--require-roots", "quit,ip",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stderr).not.toContain("Required root(s) missing");
   });
 
   test("is opt-in — absent flag never gates", async () => {

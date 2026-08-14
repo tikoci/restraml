@@ -60,8 +60,9 @@ jobs:
           ls -la /dev/kvm
 
       - name: Download CHR x86 image
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          VER="${{ inputs.rosver }}"
           wget -q "https://download.mikrotik.com/routeros/${VER}/chr-${VER}.vdi.zip" -O chr.vdi.zip \
             || (rm -f chr.vdi.zip && wget -q "https://cdn.mikrotik.com/routeros/${VER}/chr-${VER}.vdi.zip" -O chr.vdi.zip)
           unzip -q chr.vdi.zip
@@ -124,8 +125,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download and install extra packages
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          VER="${{ inputs.rosver }}"
           mkdir extra && cd extra
           wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip" \
             || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip"
@@ -302,8 +304,9 @@ jobs:
           fi
 
       - name: Download CHR arm64 image
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          VER="${{ inputs.rosver }}"
           wget -q "https://download.mikrotik.com/routeros/${VER}/chr-${VER}-arm64.img.zip" -O chr-arm64.img.zip \
             || (rm -f chr-arm64.img.zip && wget -q "https://cdn.mikrotik.com/routeros/${VER}/chr-${VER}-arm64.img.zip" -O chr-arm64.img.zip)
           unzip -q chr-arm64.img.zip
@@ -315,8 +318,9 @@ jobs:
         # Same source and primary/fallback order as the x86 job. Stable releases
         # live only on download.mikrotik.com; beta/rc only on cdn.mikrotik.com.
         # Do not reorder these two hosts.
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          VER="${{ inputs.rosver }}"
           mkdir extra && cd extra
           wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip" \
             || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-arm64-${VER}.zip"
@@ -603,8 +607,10 @@ jobs:
           echo "✓ arm64 structural delta looks legitimate ($ARM64_ONLY arm64-only paths)"
 
       - name: Generate step summary
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          echo "### Deep-Inspect Multi-Arch: ${{ inputs.rosver }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Deep-Inspect Multi-Arch: ${VER}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
@@ -617,8 +623,9 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Publish deep-inspect files to docs
+        env:
+          VER: ${{ inputs.rosver }}
         run: |
-          VER="${{ inputs.rosver }}"
           DOCS_PATH="docs/${VER}/extra"
           mkdir -p "$DOCS_PATH"
           cp deep-inspect.x86.json "$DOCS_PATH/"

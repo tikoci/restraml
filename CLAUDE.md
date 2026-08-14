@@ -1098,9 +1098,10 @@ the arm64 job instead fired a `/rest/execute` script ending in
 missed builds (#96). See the anti-pattern below.
 
 ### `/system/package/apply-changes` prompts — never rely on it to reboot
+
 MikroTik's Packages manual documents it as interactive:
 
-```
+```text
 /system/package/apply-changes
 Apply scheduled changes and reboot device? [y/N]:
 ```
