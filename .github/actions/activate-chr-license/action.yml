@@ -120,13 +120,16 @@ runs:
           const arch = process.env.ARCH || 'unknown'
           const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
 
+          // Match on title alone — deliberately NOT filtered by label. Labels are
+          // decoration; if one were ever renamed or removed, a label-filtered
+          // lookup would quietly stop finding the standing issue and start
+          // opening a duplicate on every degraded run.
           let existing = null
           try {
-            const { data: open } = await github.rest.issues.listForRepo({
+            const open = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'ci,licensing',
               per_page: 100,
             })
             existing = open.find(i => i.title === title) || null
@@ -137,6 +140,29 @@ runs:
           if (existing) {
             console.log(`Standing issue #${existing.number} already open — not commenting (persistent condition).`)
             return
+          }
+
+          // Create the labels if absent. `ci` and `licensing` do not exist in this
+          // repo yet, and issues.create rejects unknown labels — with
+          // continue-on-error above, that would silently mean no issue at all.
+          const labels = ['ci', 'licensing']
+          for (const name of labels) {
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name })
+            } catch {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name,
+                  color: 'ededed',
+                  description: name === 'ci' ? 'CI workflow behaviour' : 'CHR licensing / trial pool',
+                })
+                console.log(`Created missing label "${name}".`)
+              } catch (e) {
+                console.log(`Could not create label "${name}": ${e.message}`)
+              }
+            }
           }
 
           const body = [
@@ -166,11 +192,15 @@ runs:
             'add comments. Per-run detail is in each job summary.',
           ].join('\n')
 
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title,
-            body,
-            labels: ['ci', 'licensing'],
-          })
+          // Never lose the issue over a label problem — retry bare.
+          try {
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo, title, body, labels,
+            })
+          } catch (e) {
+            console.log(`Create with labels failed (${e.message}) — retrying without labels.`)
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo, title, body,
+            })
+          }
           console.log(`Created standing licensing issue (first seen on ${arch}).`)

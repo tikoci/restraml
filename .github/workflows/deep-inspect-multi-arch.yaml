@@ -124,7 +124,9 @@ jobs:
           timeout: "10"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download and install extra packages
+      - name: Download x86 extra packages
+        # Stable releases live only on download.mikrotik.com; beta/rc only on
+        # cdn.mikrotik.com. Do not reorder these two hosts.
         env:
           VER: ${{ inputs.rosver }}
         run: |
@@ -132,7 +134,21 @@ jobs:
           wget -q "https://download.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip" \
             || wget -q "https://cdn.mikrotik.com/routeros/${VER}/all_packages-x86-${VER}.zip"
           unzip -q all_packages*.zip && rm all_packages*.zip && cd ..
+          echo "Packages to inject: $(find extra -name '*.npk' | wc -l)"
+          ls -lh extra/*.npk
+
+      - name: Install extra packages via SCP
+        # SLIRP runs in the QEMU host process — it is unaffected by guest events.
+        # RouterOS installs any .npk found at flash root on the next boot, so the
+        # activation trigger is the explicit reboot in the next step — never
+        # /system/package/apply-changes, which prompts and defaults to no (#96).
+        # Bounded so a slow-upload regression fails fast instead of quietly
+        # consuming the job budget (see the arm64 job for the 2026-04 precedent).
+        timeout-minutes: 15
+        run: |
+          started=$(date +%s)
           scp -o StrictHostKeyChecking=no -P 9122 extra/* admin@localhost:/
+          echo "Uploaded $(find extra -name '*.npk' | wc -l) NPK(s) in $(( $(date +%s) - started ))s."
 
       - name: Reboot CHR and wait for extra packages
         run: |
@@ -409,8 +425,10 @@ jobs:
           account: ${{ secrets.MIKROTIK_ACCOUNT }}
           password: ${{ secrets.MIKROTIK_PASSWORD }}
           arch: arm64
-          # TCG guests answer slowly through the emulated TCP stack.
-          timeout: ${{ env.ARM_ACCEL == 'kvm' && '10' || '30' }}
+          # Flat 30s rather than branching on ARM_ACCEL: this is a ceiling, not a
+          # sleep, so a KVM guest that answers in under a second is unaffected —
+          # and TCG guests answer slowly through the emulated TCP stack.
+          timeout: "30"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install extra packages via SCP
