@@ -27,7 +27,7 @@
     "test:native-api-drops": "bun scripts/test-native-api-drops.ts"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^5.3.0"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
