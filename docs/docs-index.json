@@ -1,9 +1,9 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-08-18T04:55:23.512Z",
+  "generatedAt": "2026-08-24T14:56:06.715Z",
   "rootPath": "docs",
-  "latestVersion": "7.24",
-  "latestStableVersion": "7.24",
+  "latestVersion": "7.24.1",
+  "latestStableVersion": "7.24.1",
   "nightly": {
     "name": "nightly",
     "nightlyVersion": "7.25_ab434",
@@ -188,6 +188,19 @@
           "dirs": []
         }
       ]
+    },
+    {
+      "name": "7.24.1",
+      "path": "docs/7.24.1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.24.1/app.json",
+          "type": "file"
+        }
+      ],
+      "dirs": []
     },
     {
       "name": "7.24",
