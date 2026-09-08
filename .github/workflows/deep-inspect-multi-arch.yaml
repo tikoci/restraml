@@ -47,7 +47,7 @@ jobs:
       BASICAUTH: "admin:"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install QEMU (x86)
         run: sudo apt-get update -y && sudo apt-get install -y qemu-system-x86 qemu-utils
@@ -286,7 +286,7 @@ jobs:
       BASICAUTH: "admin:"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install QEMU for aarch64
         run: |
@@ -574,7 +574,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Configure git for automated commits
         run: |

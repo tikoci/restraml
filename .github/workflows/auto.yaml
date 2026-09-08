@@ -46,7 +46,7 @@ jobs:
       skipped_versions: ${{ steps.needs-builds.outputs.skipped_versions }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Get RouterOS "stable" channel version
         id: get-stable
