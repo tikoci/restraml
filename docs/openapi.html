@@ -433,7 +433,7 @@
                 <input id="includeTesting" type="checkbox">
                 <code>testing</code>
             </label>
-            <label class="toggle-label">
+            <label class="toggle-label" data-nightly-feature>
                 <input id="includeNightly" type="checkbox">
                 <code>nightly</code>
             </label>
@@ -540,7 +540,7 @@
                     if (opt.value === v) { versionSelect.value = v; break; }
                 }
                 // Auto-enable nightly if version is nightly
-                if (v === 'nightly' && nightlyCheck && !nightlyCheck.checked) {
+                if (NIGHTLY_FEATURE_ENABLED && v === 'nightly' && nightlyCheck && !nightlyCheck.checked) {
                     nightlyCheck.checked = true
                     rebuildVersionSelect()
                     for (const opt of versionSelect.options) {
@@ -556,7 +556,7 @@
                 rebuildVersionSelect();
             }
             if (params.has('nightly')) {
-                nightlyCheck.checked = params.get('nightly') === 'true';
+                nightlyCheck.checked = NIGHTLY_FEATURE_ENABLED && params.get('nightly') === 'true';
                 rebuildVersionSelect();
             }
         }
@@ -723,6 +723,7 @@
 
         // --- Init ---
         initThemeSwitcher();
+        applyNightlyFeatureFlag();
         syncThemeToScalar();
         new MutationObserver(syncThemeToScalar).observe(document.documentElement, {
             attributes: true,
