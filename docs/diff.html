@@ -320,7 +320,7 @@
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
-                    <label class="ml-1">
+                    <label class="ml-1" data-nightly-feature>
                         <input id="diffShowNightly" type="checkbox" role="switch">
                         include <code>nightly</code>
                     </label>
@@ -493,7 +493,7 @@
                     </small>
                 </div>
                 <hr>
-                <div class="behind-curtain">
+                <div class="behind-curtain" data-nightly-feature>
                     <small>
                         <b>Nightly note</b> &mdash; <code>nightly</code> is the single
                         overwritten slot at <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a>
@@ -1218,13 +1218,13 @@
                 if (diffShowAll) diffShowAll.checked = true
                 needsRebuild = true
             }
-            if (nightly === 'true' && !_diffShowNightly) {
+            if (NIGHTLY_FEATURE_ENABLED && nightly === 'true' && !_diffShowNightly) {
                 _diffShowNightly = true
                 if (diffShowNightly) diffShowNightly.checked = true
                 needsRebuild = true
             }
             // Auto-enable nightly if query asks for it explicitly
-            if ([q1, q2].some(v => v === 'nightly') && !_diffShowNightly) {
+            if (NIGHTLY_FEATURE_ENABLED && [q1, q2].some(v => v === 'nightly') && !_diffShowNightly) {
                 _diffShowNightly = true
                 if (diffShowNightly) diffShowNightly.checked = true
                 needsRebuild = true
@@ -1364,7 +1364,7 @@
         })
     </script>
 
-    <script>initThemeSwitcher()</script>
+    <script>initThemeSwitcher(); applyNightlyFeatureFlag()</script>
 
 </body>
 

@@ -20,10 +20,19 @@ name: "Nightly Build"
 #   nightly-build.ts stages inspect.json/schema.raml/openapi.json into that dir.
 # - Publish job merges x86+arm64 provenances, runs diff, regenerates docs-index.json,
 #   and publishes via publish-with-retry.
+#
+# STATUS (see #101): MikroTik stopped publishing https://mt.lv/nightly-build
+# (redirect now dead / password-protected per the forum thread linked in #101).
+# The daily `schedule:` trigger is disabled below so CI stops polling a dead
+# share every day; `workflow_dispatch` is kept so this can be run manually the
+# moment nightly-build comes back, without rebuilding any of this from scratch.
+# The corresponding docs/*.html "include nightly" UI is hidden behind the
+# `NIGHTLY_FEATURE_ENABLED` flag in docs/restraml-shared.js — flip both back
+# on together.
 
 on:
-  schedule:
-    - cron: "0 6 * * *"
+  # schedule:
+  #   - cron: "0 6 * * *" # disabled — see STATUS note above (#101)
   workflow_dispatch:
     inputs:
       force:
