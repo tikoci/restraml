@@ -183,7 +183,7 @@
                             include <code>testing</code>
                         </label>
                     </li>
-                    <li>
+                    <li data-nightly-feature>
                         <label>
                             <input id="includeNightly" type="checkbox" role="switch">
                             include <code>nightly</code>
@@ -261,10 +261,10 @@
                     <mark>check all versions</mark> scans every published release at once.
                     <mark>include testing</mark> adds beta and RC builds to the version list
                     and automatically enables all-version scanning.
-                    <mark>include nightly</mark> shows the single overwritten slot
+                    <span data-nightly-feature><mark>include nightly</mark> shows the single overwritten slot
                     <code>nightly</code> from
                     <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — badge includes version and age; its
-                    <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc., see <code>nightly.json</code>).
+                    <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc., see <code>nightly.json</code>).</span>
                 </p>
             </article>
 
@@ -942,7 +942,7 @@
                 checkAllVersions.checked = true
                 versionSelect.disabled = true
             }
-            if (nightly === 'true') {
+            if (NIGHTLY_FEATURE_ENABLED && nightly === 'true') {
                 includeNightly.checked = true
                 checkAllVersions.checked = true
                 versionSelect.disabled = true
@@ -951,7 +951,7 @@
                 versionSelect.disabled = true
             }
             // Auto-enable nightly if version param is nightly
-            if (version === 'nightly' && !includeNightly.checked) {
+            if (NIGHTLY_FEATURE_ENABLED && version === 'nightly' && !includeNightly.checked) {
                 includeNightly.checked = true
                 checkAllVersions.checked = true
                 versionSelect.disabled = true
@@ -1061,7 +1061,7 @@
         })
     </script>
 
-    <script>initThemeSwitcher()</script>
+    <script>initThemeSwitcher(); applyNightlyFeatureFlag()</script>
 
 </body>
 

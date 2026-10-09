@@ -51,6 +51,29 @@ const _BRAND_GRADIENTS = [
  */
 const SYNTHETIC_VERSIONS = new Set(['nightly'])
 
+// --- Nightly feature flag ----------------------------------------------
+// MikroTik stopped publishing https://mt.lv/nightly-build (see issue #101 /
+// forum: "Is https://mt.lv/nightly-build now password protected?"). The
+// nightly plumbing (toggles, badges, synthetic changelog, docs/nightly/
+// artifacts) stays in the codebase behind this flag instead of being ripped
+// out, so it can be re-enabled without starting from scratch if MikroTik
+// brings nightly-build back. Flip to `true` (and re-enable the `schedule:`
+// trigger in .github/workflows/nightly.yaml) to resume.
+const NIGHTLY_FEATURE_ENABLED = false
+
+/**
+ * Hides every element marked `[data-nightly-feature]` when the nightly
+ * feature flag above is disabled. Call once per page during init (alongside
+ * initThemeSwitcher()) so nightly-only controls don't show a month-stale
+ * slot as if it were live.
+ */
+function applyNightlyFeatureFlag() {
+    if (NIGHTLY_FEATURE_ENABLED) return
+    document.querySelectorAll('[data-nightly-feature]').forEach((el) => {
+        el.hidden = true
+    })
+}
+
 function parseVersion(str) {
     const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
     if (!m) return null
@@ -118,7 +141,7 @@ function rebuildSelect(sel, versions, showAll) {
         const isNightlyVersion = SYNTHETIC_VERSIONS.has(name)
         const isTesting = /(?:beta|rc)\d*$/.test(name)
         let show = true
-        if (isNightlyVersion) show = includeNightly
+        if (isNightlyVersion) show = NIGHTLY_FEATURE_ENABLED && includeNightly
         else if (isTesting) show = includeTesting
         if (show) {
             const label = isNightlyVersion && typeof formatVersionLabel === 'function'
@@ -162,7 +185,7 @@ function isTestingPreRelease(name) {
  * Whether a version should be shown given the two toggles.
  */
 function shouldShowVersion(name, includeTesting, includeNightly) {
-    if (isNightly(name)) return !!includeNightly
+    if (isNightly(name)) return NIGHTLY_FEATURE_ENABLED && !!includeNightly
     if (isTestingPreRelease(name)) return !!includeTesting
     return true
 }
@@ -1123,6 +1146,8 @@ Object.assign(window, {
     isNightly,
     isTestingPreRelease,
     shouldShowVersion,
+    NIGHTLY_FEATURE_ENABLED,
+    applyNightlyFeatureFlag,
     rebuildSelect,
     fetchVersionList,
     fetchNightlyJson,
