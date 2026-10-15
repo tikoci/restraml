@@ -146,7 +146,7 @@
                         <input id="diffShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
-                    <label class="ml-1">
+                    <label class="ml-1" data-nightly-feature>
                         <input id="diffShowNightly" type="checkbox" role="switch">
                         include <code>nightly</code>
                     </label>
@@ -217,7 +217,7 @@
                         <input id="schemaShowAll" type="checkbox" role="switch">
                         include <code>testing</code>
                     </label>
-                    <label class="ml-1">
+                    <label class="ml-1" data-nightly-feature>
                         <input id="schemaShowNightly" type="checkbox" role="switch">
                         include <code>nightly</code>
                     </label>
@@ -230,7 +230,7 @@
                 <small>📬 The <strong>RAML</strong> schema can be imported into <a href="https://www.postman.com/" target="_blank" rel="noopener">Postman</a> — see <a href="https://github.com/tikoci/restraml/blob/main/README.md#usage-with-postman">README.md</a> for import instructions.</small><br>
                 <small>🔍 <strong>OpenAPI 3</strong> schemas power the <a href="openapi.html">API Explorer</a> — an interactive browser for the RouterOS REST API with enriched descriptions.</small><br>
                 <small>📋 <strong><code>/app</code> YAML</strong> columns (7.22+) provide per-version JSON Schema files for validating RouterOS <code>/app</code> container YAML — <i>/app</i> for single-app definitions, <i>store</i> for <code>app-store-urls=</code> arrays. See the callout below for version-independent <i>latest</i> links.</small><br>
-                <small>🌙 <strong><code>nightly</code></strong> is the Box share at <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — single overwritten slot <code>docs/nightly/</code> with badge <code>nightly (7.25_ab434)</code> &middot; age. Its <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc.), see <code>nightly.json</code> for packages and build window.</small>
+                <small data-nightly-feature>🌙 <strong><code>nightly</code></strong> is the Box share at <a href="https://mt.lv/nightly-build">mt.lv/nightly-build</a> — single overwritten slot <code>docs/nightly/</code> with badge <code>nightly (7.25_ab434)</code> &middot; age. Its <code>extra/</code> is partial (no <code>dude</code>/<code>user-manager</code>/etc.), see <code>nightly.json</code> for packages and build window.</small>
             </article>
             <table>
                 <thead>
@@ -673,7 +673,7 @@
                 if (schemaShowAll) { schemaShowAll.checked = true; _schemaShowAll = true }
                 needsRebuild = true
             }
-            if (nightly === 'true' && !_diffShowNightly) {
+            if (NIGHTLY_FEATURE_ENABLED && nightly === 'true' && !_diffShowNightly) {
                 _diffShowNightly = true
                 _schemaShowNightly = true
                 if (diffShowNightly) diffShowNightly.checked = true
@@ -702,7 +702,7 @@
                 needsCompare = true
             }
             // If compare params include nightly but toggle wasn't set via query, auto-enable nightly
-            const needsNightly = [q1, q2].some(v => v === 'nightly')
+            const needsNightly = NIGHTLY_FEATURE_ENABLED && [q1, q2].some(v => v === 'nightly')
             if (needsNightly && !_diffShowNightly) {
                 _diffShowNightly = true
                 _schemaShowNightly = true
@@ -934,7 +934,7 @@
         })
     </script>
 
-    <script>initThemeSwitcher()</script>
+    <script>initThemeSwitcher(); applyNightlyFeatureFlag()</script>
 
 </body>
 

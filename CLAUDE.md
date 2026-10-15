@@ -965,7 +965,7 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
 | `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs in parallel. Both arches install extra packages identically — `all_packages-<arch>` zip → SCP → **explicit** reboot — then run a live deep-inspect crawl gated on `--require-roots`, diff results, and publish `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
-| `nightly.yaml` | Daily cron (06:00 UTC) + manual | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
+| `nightly.yaml` | Manual only (`schedule` disabled — see #101) | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 | `codeql.yml` | Push + PR + weekly schedule | Runs repository-managed CodeQL for JavaScript/TypeScript and GitHub Actions, using repo path ignores for generated versioned docs artifacts |
 | `dependency-review.yml` | Pull requests | Uses GitHub dependency review to block new high-severity vulnerable dependency changes |
@@ -973,6 +973,15 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
 ### `nightly.yaml` — the `docs/nightly/` single slot
+
+> **Status (2026-09, see #101): disabled pending upstream availability.** MikroTik stopped
+> publishing `https://mt.lv/nightly-build` (the redirect now dies / is password-protected — see
+> the forum thread linked from #101). The workflow's `schedule:` trigger is commented out so CI
+> stops polling a dead share daily; `workflow_dispatch` still works for a manual run the moment
+> nightly-build returns. The `docs/*.html` "include nightly" toggles are hidden behind the
+> `NIGHTLY_FEATURE_ENABLED` flag in `docs/restraml-shared.js` (`applyNightlyFeatureFlag()` hides
+> any element marked `[data-nightly-feature]`) — flip both back on together to resume. All the
+> logic below (and in `scripts/nightly-build.ts`) is otherwise unchanged and ready to go.
 
 MikroTik's nightly ("ab") builds are published only as `.npk` files on a Box/Seafile share behind
 `https://mt.lv/nightly-build` — there is no nightly CHR disk image. `scripts/nightly-build.ts`
