@@ -152,11 +152,11 @@
                     "anyOf": [
                       {
                         "$comment": "Old OCI-style: [ip:]host:container[/tcp|/udp][:label]",
-                        "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+                        "pattern": "^(\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
                       },
                       {
                         "$comment": "New RouterOS 7.23+ style: [ip:]host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
-                        "pattern": "^(\\d+\\.\\d+\\.\\d+\\.\\d+:|\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
+                        "pattern": "^(\\[[a-zA-Z0-9]+\\]:)?(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
                       }
                     ]
                   },
