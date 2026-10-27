@@ -30,7 +30,10 @@ const addFormats = require("ajv-formats")
 const SINGLE_SCHEMA_PATH = process.env.APP_YAML_SCHEMA || "docs/routeros-app-yaml-schema.latest.json"
 const STORE_SCHEMA_PATH = "docs/routeros-app-yaml-store-schema.latest.json"
 const FAILURES_FILE = process.env.APP_YAML_FAILURES_FILE || "app-yaml-failures.txt"
-const APP_LIST_WAIT_SECONDS = Number(process.env.APP_LIST_WAIT_SECONDS || 180)
+const APP_LIST_WAIT_SECONDS = (() => {
+  const s = Number(process.env.APP_LIST_WAIT_SECONDS || 180)
+  return Number.isFinite(s) && s >= 0 ? s : 180
+})()
 const VERSION_SEGMENT_RE = /^[0-9A-Za-z][0-9A-Za-z._-]*$/
 
 function assertSafeVersion(version) {
@@ -343,7 +346,7 @@ async function main() {
     // publishing that [] is what emptied the /app editor's example picker.
     const deadline = Date.now() + APP_LIST_WAIT_SECONDS * 1000
     for (let attempt = 1; ; attempt++) {
-      const resp = await fetch(appUrl, { headers })
+      const resp = await fetch(appUrl, { headers, signal: AbortSignal.timeout(30_000) })
       if (resp.status === 404 || resp.status === 400) {
         console.log(
           `::notice::/app endpoint returned ${resp.status} — this RouterOS version may not include /app (skipping live validation)`

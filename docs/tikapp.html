@@ -1207,10 +1207,11 @@
         // --- Load app.json -----------------------------------------------
         async function fetchAppJson(ver) {
             if (!appJsonCache.has(ver)) {
+                // Cache published lists (even []), but not failures, so a transient error can be retried
                 appJsonCache.set(ver, fetch(`${RESTRAML.pagesUrl}/${ver}/app.json`)
-                    .then(r => r.ok ? r.json() : [])
+                    .then(r => { if (!r.ok) throw new Error(r.status); return r.json() })
                     .then(apps => Array.isArray(apps) ? apps : [])
-                    .catch(() => []))
+                    .catch(() => { appJsonCache.delete(ver); return [] }))
             }
             return appJsonCache.get(ver)
         }
@@ -1221,7 +1222,7 @@
         async function loadAppJson(version) {
             if (version !== 'latest' && version !== 'editor') return version ? fetchAppJson(version) : []
             const stable = schemaVersions.filter(v => !isPreRelease(v.name)).map(v => v.name)
-            for (const ver of stable.slice(0, 5)) {
+            for (const ver of stable) {
                 const apps = await fetchAppJson(ver)
                 if (apps.length > 0) {
                     latestAppsVer = ver
@@ -1304,6 +1305,7 @@
             const [apps] = await Promise.all([loadAppJson(version), loadSchemas(version)])
             allApps = apps
             if (apps.length === 0) setStatus(`No built-in /app examples are published for ${version}.`)
+            else if (statusLine.textContent.startsWith('No built-in /app examples')) clearStatus()
             populateCategoryDropdown(allApps)
             populateAppDropdown(allApps, appCatSelect.value)
             appNameSelect.disabled = false
