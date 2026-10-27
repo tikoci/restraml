@@ -401,6 +401,8 @@
         let filteredApps = []
         let useStoreSchema = false
         let latestStableVer = null
+        let latestAppsVer = null     // newest stable version whose app.json is non-empty
+        const appJsonCache = new Map()
         let loadedSchemaVersion = null
         let schemaVersions = []
         let validationErrors = []
@@ -1203,13 +1205,30 @@
         }
 
         // --- Load app.json -----------------------------------------------
+        async function fetchAppJson(ver) {
+            if (!appJsonCache.has(ver)) {
+                appJsonCache.set(ver, fetch(`${RESTRAML.pagesUrl}/${ver}/app.json`)
+                    .then(r => r.ok ? r.json() : [])
+                    .then(apps => Array.isArray(apps) ? apps : [])
+                    .catch(() => []))
+            }
+            return appJsonCache.get(ver)
+        }
+
+        // 'latest'/'editor' use the newest stable version that actually has apps:
+        // some builds published an empty app.json ([]), which would leave the
+        // example picker blank.
         async function loadAppJson(version) {
-            const ver = (version === 'latest' || version === 'editor') ? latestStableVer : version
-            if (!ver) return []
-            try {
-                const r = await fetch(`${RESTRAML.pagesUrl}/${ver}/app.json`)
-                return r.ok ? await r.json() : []
-            } catch (_) { return [] }
+            if (version !== 'latest' && version !== 'editor') return version ? fetchAppJson(version) : []
+            const stable = schemaVersions.filter(v => !isPreRelease(v.name)).map(v => v.name)
+            for (const ver of stable.slice(0, 5)) {
+                const apps = await fetchAppJson(ver)
+                if (apps.length > 0) {
+                    latestAppsVer = ver
+                    return apps
+                }
+            }
+            return latestStableVer ? fetchAppJson(latestStableVer) : []
         }
 
         // --- Load and compile JSON schemas -------------------------------
@@ -1267,7 +1286,7 @@
         function viewAppJson() {
             const version = verSelect.value
             if (!version) return
-            const ver = (version === 'latest' || version === 'editor') ? latestStableVer : version
+            const ver = (version === 'latest' || version === 'editor') ? (latestAppsVer || latestStableVer) : version
             if (!ver) return
             const url = `${RESTRAML.pagesUrl}/${ver}/app.json`
             window.open(url, '_blank', 'noopener')
@@ -1284,6 +1303,7 @@
 
             const [apps] = await Promise.all([loadAppJson(version), loadSchemas(version)])
             allApps = apps
+            if (apps.length === 0) setStatus(`No built-in /app examples are published for ${version}.`)
             populateCategoryDropdown(allApps)
             populateAppDropdown(allApps, appCatSelect.value)
             appNameSelect.disabled = false
@@ -2525,9 +2545,8 @@
             },
             execute: async ({ version }) => {
                 try {
-                    const ver = version || latestStableVer
-                    if (!ver) return JSON.stringify({ error: 'No version available' })
-                    const apps = await loadAppJson(ver)
+                    if (!latestStableVer) return JSON.stringify({ error: 'No version available' })
+                    const apps = await loadAppJson(version || 'latest')
                     return JSON.stringify(apps.map(a => ({
                         name: a.name,
                         category: a.category || '',

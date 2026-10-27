@@ -184,7 +184,11 @@ in the filename since the parent directory already implies the version.
 **`appyamlschemas.yaml` workflow:**
 - Takes `rosver` input; boots CHR with extra packages (container/app feature requires them)
 - Runs `appyamlvalidate.js` against the live CHR
-- Handles three distinct exit codes from `appyamlvalidate.js`:
+- Handles four distinct exit codes from `appyamlvalidate.js`:
+  - **Exit 3** (live `/app` list unreachable, or still empty after `APP_LIST_WAIT_SECONDS`, default 180 s)
+    → fails, commits nothing. RouterOS 7.25+ returns `[]` from `GET /rest/app` right after boot, so
+    the script polls; an empty list is never published (7.25beta3–7.26beta3 shipped `app.json` = `[]`
+    before this gate existed).
   - **Exit 0** (all passed) → commits `app.json` + per-version schemas to `docs/{version}/`
   - **Exit 1** (meta-validation failed — schemas are invalid JSON Schema) → fails immediately, commits nothing
   - **Exit 2** (live validation failed — schemas valid but some MikroTik apps don't conform) → commits `app.json` only (for debugging); schemas are NOT committed so `auto.yaml` will detect them as missing and retry the build
