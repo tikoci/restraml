@@ -133,6 +133,13 @@ returns `versions[]` (same `{name, path, type}` core shape as before, with extra
 Existing pages can keep using `fetchVersionList()`; pages that need file-aware filtering can inspect
 the added `files` / `dirs` fields.
 
+**`RESTRAML.pagesUrl` is derived from the URL `restraml-shared.js` was loaded from — never hardcode
+the Pages host for fetches.** The org site `tikoci.github.io` has the custom domain `tikoci.dev`, so
+GitHub Pages 301-redirects `tikoci.github.io/restraml/*` → `tikoci.dev/restraml/*` (project sites
+inherit the org domain; `tikoci/restraml` itself cannot and need not claim `tikoci.dev`). That
+redirect has no `Access-Control-Allow-Origin` header, so a hardcoded cross-origin data URL fails
+CORS. `<link rel="canonical">` / `og:url` and schema `$id` values are identifiers, not fetches.
+
 ### RouterOS /app YAML Schema System (7.22+)
 
 RouterOS 7.22 introduced `/app` — a `docker-compose`-lite YAML format for defining custom container
