@@ -49,11 +49,11 @@
     "icon": {
       "type": "string",
       "format": "uri",
-      "description": "Icon image URL. With `show-in-webfig=yes`, displayed on the WebFig login screen."
+      "description": "Icon image URL. With `show-in-webfig=yes`, displayed on the WebFig landing page."
     },
     "default-credentials": {
       "type": ["string", "null"],
-      "description": "Credentials shown in the app UI. Format: `username:password`. Use `null` for no credentials.",
+      "description": "Informational credentials shown in the app UI. Format: `username:password`. May be left blank or `null` for no credentials.",
       "examples": ["admin:admin", "admin:", null]
     },
     "url-path": {
@@ -72,6 +72,24 @@
     "auto-update": {
       "type": "boolean",
       "description": "Pull and restart all service containers on every router boot"
+    },
+    "supported-archs": {
+      "type": "array",
+      "description": "CPU architectures the /app supports. Devices with a non-matching architecture do not show the /app (RouterOS 7.25+).",
+      "items": {
+        "type": "string",
+        "enum": ["arm", "arm64", "arm_v5", "x86"]
+      },
+      "uniqueItems": true,
+      "examples": [["arm", "arm64", "x86"]]
+    },
+    "compatible-boards": {
+      "type": "array",
+      "description": "Board names the /app is compatible with, e.g. `RDS2216`; `*` wildcard allowed. Non-matching boards do not show the /app.",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
     },
     "secrets": {
       "type": "object",
@@ -101,7 +119,7 @@
             },
             "container_name": {
               "type": "string",
-              "description": "Explicit container name; also used as the base for file paths under `/container`"
+              "description": "Container name shown in the `/container` menu; also used as the base for file paths"
             },
             "hostname": {
               "type": "string",
@@ -241,7 +259,7 @@
                 {"type": "array", "items": {"type": "string"}},
                 {"type": "object"}
               ],
-              "description": "Start after these named services"
+              "description": "Names of services that must start before this service"
             },
             "devices": {
               "type": "array",
