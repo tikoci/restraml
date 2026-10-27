@@ -18,8 +18,8 @@ const schemas = {
   editor: await Bun.file(join(repoRoot, "docs/routeros-app-yaml-schema.editor.json")).json(),
 };
 
-// Last stable before the 7.25 re-emitter (authored YAML), and the re-emitted 7.25+ collections
-const builtinCollections = ["7.24.5", "7.25", "7.26beta1", "7.26beta3"];
+// One authored-YAML collection per minor before the 7.25 re-emitter, and the re-emitted 7.25+ ones
+const builtinCollections = ["7.22", "7.23.8", "7.24.5", "7.25", "7.26beta1", "7.26beta3"];
 
 function validatorFor(schema: object) {
   // Same Ajv options as appyamlvalidate.js

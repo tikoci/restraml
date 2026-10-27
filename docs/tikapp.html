@@ -1558,6 +1558,9 @@
                     description: schema.description || '',
                 }
                 if (Array.isArray(schema.enum)) summary.enum = schema.enum
+                // Open list (anyOf: [{enum}, {type: string}]): known values, but any string is valid
+                const openList = (schema.anyOf || []).find(branch => Array.isArray(branch?.enum))
+                if (openList) summary.suggestions = openList.enum
                 return summary
             })
         }
