@@ -133,6 +133,13 @@ returns `versions[]` (same `{name, path, type}` core shape as before, with extra
 Existing pages can keep using `fetchVersionList()`; pages that need file-aware filtering can inspect
 the added `files` / `dirs` fields.
 
+**`RESTRAML.pagesUrl` is derived from the URL `restraml-shared.js` was loaded from — never hardcode
+the Pages host for fetches.** The org site `tikoci.github.io` has the custom domain `tikoci.dev`, so
+GitHub Pages 301-redirects `tikoci.github.io/restraml/*` → `tikoci.dev/restraml/*` (project sites
+inherit the org domain; `tikoci/restraml` itself cannot and need not claim `tikoci.dev`). That
+redirect has no `Access-Control-Allow-Origin` header, so a hardcoded cross-origin data URL fails
+CORS. `<link rel="canonical">` / `og:url` and schema `$id` values are identifiers, not fetches.
+
 ### RouterOS /app YAML Schema System (7.22+)
 
 RouterOS 7.22 introduced `/app` — a `docker-compose`-lite YAML format for defining custom container
@@ -177,7 +184,11 @@ in the filename since the parent directory already implies the version.
 **`appyamlschemas.yaml` workflow:**
 - Takes `rosver` input; boots CHR with extra packages (container/app feature requires them)
 - Runs `appyamlvalidate.js` against the live CHR
-- Handles three distinct exit codes from `appyamlvalidate.js`:
+- Handles four distinct exit codes from `appyamlvalidate.js`:
+  - **Exit 3** (live `/app` list unreachable, or still empty after `APP_LIST_WAIT_SECONDS`, default 180 s)
+    → fails, commits nothing. RouterOS 7.25+ returns `[]` from `GET /rest/app` right after boot, so
+    the script polls; an empty list is never published (7.25beta3–7.26beta3 shipped `app.json` = `[]`
+    before this gate existed).
   - **Exit 0** (all passed) → commits `app.json` + per-version schemas to `docs/{version}/`
   - **Exit 1** (meta-validation failed — schemas are invalid JSON Schema) → fails immediately, commits nothing
   - **Exit 2** (live validation failed — schemas valid but some MikroTik apps don't conform) → commits `app.json` only (for debugging); schemas are NOT committed so `auto.yaml` will detect them as missing and retry the build
@@ -963,7 +974,7 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks base schema, extra schema, /app YAML schema, and deep-inspect multi-arch artifacts (`deep-inspect.x86.json`, `deep-inspect.arm64.json`, `diff-deep-inspect.json`) and dispatches only the builds that are missing; outputs a step summary table. Accepts a `skip_versions` input (see below). |
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
-| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
+| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2/3), commits a freshly fetched `app.json` on exit 0 or 2; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2; fails without committing on exit 1 or 3 (exit 3: live `/app` list unreachable or still empty) |
 | `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs in parallel. Both arches install extra packages identically — `all_packages-<arch>` zip → SCP → **explicit** reboot — then run a live deep-inspect crawl gated on `--require-roots`, diff results, and publish `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
 | `nightly.yaml` | Daily cron (06:00 UTC) + manual | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
