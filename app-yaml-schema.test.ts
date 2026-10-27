@@ -18,6 +18,9 @@ const schemas = {
   editor: await Bun.file(join(repoRoot, "docs/routeros-app-yaml-schema.editor.json")).json(),
 };
 
+// Last stable before the 7.25 re-emitter (authored YAML), and the re-emitted 7.25+ collections
+const builtinCollections = ["7.24.5", "7.25", "7.26beta1", "7.26beta3"];
+
 function validatorFor(schema: object) {
   // Same Ajv options as appyamlvalidate.js
   const ajv = new Ajv({ allErrors: true, strict: false });
@@ -98,6 +101,32 @@ for (const [variant, schema] of Object.entries(schemas)) {
       const ok = validate(YAML.load(reemittedHealthcheck));
       expect(validate.errors ?? []).toEqual([]);
       expect(ok).toBe(true);
+    });
+
+    // The manual's own category examples are not among the built-in categories
+    test.each(["network", "system", "utilities", "networking"])("accepts category %p", (category) => {
+      const ok = validate({ name: "x", category, services: { app: { image: "alpine" } } });
+      expect(validate.errors ?? []).toEqual([]);
+      expect(ok).toBe(true);
+    });
+
+    test("rejects a non-string category", () => {
+      expect(validate({ name: "x", category: 5, services: { app: { image: "alpine" } } })).toBe(false);
+    });
+
+    // Built-in collections captured from live CHRs. Each must be non-empty and carry YAML,
+    // so an empty app.json ([]) cannot pass as green.
+    test.each(builtinCollections)("validates every built-in app in docs/%s/app.json", (version) => {
+      const apps: { name?: string; yaml?: unknown }[] = require(join(repoRoot, "docs", version, "app.json"));
+      expect(apps.length).toBeGreaterThan(0);
+      const failures: string[] = [];
+      for (const app of apps) {
+        expect(typeof app.yaml).toBe("string");
+        if (!validate(YAML.load(app.yaml as string))) {
+          failures.push(`${app.name}: ${(validate.errors ?? []).map((e) => `${e.instancePath} ${e.message}`).join("; ")}`);
+        }
+      }
+      expect(failures).toEqual([]);
     });
   });
 }

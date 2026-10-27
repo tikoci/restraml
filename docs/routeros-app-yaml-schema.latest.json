@@ -24,28 +24,35 @@
     },
     "category": {
       "type": "string",
-      "enum": [
-        "productivity",
-        "storage",
-        "networking",
-        "development",
-        "communication",
-        "file-management",
-        "search",
-        "video",
-        "media",
-        "media-management",
-        "home-automation",
-        "monitoring",
-        "database",
-        "automation",
-        "ai",
-        "messaging",
-        "radio",
-        "security",
-        "business"
+      "anyOf": [
+        {
+          "enum": [
+            "productivity",
+            "storage",
+            "networking",
+            "development",
+            "communication",
+            "file-management",
+            "search",
+            "video",
+            "media",
+            "media-management",
+            "home-automation",
+            "monitoring",
+            "database",
+            "automation",
+            "ai",
+            "messaging",
+            "radio",
+            "security",
+            "business"
+          ]
+        },
+        {
+          "type": "string"
+        }
       ],
-      "description": "Category classification for the /app"
+      "description": "Classification group shown in the /app list. Any string is accepted (the manual's examples include `network`, `system`, `utilities`); the listed values are the categories MikroTik's built-in apps use"
     },
     "icon": {
       "type": "string",

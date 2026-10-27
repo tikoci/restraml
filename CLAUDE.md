@@ -238,7 +238,8 @@ listing the failing app names and error messages. To resolve:
    and examine the properties that cause errors.
 3. **Identify new patterns**: map each error class to a schema change:
    - `must NOT have additional properties` → new service property (e.g., `entrypoint`, `devices`)
-   - `must be equal to one of the allowed values` → new enum value (e.g., new `category`)
+   - `must be equal to one of the allowed values` → new enum value (e.g., new `restart` policy;
+     `category` accepts any string, with the built-in categories kept only as editor suggestions)
    - `must match pattern` → port format change or new regex syntax
 4. **Update `docs/routeros-app-yaml-schema.latest.json`** (strict, CI validation) and
    `docs/routeros-app-yaml-schema.editor.json` (relaxed, SchemaStore/editor) with the new properties.
