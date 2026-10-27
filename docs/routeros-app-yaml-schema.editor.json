@@ -128,7 +128,7 @@
             "entrypoint": {
               "oneOf": [
                 {"type": "string"},
-                {"type": "array", "items": {"type": ["string", "number", "boolean"]}}
+                {"type": "array", "items": {"type": ["string", "number", "boolean", "null"]}}
               ],
               "description": "Executable used as the container entry point, overriding the image default (string or list)",
               "examples": ["/bin/bash", ["/bin/sh", "-c"]]
@@ -136,7 +136,7 @@
             "command": {
               "oneOf": [
                 {"type": "string"},
-                {"type": "array", "items": {"type": ["string", "number", "boolean"]}}
+                {"type": "array", "items": {"type": ["string", "number", "boolean", "null"]}}
               ],
               "description": "Startup command executed inside the container, overriding the image default (string or list)"
             },
@@ -328,7 +328,7 @@
               "properties": {
                 "test": {
                   "oneOf": [
-                    {"type": "array", "items": {"type": "string"}},
+                    {"type": "array", "items": {"type": ["string", "number", "boolean", "null"]}},
                     {"type": "string"}
                   ]
                 },
