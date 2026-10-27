@@ -1,6 +1,6 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-10-27T16:56:24.085Z",
+  "generatedAt": "2026-10-27T17:16:59.933Z",
   "rootPath": "docs",
   "latestVersion": "7.26beta3",
   "latestStableVersion": "7.25",
@@ -299,16 +299,6 @@
         {
           "name": "openapi.json",
           "path": "docs/7.26beta1/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.26beta1/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.26beta1/routeros-app-yaml-store-schema.json",
           "type": "file"
         },
         {
