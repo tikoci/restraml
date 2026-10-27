@@ -128,7 +128,7 @@
             "entrypoint": {
               "oneOf": [
                 {"type": "string"},
-                {"type": "array", "items": {"type": "string"}}
+                {"type": "array", "items": {"type": ["string", "number", "boolean"]}}
               ],
               "description": "Executable used as the container entry point, overriding the image default (string or list)",
               "examples": ["/bin/bash", ["/bin/sh", "-c"]]
@@ -136,7 +136,7 @@
             "command": {
               "oneOf": [
                 {"type": "string"},
-                {"type": "array", "items": {"type": "string"}}
+                {"type": "array", "items": {"type": ["string", "number", "boolean"]}}
               ],
               "description": "Startup command executed inside the container, overriding the image default (string or list)"
             },
@@ -168,11 +168,11 @@
                         "description": "Port mapping label"
                       },
                       "target": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Container port"
                       },
                       "published": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Host port"
                       },
                       "protocol": {
@@ -297,11 +297,11 @@
                       "required": ["soft", "hard"],
                       "additionalProperties": false,
                       "properties": {
-                        "soft": {"type": "integer"},
-                        "hard": {"type": "integer"}
+                        "soft": {"type": ["integer", "string"]},
+                        "hard": {"type": ["integer", "string"]}
                       }
                     },
-                    {"type": "integer"}
+                    {"type": ["integer", "string"]}
                   ]
                 }
               }
@@ -334,7 +334,7 @@
                 },
                 "interval": {"type": "string"},
                 "timeout": {"type": "string"},
-                "retries": {"type": "integer"},
+                "retries": {"type": ["integer", "string"]},
                 "start_period": {"type": "string"}
               }
             },

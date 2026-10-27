@@ -137,7 +137,7 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": ["string", "number", "boolean"]
                   }
                 }
               ],
@@ -151,7 +151,7 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": ["string", "number", "boolean"]
                   }
                 }
               ],
@@ -190,11 +190,13 @@
                         "description": "Port mapping label"
                       },
                       "target": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
+                        "pattern": "^[0-9]+$",
                         "description": "Container port"
                       },
                       "published": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
+                        "pattern": "^[0-9]+$",
                         "description": "Host port"
                       },
                       "protocol": {
@@ -349,15 +351,18 @@
                       "additionalProperties": false,
                       "properties": {
                         "soft": {
-                          "type": "integer"
+                          "type": ["integer", "string"],
+                          "pattern": "^[0-9]+$"
                         },
                         "hard": {
-                          "type": "integer"
+                          "type": ["integer", "string"],
+                          "pattern": "^[0-9]+$"
                         }
                       }
                     },
                     {
-                      "type": "integer"
+                      "type": ["integer", "string"],
+                      "pattern": "^[0-9]+$"
                     }
                   ]
                 }
@@ -411,7 +416,8 @@
                   "type": "string"
                 },
                 "retries": {
-                  "type": "integer"
+                  "type": ["integer", "string"],
+                  "pattern": "^[0-9]+$"
                 },
                 "start_period": {
                   "type": "string"
