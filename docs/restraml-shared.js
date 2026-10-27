@@ -12,11 +12,27 @@
 // =====================================================================
 
 // --- Project constants -----------------------------------------------
+// pagesUrl is resolved from where THIS script was loaded, so data fetches
+// stay same-origin. The org site has a custom domain (tikoci.dev), which makes
+// GitHub Pages 301-redirect tikoci.github.io/restraml/* → tikoci.dev/restraml/*.
+// That redirect carries no Access-Control-Allow-Origin header, so a hardcoded
+// cross-origin URL fails CORS on whichever host the page is NOT served from.
+// file:// (no fetch support) falls back to the canonical published URL.
+const _RESTRAML_FALLBACK_URL = 'https://tikoci.github.io/restraml'
+const _restramlPagesUrl = (() => {
+    try {
+        const src = document.currentScript?.src
+        if (src && /^https?:$/.test(new URL(src).protocol)) {
+            return new URL('.', src).href.replace(/\/$/, '')
+        }
+    } catch { /* fall through */ }
+    return _RESTRAML_FALLBACK_URL
+})()
 const RESTRAML = Object.freeze({
     owner: 'tikoci',
     repo: 'restraml',
-    pagesUrl: 'https://tikoci.github.io/restraml',
-    docsIndexUrl: 'https://tikoci.github.io/restraml/docs-index.json',
+    pagesUrl: _restramlPagesUrl,
+    docsIndexUrl: `${_restramlPagesUrl}/docs-index.json`,
 })
 
 // --- Brand gradient (random MikroTik-inspired gradient per page load) -

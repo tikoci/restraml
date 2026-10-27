@@ -1,9 +1,9 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-09-05T08:24:30.759Z",
+  "generatedAt": "2026-10-27T14:50:32.460Z",
   "rootPath": "docs",
-  "latestVersion": "7.25beta3",
-  "latestStableVersion": "7.24.2",
+  "latestVersion": "7.26beta3",
+  "latestStableVersion": "7.25",
   "nightly": {
     "name": "nightly",
     "nightlyVersion": "7.25_ab434",
@@ -190,6 +190,431 @@
       ]
     },
     {
+      "name": "7.26beta3",
+      "path": "docs/7.26beta3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.26beta3/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.26beta3/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.26beta3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.26beta3/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.26beta3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.26beta3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.26beta3/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.26beta3/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.26beta3/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.26beta3/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.26beta3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.26beta3/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.26beta3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.26beta1",
+      "path": "docs/7.26beta1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.26beta1/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.26beta1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.26beta1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.26beta1/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.26beta1/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.26beta1/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.26beta1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.26beta1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.26beta1/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.26beta1/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.26beta1/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.26beta1/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.26beta1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.26beta1/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.26beta1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25",
+      "path": "docs/7.25",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25beta5",
+      "path": "docs/7.25beta5",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25beta5/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25beta5/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25beta5/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25beta5/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25beta5/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25beta5/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25beta5/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25beta5/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25beta5/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25beta5/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25beta5/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25beta5/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25beta5/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25beta5/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25beta5/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25beta4",
+      "path": "docs/7.25beta4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25beta4/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25beta4/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25beta4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25beta4/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25beta4/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25beta4/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25beta4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25beta4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25beta4/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25beta4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25beta4/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25beta4/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25beta4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25beta4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25beta4/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
       "name": "7.25beta3",
       "path": "docs/7.25beta3",
       "type": "dir",
@@ -269,6 +694,441 @@
             {
               "name": "schema.raml",
               "path": "docs/7.25beta3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25rc3",
+      "path": "docs/7.25rc3",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25rc3/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25rc3/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25rc3/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25rc3/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25rc3/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25rc3/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25rc3/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25rc3/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25rc3/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25rc3/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25rc3/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25rc3/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25rc3/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25rc3/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25rc3/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25rc2",
+      "path": "docs/7.25rc2",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25rc2/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25rc2/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25rc2/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25rc2/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25rc2/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25rc2/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25rc2/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25rc2/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25rc2/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25rc2/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25rc2/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25rc2/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25rc2/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25rc2/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25rc2/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.25rc1",
+      "path": "docs/7.25rc1",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.25rc1/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.25rc1/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.25rc1/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.25rc1/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.25rc1/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.25rc1/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.25rc1/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.25rc1/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.25rc1/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.25rc1/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.25rc1/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.25rc1/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.25rc1/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.25rc1/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.25rc1/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.24.5",
+      "path": "docs/7.24.5",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.24.5/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.24.5/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.24.5/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.24.5/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.24.5/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.24.5/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.24.5/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.24.5/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.24.5/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.24.5/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.24.5/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.24.5/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.24.5/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.24.5/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.24.5/extra/schema.raml",
+              "type": "file"
+            }
+          ],
+          "dirs": []
+        }
+      ]
+    },
+    {
+      "name": "7.24.4",
+      "path": "docs/7.24.4",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.24.4/app.json",
+          "type": "file"
+        },
+        {
+          "name": "deep-inspect.json",
+          "path": "docs/7.24.4/deep-inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "inspect.json",
+          "path": "docs/7.24.4/inspect.json",
+          "type": "file"
+        },
+        {
+          "name": "openapi.json",
+          "path": "docs/7.24.4/openapi.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-schema.json",
+          "path": "docs/7.24.4/routeros-app-yaml-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "routeros-app-yaml-store-schema.json",
+          "path": "docs/7.24.4/routeros-app-yaml-store-schema.json",
+          "type": "file"
+        },
+        {
+          "name": "schema.raml",
+          "path": "docs/7.24.4/schema.raml",
+          "type": "file"
+        }
+      ],
+      "dirs": [
+        {
+          "name": "extra",
+          "path": "docs/7.24.4/extra",
+          "type": "dir",
+          "files": [
+            {
+              "name": "deep-inspect.arm64.json",
+              "path": "docs/7.24.4/extra/deep-inspect.arm64.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.json",
+              "path": "docs/7.24.4/extra/deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "deep-inspect.x86.json",
+              "path": "docs/7.24.4/extra/deep-inspect.x86.json",
+              "type": "file"
+            },
+            {
+              "name": "diff-deep-inspect.json",
+              "path": "docs/7.24.4/extra/diff-deep-inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "inspect.json",
+              "path": "docs/7.24.4/extra/inspect.json",
+              "type": "file"
+            },
+            {
+              "name": "openapi.json",
+              "path": "docs/7.24.4/extra/openapi.json",
+              "type": "file"
+            },
+            {
+              "name": "schema.raml",
+              "path": "docs/7.24.4/extra/schema.raml",
               "type": "file"
             }
           ],
@@ -538,85 +1398,85 @@
       ]
     },
     {
-      "name": "7.24rc4",
-      "path": "docs/7.24rc4",
+      "name": "7.23.8",
+      "path": "docs/7.23.8",
       "type": "dir",
       "files": [
         {
           "name": "app.json",
-          "path": "docs/7.24rc4/app.json",
+          "path": "docs/7.23.8/app.json",
           "type": "file"
         },
         {
           "name": "deep-inspect.json",
-          "path": "docs/7.24rc4/deep-inspect.json",
+          "path": "docs/7.23.8/deep-inspect.json",
           "type": "file"
         },
         {
           "name": "inspect.json",
-          "path": "docs/7.24rc4/inspect.json",
+          "path": "docs/7.23.8/inspect.json",
           "type": "file"
         },
         {
           "name": "openapi.json",
-          "path": "docs/7.24rc4/openapi.json",
+          "path": "docs/7.23.8/openapi.json",
           "type": "file"
         },
         {
           "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24rc4/routeros-app-yaml-schema.json",
+          "path": "docs/7.23.8/routeros-app-yaml-schema.json",
           "type": "file"
         },
         {
           "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24rc4/routeros-app-yaml-store-schema.json",
+          "path": "docs/7.23.8/routeros-app-yaml-store-schema.json",
           "type": "file"
         },
         {
           "name": "schema.raml",
-          "path": "docs/7.24rc4/schema.raml",
+          "path": "docs/7.23.8/schema.raml",
           "type": "file"
         }
       ],
       "dirs": [
         {
           "name": "extra",
-          "path": "docs/7.24rc4/extra",
+          "path": "docs/7.23.8/extra",
           "type": "dir",
           "files": [
             {
               "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24rc4/extra/deep-inspect.arm64.json",
+              "path": "docs/7.23.8/extra/deep-inspect.arm64.json",
               "type": "file"
             },
             {
               "name": "deep-inspect.json",
-              "path": "docs/7.24rc4/extra/deep-inspect.json",
+              "path": "docs/7.23.8/extra/deep-inspect.json",
               "type": "file"
             },
             {
               "name": "deep-inspect.x86.json",
-              "path": "docs/7.24rc4/extra/deep-inspect.x86.json",
+              "path": "docs/7.23.8/extra/deep-inspect.x86.json",
               "type": "file"
             },
             {
               "name": "diff-deep-inspect.json",
-              "path": "docs/7.24rc4/extra/diff-deep-inspect.json",
+              "path": "docs/7.23.8/extra/diff-deep-inspect.json",
               "type": "file"
             },
             {
               "name": "inspect.json",
-              "path": "docs/7.24rc4/extra/inspect.json",
+              "path": "docs/7.23.8/extra/inspect.json",
               "type": "file"
             },
             {
               "name": "openapi.json",
-              "path": "docs/7.24rc4/extra/openapi.json",
+              "path": "docs/7.23.8/extra/openapi.json",
               "type": "file"
             },
             {
               "name": "schema.raml",
-              "path": "docs/7.24rc4/extra/schema.raml",
+              "path": "docs/7.23.8/extra/schema.raml",
               "type": "file"
             }
           ],
@@ -625,505 +1485,85 @@
       ]
     },
     {
-      "name": "7.24rc3",
-      "path": "docs/7.24rc3",
+      "name": "7.23.7",
+      "path": "docs/7.23.7",
       "type": "dir",
       "files": [
         {
           "name": "app.json",
-          "path": "docs/7.24rc3/app.json",
+          "path": "docs/7.23.7/app.json",
           "type": "file"
         },
         {
           "name": "deep-inspect.json",
-          "path": "docs/7.24rc3/deep-inspect.json",
+          "path": "docs/7.23.7/deep-inspect.json",
           "type": "file"
         },
         {
           "name": "inspect.json",
-          "path": "docs/7.24rc3/inspect.json",
+          "path": "docs/7.23.7/inspect.json",
           "type": "file"
         },
         {
           "name": "openapi.json",
-          "path": "docs/7.24rc3/openapi.json",
+          "path": "docs/7.23.7/openapi.json",
           "type": "file"
         },
         {
           "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24rc3/routeros-app-yaml-schema.json",
+          "path": "docs/7.23.7/routeros-app-yaml-schema.json",
           "type": "file"
         },
         {
           "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24rc3/routeros-app-yaml-store-schema.json",
+          "path": "docs/7.23.7/routeros-app-yaml-store-schema.json",
           "type": "file"
         },
         {
           "name": "schema.raml",
-          "path": "docs/7.24rc3/schema.raml",
+          "path": "docs/7.23.7/schema.raml",
           "type": "file"
         }
       ],
       "dirs": [
         {
           "name": "extra",
-          "path": "docs/7.24rc3/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.24rc3/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.24rc3/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.24rc3/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.24rc3/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.24beta3",
-      "path": "docs/7.24beta3",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.24beta3/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.24beta3/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.24beta3/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.24beta3/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24beta3/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24beta3/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.24beta3/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.24beta3/extra",
+          "path": "docs/7.23.7/extra",
           "type": "dir",
           "files": [
             {
               "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24beta3/extra/deep-inspect.arm64.json",
+              "path": "docs/7.23.7/extra/deep-inspect.arm64.json",
               "type": "file"
             },
             {
               "name": "deep-inspect.json",
-              "path": "docs/7.24beta3/extra/deep-inspect.json",
+              "path": "docs/7.23.7/extra/deep-inspect.json",
               "type": "file"
             },
             {
               "name": "deep-inspect.x86.json",
-              "path": "docs/7.24beta3/extra/deep-inspect.x86.json",
+              "path": "docs/7.23.7/extra/deep-inspect.x86.json",
               "type": "file"
             },
             {
               "name": "diff-deep-inspect.json",
-              "path": "docs/7.24beta3/extra/diff-deep-inspect.json",
+              "path": "docs/7.23.7/extra/diff-deep-inspect.json",
               "type": "file"
             },
             {
               "name": "inspect.json",
-              "path": "docs/7.24beta3/extra/inspect.json",
+              "path": "docs/7.23.7/extra/inspect.json",
               "type": "file"
             },
             {
               "name": "openapi.json",
-              "path": "docs/7.24beta3/extra/openapi.json",
+              "path": "docs/7.23.7/extra/openapi.json",
               "type": "file"
             },
             {
               "name": "schema.raml",
-              "path": "docs/7.24beta3/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.24rc2",
-      "path": "docs/7.24rc2",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.24rc2/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.24rc2/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.24rc2/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.24rc2/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24rc2/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24rc2/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.24rc2/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.24rc2/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24rc2/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.24rc2/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.24rc2/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.24rc2/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.24rc2/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.24rc2/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.24rc2/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.24beta2",
-      "path": "docs/7.24beta2",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.24beta2/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.24beta2/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.24beta2/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.24beta2/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24beta2/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24beta2/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.24beta2/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.24beta2/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24beta2/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.24beta2/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.24beta2/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.24beta2/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.24beta2/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.24beta2/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.24beta2/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.24beta1",
-      "path": "docs/7.24beta1",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.24beta1/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.24beta1/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.24beta1/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.24beta1/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24beta1/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24beta1/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.24beta1/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.24beta1/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24beta1/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.24beta1/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.24beta1/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.24beta1/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.24beta1/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.24beta1/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.24beta1/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.24rc1",
-      "path": "docs/7.24rc1",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.24rc1/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.24rc1/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.24rc1/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.24rc1/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.24rc1/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.24rc1/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.24rc1/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.24rc1/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.24rc1/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.24rc1/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.24rc1/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.24rc1/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.24rc1/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.24rc1/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.24rc1/extra/schema.raml",
+              "path": "docs/7.23.7/extra/schema.raml",
               "type": "file"
             }
           ],
@@ -1646,545 +2086,6 @@
             {
               "name": "schema.raml",
               "path": "docs/7.23/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23beta5",
-      "path": "docs/7.23beta5",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23beta5/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23beta5/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23beta5/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23beta5/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23beta5/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23beta5/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.23beta5/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23beta5/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.23beta5/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.23beta5/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23beta5/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23beta5/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23beta5/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23beta4",
-      "path": "docs/7.23beta4",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23beta4/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23beta4/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23beta4/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23beta4/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23beta4/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23beta4/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23beta4/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23beta4/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23beta4/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23beta4/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23beta4/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23beta4/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23rc4",
-      "path": "docs/7.23rc4",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23rc4/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc4/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc4/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc4/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23rc4/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23rc4/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc4/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23rc4/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.23rc4/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23rc4/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.23rc4/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.23rc4/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23rc4/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23rc4/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23rc4/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23rc3",
-      "path": "docs/7.23rc3",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23rc3/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc3/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc3/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc3/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23rc3/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23rc3/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc3/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23rc3/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.23rc3/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23rc3/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.23rc3/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.23rc3/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23rc3/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23rc3/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23rc3/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23beta2",
-      "path": "docs/7.23beta2",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23beta2/app.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23beta2/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23beta2/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23beta2/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23beta2/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23beta2/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23beta2/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23beta2/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23rc2",
-      "path": "docs/7.23rc2",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23rc2/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc2/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc2/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc2/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-schema.json",
-          "path": "docs/7.23rc2/routeros-app-yaml-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "routeros-app-yaml-store-schema.json",
-          "path": "docs/7.23rc2/routeros-app-yaml-store-schema.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc2/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23rc2/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.23rc2/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23rc2/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.23rc2/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.23rc2/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23rc2/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23rc2/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23rc2/extra/schema.raml",
-              "type": "file"
-            }
-          ],
-          "dirs": []
-        }
-      ]
-    },
-    {
-      "name": "7.23rc1",
-      "path": "docs/7.23rc1",
-      "type": "dir",
-      "files": [
-        {
-          "name": "app.json",
-          "path": "docs/7.23rc1/app.json",
-          "type": "file"
-        },
-        {
-          "name": "deep-inspect.json",
-          "path": "docs/7.23rc1/deep-inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "inspect.json",
-          "path": "docs/7.23rc1/inspect.json",
-          "type": "file"
-        },
-        {
-          "name": "openapi.json",
-          "path": "docs/7.23rc1/openapi.json",
-          "type": "file"
-        },
-        {
-          "name": "schema.raml",
-          "path": "docs/7.23rc1/schema.raml",
-          "type": "file"
-        }
-      ],
-      "dirs": [
-        {
-          "name": "extra",
-          "path": "docs/7.23rc1/extra",
-          "type": "dir",
-          "files": [
-            {
-              "name": "deep-inspect.arm64.json",
-              "path": "docs/7.23rc1/extra/deep-inspect.arm64.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.json",
-              "path": "docs/7.23rc1/extra/deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "deep-inspect.x86.json",
-              "path": "docs/7.23rc1/extra/deep-inspect.x86.json",
-              "type": "file"
-            },
-            {
-              "name": "diff-deep-inspect.json",
-              "path": "docs/7.23rc1/extra/diff-deep-inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "inspect.json",
-              "path": "docs/7.23rc1/extra/inspect.json",
-              "type": "file"
-            },
-            {
-              "name": "openapi.json",
-              "path": "docs/7.23rc1/extra/openapi.json",
-              "type": "file"
-            },
-            {
-              "name": "schema.raml",
-              "path": "docs/7.23rc1/extra/schema.raml",
               "type": "file"
             }
           ],
