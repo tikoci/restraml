@@ -19,7 +19,7 @@
     "page": {
       "type": "string",
       "format": "uri",
-      "description": "Project homepage URL"
+      "description": "Project page URL, shown as the /app's `project-page` property"
     },
     "category": {
       "type": "string",
@@ -49,16 +49,16 @@
     "icon": {
       "type": "string",
       "format": "uri",
-      "description": "Icon image URL. With `show-in-webfig=yes`, displayed on the WebFig landing page."
+      "description": "Icon image URL, displayed on the WebFig landing page when `/app/settings show-in-webfig=yes` (the default)."
     },
     "default-credentials": {
       "type": ["string", "null"],
-      "description": "Informational credentials shown in the app UI. Format: `username:password`. May be left blank or `null` for no credentials.",
+      "description": "Login credentials shown in the app UI, informative only. Format: `username:password`; may contain placeholders such as `[secret:name]`. May be left blank or `null`.",
       "examples": ["admin:admin", "admin:", null]
     },
     "url-path": {
       "type": "string",
-      "description": "URL path suffix appended to the access URL for browser access",
+      "description": "Path appended to the /app URL, e.g. `/login` or `/web`",
       "examples": ["/", "/ui", "/admin"]
     },
     "credentials": {
@@ -71,11 +71,11 @@
     },
     "auto-update": {
       "type": "boolean",
-      "description": "Pull and restart all service containers on every router boot"
+      "description": "When `true`, the /app is updated automatically when a new container image is available"
     },
     "supported-archs": {
       "type": "array",
-      "description": "CPU architectures the /app supports. Devices with a non-matching architecture do not show the /app (RouterOS 7.25+).",
+      "description": "CPU architectures supported by the /app. Devices not matching the specified architecture do not display the /app (RouterOS 7.25+).",
       "items": {
         "type": "string",
         "enum": ["arm", "arm64", "arm_v5", "x86"]
@@ -85,7 +85,7 @@
     },
     "compatible-boards": {
       "type": "array",
-      "description": "Board names the /app is compatible with, e.g. `RDS2216`; `*` wildcard allowed. Non-matching boards do not show the /app.",
+      "description": "Board names supported by the /app, e.g. `RDS2216`; the `*` wildcard is accepted. Devices not matching the specified board name do not display the /app.",
       "items": {
         "type": "string"
       },
@@ -93,7 +93,7 @@
     },
     "secrets": {
       "type": "object",
-      "description": "Generated secret declarations referenced by service `secrets` and `[secret:name]` placeholders. Empty/null entries request RouterOS-generated secret values.",
+      "description": "Secret declarations, referenced with `[secret:name]` placeholders and by service `secrets`. RouterOS generates the values when the /app runs; entries are normally empty/null.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": ["object", "null"],
@@ -130,7 +130,7 @@
                 {"type": "string"},
                 {"type": "array", "items": {"type": "string"}}
               ],
-              "description": "Override the default container entrypoint (string or list)",
+              "description": "Executable used as the container entry point, overriding the image default (string or list)",
               "examples": ["/bin/bash", ["/bin/sh", "-c"]]
             },
             "command": {
@@ -138,7 +138,7 @@
                 {"type": "string"},
                 {"type": "array", "items": {"type": "string"}}
               ],
-              "description": "Override the default container command (string or list)"
+              "description": "Startup command executed inside the container, overriding the image default (string or list)"
             },
             "ports": {
               "type": "array",
@@ -252,7 +252,7 @@
             "restart": {
               "type": "string",
               "enum": ["no", "always", "on-failure", "unless-stopped"],
-              "description": "Container restart policy"
+              "description": "Restart policy of the container"
             },
             "depends_on": {
               "oneOf": [
@@ -263,7 +263,7 @@
             },
             "devices": {
               "type": "array",
-              "description": "Host device mappings passed into the container (e.g. for USB/serial hardware access)",
+              "description": "Hardware devices passed through to the container, e.g. `/dev/ttyACM0:/dev/ttyACM0`",
               "items": {
                 "type": "string",
                 "description": "Format: `host-device[:container-device]` (e.g. `/dev/ttyACM0:/dev/ttyACM0`)"
@@ -271,7 +271,7 @@
             },
             "user": {
               "type": "string",
-              "description": "Run container as this user (name or `uid:gid`)"
+              "description": "Linux user or UID the container runs as (name or `uid:gid`)"
             },
             "security_opt": {
               "type": "array",
@@ -280,11 +280,11 @@
             },
             "shm_size": {
               "type": "string",
-              "description": "Shared memory size (e.g. `128m`, `1g`)"
+              "description": "Shared memory size, e.g. `512mb` or `1gb`"
             },
             "stop_grace_period": {
               "type": ["string", "integer"],
-              "description": "Wait this long before sending SIGKILL (e.g. `10s`, `1m30s`)"
+              "description": "Timeout for graceful shutdown, e.g. `30s` or `0` (default 30 seconds)"
             },
             "ulimits": {
               "type": "object",
@@ -319,11 +319,11 @@
                 },
                 {"type": "string"}
               ],
-              "description": "Build configuration for the container image"
+              "description": "Build configuration for a locally built image"
             },
             "healthcheck": {
               "type": "object",
-              "description": "Container health check configuration",
+              "description": "Health check run when the container starts; `test` runs inside the container and passes on exit code 0",
               "additionalProperties": false,
               "properties": {
                 "test": {
@@ -344,7 +344,7 @@
             },
             "expose": {
               "type": "array",
-              "description": "Expose ports without publishing them to the host",
+              "description": "Ports exposed to other containers without publishing them on the router",
               "items": {"type": ["string", "integer"]}
             },
             "secrets": {
@@ -355,7 +355,7 @@
                 },
                 {"type": "string"}
               ],
-              "description": "Secret name or secret names to expose to the service"
+              "description": "Secret names available to this service, mounted as files at `/run/secrets/<name>`"
             },
             "secret": {
               "oneOf": [
@@ -386,7 +386,7 @@
     },
     "networks": {
       "type": "object",
-      "description": "Network definitions",
+      "description": "Network declarations. Define `default` as an external network (e.g. `lan`) to place the /app directly on it instead of behind NAT.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "object",
