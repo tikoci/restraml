@@ -90,9 +90,9 @@ interface TypeMismatch {
 }
 
 /** Top-level roots present in one file and absent in the other.
- *  Report-only: some asymmetry is legitimate (/blink is arm64-only, and the
- *  nightly NPK set carries no dude/openflow/tr069-client/user-manager). It is
- *  still the fastest way to see a whole package menu go missing (#96). */
+ *  Report-only: some asymmetry is legitimate (/blink is arm64-only, and a
+ *  partial per-arch NPK set may lack dude/openflow/tr069-client/user-manager).
+ *  It is still the fastest way to see a whole package menu go missing (#96). */
 interface CensusDrift {
   onlyInA: string[];
   onlyInB: string[];
@@ -404,9 +404,9 @@ function textReport(r: DiffReport, opts: Opts): string {
     lines.push("  (whole top-level menus present on one side only — report, not a verdict)");
     if (cd.onlyInA.length > 0) lines.push(`    only in ${A}: ${cd.onlyInA.map((x) => `/${x}`).join(" ")}`);
     if (cd.onlyInB.length > 0) lines.push(`    only in ${B}: ${cd.onlyInB.map((x) => `/${x}`).join(" ")}`);
-    lines.push("  Some asymmetry is legitimate (/blink is arm64-only; the nightly NPK set");
-    lines.push("  carries no dude/openflow/tr069-client/user-manager). But a package menu");
-    lines.push("  missing on one arch only usually means its packages never activated (#96).");
+    lines.push("  Some asymmetry is legitimate (/blink is arm64-only; a partial per-arch");
+    lines.push("  NPK set may lack dude/openflow/tr069-client/user-manager). But a package");
+    lines.push("  menu missing on one arch only usually means its packages never activated (#96).");
     lines.push("");
   }
 

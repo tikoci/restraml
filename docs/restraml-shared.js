@@ -65,8 +65,6 @@ const _BRAND_GRADIENTS = [
  *           "7.21beta11" -> {major:7, minor:21, patch:0, pre:"beta", preNum:11}
  *           "7.15.3" -> {major:7, minor:15, patch:3, pre:"", preNum:Infinity}
  */
-const SYNTHETIC_VERSIONS = new Set(['nightly'])
-
 function parseVersion(str) {
     const m = str.match(/^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/)
     if (!m) return null
@@ -81,12 +79,9 @@ function parseVersion(str) {
 
 /**
  * Compare two version strings for sorting (descending: newest first).
- * Synthetic versions (nightly) sort before all real RouterOS versions.
  */
 function compareVersions(a, b) {
     if (a === b) return 0
-    if (SYNTHETIC_VERSIONS.has(a)) return -1
-    if (SYNTHETIC_VERSIONS.has(b)) return 1
     const va = parseVersion(a)
     const vb = parseVersion(b)
     if (!va && !vb) return a.localeCompare(b)
@@ -101,10 +96,10 @@ function compareVersions(a, b) {
 }
 
 /**
- * Returns true if the version is a pre-release (beta, rc, or nightly).
+ * Returns true if the version is a pre-release (beta or rc).
  */
 function isPreRelease(name) {
-    return SYNTHETIC_VERSIONS.has(name) || /(?:beta|rc)\d*$/.test(name)
+    return /(?:beta|rc)\d*$/.test(name)
 }
 
 /**
@@ -112,36 +107,15 @@ function isPreRelease(name) {
  * Safari does not support `option.hidden`, so we add/remove options instead.
  * Preserves the current selection if still present.
  *
- * Supports both legacy `showAll` boolean (testing+nightly together) and
- * the new `{includeTesting, includeNightly}` object for the N5 nightly
- * toggle. When nightly info is cached via fetchNightlyJson(), the option
- * label is shown as `nightly (7.25_ab434)` instead of bare `nightly`.
+ * @param {boolean} includeTesting - show beta/rc versions when true
  */
-function rebuildSelect(sel, versions, showAll) {
+function rebuildSelect(sel, versions, includeTesting) {
     const selectedVal = sel.value
     // Remove all non-placeholder options
     while (sel.options.length > 1) sel.remove(1)
-    let includeTesting
-    let includeNightly
-    if (showAll !== null && typeof showAll === 'object') {
-        includeTesting = !!showAll.includeTesting
-        includeNightly = !!showAll.includeNightly
-    } else {
-        includeTesting = !!showAll
-        includeNightly = !!showAll
-    }
     versions.forEach(name => {
-        const isNightlyVersion = SYNTHETIC_VERSIONS.has(name)
-        const isTesting = /(?:beta|rc)\d*$/.test(name)
-        let show = true
-        if (isNightlyVersion) show = includeNightly
-        else if (isTesting) show = includeTesting
-        if (show) {
-            const label = isNightlyVersion && typeof formatVersionLabel === 'function'
-                ? formatVersionLabel(name)
-                : name
-            sel.appendChild(new Option(label, name))
-        }
+        if (!includeTesting && isTestingPreRelease(name)) return
+        sel.appendChild(new Option(name, name))
     })
     // Restore selection if the value is still in the list
     if ([...sel.options].some(o => o.value === selectedVal)) {
@@ -149,252 +123,40 @@ function rebuildSelect(sel, versions, showAll) {
     }
 }
 
-// --- Nightly helpers (N5) ---------------------------------------------
-// Synthetic `nightly` slot: published at docs/nightly/ with provenance
-// docs/nightly/nightly.json. These helpers give every page a consistent
-// badge (`nightly (7.25_ab434) · 11h ago`), MIB/CHANGELOG fallbacks, and
-// the shared synthetic changelog section.
-
-const _NIGHTLY_JSON_CACHE_KEY = 'restraml_nightly_json_v1'
-const _NIGHTLY_JSON_TTL = 5 * 60 * 1000 // 5 minutes
-let _nightlyJsonData = null
-let _nightlyJsonPromise = null
+// --- Version display helpers -----------------------------------------
 
 /**
- * Returns true if the name is a synthetic nightly slot.
- */
-function isNightly(name) {
-    return SYNTHETIC_VERSIONS.has(name)
-}
-
-/**
- * Returns true if the name is a beta/rc pre-release (excludes nightly).
+ * Returns true if the name is a beta/rc pre-release.
  */
 function isTestingPreRelease(name) {
     return /(?:beta|rc)\d*$/.test(name)
 }
 
 /**
- * Whether a version should be shown given the two toggles.
+ * Whether a version should be shown given the testing toggle.
  */
-function shouldShowVersion(name, includeTesting, includeNightly) {
-    if (isNightly(name)) return !!includeNightly
+function shouldShowVersion(name, includeTesting) {
     if (isTestingPreRelease(name)) return !!includeTesting
     return true
 }
 
 /**
- * Format a relative age string from an ISO builtAt timestamp.
- * e.g. "11h ago", "2d ago", "42m ago"
- */
-function formatRelativeAge(builtAt) {
-    if (!builtAt) return ''
-    const ms = Date.now() - new Date(builtAt).getTime()
-    if (!Number.isFinite(ms) || ms < 0) return ''
-    const mins = Math.floor(ms / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    const days = Math.floor(hrs / 24)
-    if (days < 30) return `${days}d ago`
-    const months = Math.floor(days / 30)
-    return `${months}mo ago`
-}
-
-/**
- * User-facing label for a version. For nightly shows the captured ab build:
- * `nightly (7.25_ab434)` when nightly info is available, otherwise bare `nightly`.
- */
-function formatVersionLabel(name) {
-    if (isNightly(name) && _nightlyJsonData?.nightlyVersion) {
-        return `nightly (${_nightlyJsonData.nightlyVersion})`
-    }
-    return name
-}
-
-/**
- * Label with age suffix for table badges: `nightly (7.25_ab434) · 11h ago`.
- * Falls back to formatVersionLabel when builtAt is absent.
- */
-function formatVersionLabelWithAge(name) {
-    if (isNightly(name) && _nightlyJsonData?.nightlyVersion) {
-        const age = formatRelativeAge(_nightlyJsonData.builtAt)
-        const base = `nightly (${_nightlyJsonData.nightlyVersion})`
-        return age ? `${base} · ${age}` : base
-    }
-    return formatVersionLabel(name)
-}
-
-/**
- * Returns the MIB download URL for a version, or null for nightly (no MIB).
+ * Returns the MIB download URL for a version.
  */
 function getMibUrl(version) {
-    if (isNightly(version)) return null
     return `https://download.mikrotik.com/routeros/${version}/mikrotik.mib`
 }
 
 /**
- * Returns the MikroTik CHANGELOG URL, or the nightly Box share for the synthetic slot.
+ * Returns the MikroTik CHANGELOG URL for a version.
  */
 function getChangelogUrl(version) {
-    if (isNightly(version)) return 'https://mt.lv/nightly-build'
     return `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
 }
 
 /**
- * Fetch and cache docs/nightly/nightly.json (provenance for the synthetic slot).
- * Returns the parsed nightly.json object or null if not published / 404.
- * Cached in memory and localStorage for 5 minutes; falls back to stale cache.
- */
-function fetchNightlyJson() {
-    if (_nightlyJsonPromise) return _nightlyJsonPromise
-    const p = _fetchNightlyJsonInner()
-    _nightlyJsonPromise = p
-    p.finally(() => { if (_nightlyJsonPromise === p) _nightlyJsonPromise = null }).catch(() => {})
-    return p
-}
-
-function _fetchNightlyJsonInner() {
-    try {
-        const raw = localStorage.getItem(_NIGHTLY_JSON_CACHE_KEY)
-        if (raw) {
-            const cached = JSON.parse(raw)
-            if (cached?.ts && Date.now() - cached.ts < _NIGHTLY_JSON_TTL && cached.data) {
-                _nightlyJsonData = cached.data
-                return Promise.resolve(cached.data)
-            }
-        }
-    } catch { /* ignore corrupted cache */ }
-
-    const url = `${RESTRAML.pagesUrl}/nightly/nightly.json`
-    return fetch(url)
-        .then(r => {
-            if (!r.ok) {
-                if (r.status === 404) return null
-                const stale = _readStaleNightlyCache()
-                if (stale) return stale
-                throw new Error(`nightly.json ${r.status}`)
-            }
-            return r.json()
-        })
-        .then(data => {
-            if (!data || typeof data.nightlyVersion !== 'string') return null
-            _nightlyJsonData = data
-            try {
-                localStorage.setItem(_NIGHTLY_JSON_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }))
-            } catch { /* storage full */ }
-            return data
-        })
-        .catch(err => {
-            const stale = _readStaleNightlyCache()
-            if (stale) {
-                _nightlyJsonData = stale
-                return stale
-            }
-            // 404 before first publish is expected — not an error.
-            if (err && String(err.message || err).includes('404')) return null
-            throw err
-        })
-}
-
-function _readStaleNightlyCache() {
-    try {
-        const raw = localStorage.getItem(_NIGHTLY_JSON_CACHE_KEY)
-        if (raw) {
-            const cached = JSON.parse(raw)
-            if (cached?.data && typeof cached.data.nightlyVersion === 'string') {
-                return cached.data
-            }
-        }
-    } catch { /* ignore */ }
-    return null
-}
-
-/**
- * Synchronous accessor for the last fetched nightly.json (or null).
- * Call after fetchNightlyJson() has resolved.
- */
-function getCachedNightlyJson() {
-    return _nightlyJsonData
-}
-
-/**
- * Build a synthetic changelog section for the nightly slot from nightly.json.
- * Shape matches parseChangelogSections() output so the existing renderers work.
- */
-function createNightlySyntheticSections(nightlyData) {
-    if (!nightlyData || typeof nightlyData.nightlyVersion !== 'string') return []
-    const dateStr = nightlyData.builtAt
-        ? new Date(nightlyData.builtAt).toLocaleDateString('en-CA')
-        : new Date().toLocaleDateString('en-CA')
-    const heading = `What's new in nightly (${nightlyData.nightlyVersion}) (${dateStr}):`
-    const baseVer = nightlyData.baseVersion || 'stable'
-    const entries = []
-    const x86Count = nightlyData.packages?.x86?.count
-    const arm64Count = nightlyData.packages?.arm64?.count
-    const buildWindow = nightlyData.buildWindow
-    const absent = nightlyData.absentRoots
-
-    entries.push({
-        raw: `*) nightly - Nightly build ${nightlyData.nightlyVersion} from mt.lv/nightly-build (built ${nightlyData.builtAt || ''}, base ${baseVer})`,
-        important: false,
-        secure: false,
-        subsystem: 'nightly',
-        text: `Nightly build ${nightlyData.nightlyVersion} from mt.lv/nightly-build (built ${nightlyData.builtAt || ''}, base ${baseVer}) — single overwritten slot docs/nightly/`,
-    })
-    if (buildWindow?.earliest && buildWindow?.latest) {
-        entries.push({
-            raw: `*) buildWindow - Upload window ${buildWindow.earliest} → ${buildWindow.latest}`,
-            important: false,
-            secure: false,
-            subsystem: 'buildWindow',
-            text: `Upload window ${buildWindow.earliest} → ${buildWindow.latest}`,
-        })
-    }
-    if (Number.isFinite(x86Count) || Number.isFinite(arm64Count)) {
-        const parts = []
-        if (Number.isFinite(x86Count)) parts.push(`x86: ${x86Count} NPKs${nightlyData.packages?.x86?.names ? ` (${nightlyData.packages.x86.names.join(', ')})` : ''}`)
-        if (Number.isFinite(arm64Count)) parts.push(`arm64: ${arm64Count} NPKs${nightlyData.packages?.arm64?.names ? ` (${nightlyData.packages.arm64.names.join(', ')})` : ''}`)
-        entries.push({
-            raw: `*) packages - ${parts.join('; ')}`,
-            important: false,
-            secure: false,
-            subsystem: 'packages',
-            text: parts.join('; '),
-        })
-    }
-    if (Array.isArray(absent) && absent.length > 0) {
-        entries.push({
-            raw: `*) note - extra/ is partial: absent roots ${absent.join(', ')} have no nightly NPKs`,
-            important: false,
-            secure: false,
-            subsystem: 'note',
-            text: `extra/ is partial — absent roots ${absent.join(', ')} have no nightly NPKs on Box, so diff vs release extra shows them as "removed"`,
-        })
-    }
-    const boxToken = nightlyData.source?.token
-    const boxUrl = boxToken ? ` → https://box.mikrotik.com/d/${boxToken}/` : ''
-    entries.push({
-        raw: `*) source - Box share https://mt.lv/nightly-build${boxUrl}`,
-        important: false,
-        secure: false,
-        subsystem: 'source',
-        text: `Source: mt.lv/nightly-build (Box) — see nightly.json for full provenance`,
-    })
-
-    return [{
-        version: 'nightly',
-        date: dateStr,
-        heading,
-        entries,
-        sourceUrl: 'https://mt.lv/nightly-build',
-    }]
-}
-
-/**
- * Render an array of changelog sections (as returned by parseChangelogSections
- * or createNightlySyntheticSections) into contentEl.
+ * Render an array of changelog sections (as returned by parseChangelogSections)
+ * into contentEl.
  */
 function renderChangelogSections(sections, query, contentEl, itemCountEl) {
     const q = query ? query.toLowerCase() : ''
@@ -457,28 +219,9 @@ function renderChangelogSections(sections, query, contentEl, itemCountEl) {
 }
 
 /**
- * Fetch changelog sections for a single version. For nightly returns the
- * synthetic section without hitting download.mikrotik.com (which 404s).
+ * Fetch changelog sections for a single version.
  */
 async function fetchChangelogSectionsForVersion(version) {
-    if (isNightly(version)) {
-        const nightlyData = (_nightlyJsonData && !_nightlyJsonData._partial) ? _nightlyJsonData : await fetchNightlyJson()
-        if (nightlyData) return createNightlySyntheticSections(nightlyData)
-        // Fallback synthetic when nightly.json hasn't been fetched yet
-        return [{
-            version: 'nightly',
-            date: new Date().toLocaleDateString('en-CA'),
-            heading: `What's new in nightly (synthetic):`,
-            entries: [{
-                raw: '*) nightly - Nightly build from mt.lv/nightly-build (see nightly.json)',
-                important: false,
-                secure: false,
-                subsystem: 'nightly',
-                text: 'Nightly build from mt.lv/nightly-build — see docs/nightly/nightly.json for provenance',
-            }],
-            sourceUrl: 'https://mt.lv/nightly-build',
-        }]
-    }
     const url = `https://download.mikrotik.com/routeros/${version}/CHANGELOG`
     const resp = await fetch(url)
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -491,14 +234,11 @@ async function fetchChangelogSectionsForVersion(version) {
 
 /**
  * Filter candidate versions to the changelog range (older, newer].
- * Excludes synthetic versions (nightly) — they have no CHANGELOG on
- * download.mikrotik.com and would otherwise make compareVersions(v, 'nightly')
- * true for every version, pulling the whole history.
  */
 function getChangelogVersionsInRange(range, allVersions, includeTesting) {
     const candidateVersions = includeTesting
-        ? allVersions.filter(v => !isNightly(v))
-        : allVersions.filter(v => !isNightly(v) && !isTestingPreRelease(v))
+        ? [...allVersions]
+        : allVersions.filter(v => !isTestingPreRelease(v))
     if (range.older === range.newer) {
         return candidateVersions.filter(v => v === range.newer)
     }
@@ -513,7 +253,7 @@ function getChangelogVersionsInRange(range, allVersions, includeTesting) {
 // published via GitHub Pages. All docs/*.html pages share this cache via
 // the same origin. If the fresh fetch fails, we fall back to stale cache.
 
-const _VER_CACHE_KEY = 'restraml_docs_index_v1'
+const _VER_CACHE_KEY = 'restraml_docs_index_v2'
 const _VER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 /** In-memory promise so concurrent calls within the same page share one request. */
@@ -568,19 +308,6 @@ function _fetchVersionListInner() {
             try {
                 localStorage.setItem(_VER_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: versions }))
             } catch { /* storage full or unavailable */ }
-            // Opportunistically cache nightly info from docs-index if present
-            if (data.nightly && typeof data.nightly.nightlyVersion === 'string') {
-                // Seed _nightlyJsonData with the minimal nightly fields so badge
-                // can render even before nightly.json is fetched.
-                // Marked _partial so consumers that need full provenance still fetch nightly.json.
-                if (!_nightlyJsonData) {
-                    _nightlyJsonData = {
-                        nightlyVersion: data.nightly.nightlyVersion,
-                        builtAt: data.nightly.builtAt,
-                        _partial: true,
-                    }
-                }
-            }
             return versions
         })
         .catch(err => {
@@ -879,27 +606,17 @@ function initChangelogModal(opts) {
 
     searchEl.addEventListener('input', () => {
         if (_rawText) renderChangelogContent(_rawText, _version, searchEl.value.trim(), contentEl, itemCountEl)
-        // For nightly synthetic sections we re-render via sections
-        if (!_rawText && isNightly(_version) && _nightlyJsonData) {
-            const sections = createNightlySyntheticSections(_nightlyJsonData)
-            renderChangelogSections(sections, searchEl.value.trim(), contentEl, itemCountEl)
-        }
     })
 
     async function showChangelog(version) {
-        const isNightlyVersion = isNightly(version)
         const url = getChangelogUrl(version)
         _version = version
         _rawText = ''
         searchEl.value = ''
-        titleEl.textContent = isNightlyVersion && _nightlyJsonData?.nightlyVersion
-            ? `RouterOS nightly (${_nightlyJsonData.nightlyVersion}) — Release Notes`
-            : `RouterOS ${version} — Release Notes`
-        subtitleEl.textContent = isNightlyVersion && _nightlyJsonData?.builtAt
-            ? new Date(_nightlyJsonData.builtAt).toLocaleString()
-            : ''
+        titleEl.textContent = `RouterOS ${version} — Release Notes`
+        subtitleEl.textContent = ''
         mikrotikLink.href = url
-        mikrotikLink.textContent = isNightlyVersion ? 'mt.lv/nightly-build ↗' : 'CHANGELOG ↗'
+        mikrotikLink.textContent = 'CHANGELOG ↗'
         contentEl.innerHTML = '<p aria-busy="true" style="text-align:center; padding:2rem">Loading changelog…</p>'
         itemCountEl.textContent = ''
 
@@ -925,43 +642,6 @@ function initChangelogModal(opts) {
         }
 
         modal.showModal()
-
-        // Nightly: synthetic section from nightly.json (no 404)
-        if (isNightlyVersion) {
-            try {
-                const nightlyData = (_nightlyJsonData && !_nightlyJsonData._partial) ? _nightlyJsonData : await fetchNightlyJson()
-                if (nightlyData) {
-                    // Update title/subtitle with fresh nightly data
-                    titleEl.textContent = `RouterOS nightly (${nightlyData.nightlyVersion}) — Release Notes`
-                    subtitleEl.textContent = nightlyData.builtAt ? new Date(nightlyData.builtAt).toLocaleString() : ''
-                    mikrotikLink.href = 'https://mt.lv/nightly-build'
-                    const sections = createNightlySyntheticSections(nightlyData)
-                    renderChangelogSections(sections, '', contentEl, itemCountEl)
-                    if (typeof plausible !== 'undefined') plausible('Changelog View', { props: { version } })
-                    return
-                }
-                // No nightly data yet — show friendly placeholder
-                contentEl.innerHTML = `
-                    <p style="text-align:center; padding:2rem 1rem">
-                        <span style="font-size:2rem">🌙</span><br><br>
-                        Nightly build from <a href="https://mt.lv/nightly-build" target="_blank" rel="noopener">mt.lv/nightly-build</a><br>
-                        No nightly provenance found — docs/nightly/nightly.json not yet published.<br><br>
-                        <a href="https://mt.lv/nightly-build" target="_blank" rel="noopener" role="button">Open nightly share ↗</a>
-                    </p>`
-                itemCountEl.textContent = ''
-                return
-            } catch (err) {
-                console.warn('Nightly synthetic changelog failed', err)
-                contentEl.innerHTML = `
-                    <p style="text-align:center; padding:2rem 1rem">
-                        <span style="font-size:2rem">🌙</span><br><br>
-                        Nightly build from <a href="https://mt.lv/nightly-build" target="_blank" rel="noopener">mt.lv/nightly-build</a><br><br>
-                        <a href="https://mt.lv/nightly-build" target="_blank" rel="noopener" role="button">Open nightly share ↗</a>
-                    </p>`
-                itemCountEl.textContent = ''
-                return
-            }
-        }
 
         try {
             const response = await fetch(url)
@@ -1136,19 +816,12 @@ Object.assign(window, {
     parseVersion,
     compareVersions,
     isPreRelease,
-    isNightly,
     isTestingPreRelease,
     shouldShowVersion,
     rebuildSelect,
     fetchVersionList,
-    fetchNightlyJson,
-    getCachedNightlyJson,
-    formatVersionLabel,
-    formatVersionLabelWithAge,
-    formatRelativeAge,
     getMibUrl,
     getChangelogUrl,
-    createNightlySyntheticSections,
     renderChangelogSections,
     fetchChangelogSectionsForVersion,
     getChangelogVersionsInRange,
