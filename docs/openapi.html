@@ -529,6 +529,11 @@
         // --- Query params (shareable URLs) ---
         function readQueryParams() {
             const params = new URLSearchParams(window.location.search);
+            // Apply "testing" first so beta/rc options exist before selecting a version
+            if (params.has('testing')) {
+                testingCheck.checked = params.get('testing') === 'true';
+                rebuildVersionSelect();
+            }
             if (params.has('version')) {
                 const v = params.get('version');
                 for (const opt of versionSelect.options) {
@@ -537,10 +542,6 @@
             }
             if (params.has('extra')) {
                 extraCheck.checked = params.get('extra') !== 'false';
-            }
-            if (params.has('testing')) {
-                testingCheck.checked = params.get('testing') === 'true';
-                rebuildVersionSelect();
             }
         }
 
