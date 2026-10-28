@@ -18,6 +18,8 @@
 //   0 - All validations passed (or live validation skipped)
 //   1 - JSON Schema meta-validation failed
 //   2 - One or more built-in /app YAML entries failed schema validation
+//   3 - Live /app list could not be fetched, or stayed empty for
+//       APP_LIST_WAIT_SECONDS (default 180); nothing was validated
 
 const fs = require("fs")
 const path = require("path")
@@ -28,6 +30,10 @@ const addFormats = require("ajv-formats")
 const SINGLE_SCHEMA_PATH = process.env.APP_YAML_SCHEMA || "docs/routeros-app-yaml-schema.latest.json"
 const STORE_SCHEMA_PATH = "docs/routeros-app-yaml-store-schema.latest.json"
 const FAILURES_FILE = process.env.APP_YAML_FAILURES_FILE || "app-yaml-failures.txt"
+const APP_LIST_WAIT_SECONDS = (() => {
+  const s = Number(process.env.APP_LIST_WAIT_SECONDS || 180)
+  return Number.isFinite(s) && s >= 0 ? s : 180
+})()
 const VERSION_SEGMENT_RE = /^[0-9A-Za-z][0-9A-Za-z._-]*$/
 
 function assertSafeVersion(version) {
@@ -335,17 +341,31 @@ async function main() {
       headers["Authorization"] =
         "Basic " + Buffer.from(basicauth).toString("base64")
     }
-    const resp = await fetch(appUrl, { headers })
-    if (resp.status === 404 || resp.status === 400) {
-      console.log(
-        `::notice::/app endpoint returned ${resp.status} — this RouterOS version may not include /app (skipping live validation)`
-      )
-      process.exit(0)
+    // RouterOS 7.25+ returns an empty /app list right after boot and fills it
+    // in later, so poll. An /app endpoint with no built-in apps is never valid:
+    // publishing that [] is what emptied the /app editor's example picker.
+    const deadline = Date.now() + APP_LIST_WAIT_SECONDS * 1000
+    for (let attempt = 1; ; attempt++) {
+      const resp = await fetch(appUrl, { headers, signal: AbortSignal.timeout(30_000) })
+      if (resp.status === 404 || resp.status === 400) {
+        console.log(
+          `::notice::/app endpoint returned ${resp.status} — this RouterOS version may not include /app (skipping live validation)`
+        )
+        process.exit(0)
+      }
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
+      }
+      apps = assertAppList(await resp.json())
+      if (apps.length > 0) break
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `GET /rest/app still returned 0 entries after ${APP_LIST_WAIT_SECONDS}s (${attempt} attempts)`
+        )
+      }
+      console.log(`  /app list is empty (attempt ${attempt}), retrying in 5s...`)
+      await new Promise((resolve) => setTimeout(resolve, 5000))
     }
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
-    }
-    apps = assertAppList(await resp.json())
     console.log(`Fetched ${apps.length} built-in /app entries from router`)
 
     // Save raw /app JSON to docs/<version>/app.json for reference and debugging
@@ -354,9 +374,8 @@ async function main() {
     writeJsonFile(appJsonPathLive, apps)
     console.log(`Written: ${appJsonPathLive}`)
   } catch (err) {
-    console.error(`::warning::Failed to fetch /app list: ${err.message}`)
-    console.log("Skipping live /app YAML validation due to fetch error")
-    process.exit(0)
+    console.error(`::error::Failed to fetch /app list: ${err.message}`)
+    process.exit(3)
   }
 
   const validate = ajv.compile(validateSchema)
