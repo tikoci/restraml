@@ -38,7 +38,6 @@ restraml/
 │   ├── test-ros-api.sh             # Integration + stress tests (ros-api-protocol) against local CHR
 │   ├── benchmark-qemu.sh           # REST vs native API timing benchmark against local CHR
 │   ├── deep-inspect-multi-arch.ts  # Per-arch deep-inspect orchestrator (quickchr library, x86 + arm64)
-│   ├── nightly-build.ts            # Nightly (ab) build driver: stable CHR → nightly NPK upgrade → crawl
 │   ├── diff-deep-inspect.ts        # Diff two deep-inspect.<arch>.json files (enum drift + path delta)
 │   ├── build-docs-index.mjs        # Generate docs/docs-index.json from the checked-in docs tree
 │   ├── experiment-arm64-reboot-timing.sh # Local QEMU arm64 reboot-timing experiment helper
@@ -75,11 +74,7 @@ restraml/
 │   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
 │   │   └── routeros-app-yaml-store-schema.json  # /app store schema for this version
-│   ├── {version}/extra/  # Same files, but built with all_packages (extra features)
-│   └── nightly/          # Single overwritten slot for the mt.lv/nightly-build (ab) train
-│       ├── {schema.raml,inspect.json,openapi.json,deep-inspect.json}  # x86 base phase
-│       ├── nightly.json  # Provenance: nightlyVersion, buildWindow, per-arch packages, absentRoots
-│       └── extra/        # x86 extra phase + deep-inspect.{x86,arm64}.json + diff + app.json
+│   └── {version}/extra/  # Same files, but built with all_packages (extra features)
 ├── CLAUDE.md             # Full architecture guide for AI agents
 ├── AGENTS.md             # GitHub Copilot agent-specific instructions
 └── .github/
@@ -91,7 +86,6 @@ restraml/
         ├── manual-using-extra-docker-in-docker.yaml     # Build: schema with extra packages
         ├── appyamlschemas.yaml                          # Build: validate and publish /app YAML schemas
         ├── deep-inspect-multi-arch.yaml                 # Build: per-arch deep-inspect (x86 KVM + arm64 KVM/TCG fallback) with diff
-        ├── nightly.yaml                                 # Build: nightly (ab) single slot → docs/nightly/
         ├── manual-from-secrets.yaml                     # Build: using a real RouterOS device (secrets)
         ├── codeql.yml                                   # Code scanning (JS/TS + GitHub Actions)
         └── dependency-review.yml                        # PR dependency review
@@ -965,58 +959,26 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
 | `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
 | `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs in parallel. Both arches install extra packages identically — `all_packages-<arch>` zip → SCP → **explicit** reboot — then run a live deep-inspect crawl gated on `--require-roots`, diff results, and publish `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
-| `nightly.yaml` | Daily cron (06:00 UTC) + manual | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 | `codeql.yml` | Push + PR + weekly schedule | Runs repository-managed CodeQL for JavaScript/TypeScript and GitHub Actions, using repo path ignores for generated versioned docs artifacts |
 | `dependency-review.yml` | Pull requests | Uses GitHub dependency review to block new high-severity vulnerable dependency changes |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
-### `nightly.yaml` — the `docs/nightly/` single slot
+### Nightly builds (retired)
 
-MikroTik's nightly ("ab") builds are published only as `.npk` files on a Box/Seafile share behind
-`https://mt.lv/nightly-build` — there is no nightly CHR disk image. `scripts/nightly-build.ts`
-therefore boots a **stable** CHR via quickchr, uploads the arch-filtered nightly NPKs over SCP,
-reboots, verifies `/system/resource` reports the nightly version, and only then runs the normal
-`rest2raml.js` + `deep-inspect.ts` collection. Output goes to one overwritten `docs/nightly/`
-directory — never one directory per `ab` build (see #90 for the storage rationale).
+MikroTik no longer publishes nightly ("ab") builds via the `mt.lv/nightly-build` Box share,
+so the nightly workflow (`nightly.yaml`), its driver (`scripts/nightly-build.ts`), the
+`docs/nightly/` single slot, and all nightly UI affordances were removed. If MikroTik
+introduces a new nightly release scheme, reintroduce support in whatever new form fits —
+see git history for the retired implementation. Do not re-add a `nightly` synthetic version
+to `docs-index.json` or the page version lists without a live data source behind it.
 
-Rules that are easy to get wrong:
-
-- **Harness names must not reach `docs/`.** `docs/nightly/nightly.json` embeds the full per-arch
-  provenance, including `outputSuffix` and `machineName`. Those are named for the *artifact*
-  (`x86`, `x86-base`, `arm64`, `restraml-nightly-<arch>`), never for quickchr or any other tool
-  that happens to run the build.
-- **Discovery reads a marker, not prose.** `nightly-build.ts --dry-run` prints
-  `nightly-version=<ver>` as a dedicated line and `nightly.yaml` extracts exactly that. The Box
-  share holds two `ab` builds during the upload window, so scraping any other log line can select
-  the older one.
-- **Each `--phase` gets its own `--output-dir`.** Base and extra crawls otherwise collide on the
-  `ros-*` artifacts at the repo root, and the `deep-inspect.<suffix>.json` floor gate would
-  validate the wrong phase.
-- **Package floors are phase-aware** (`getExpectedMinPackageCount`, `getArgsTotalFloor`). The
-  nightly NPK set is smaller than `all_packages` — the Box share carries no `dude`, `openflow`,
-  `tr069-client`, or `user-manager`, which is why `nightly.json` records `absentRoots`. Do not
-  compare nightly `argsTotal` against the versioned `docs/{version}/extra/` numbers without
-  accounting for that.
-- **`@tikoci/quickchr` is a devDependency from npm** (`^0.4.7`), not `file:../quickchr`. CI runs
-  `bun install --frozen-lockfile` on a runner where no sibling checkout exists, so a `file:` path
-  fails the install outright. To iterate against a local quickchr working copy, use
-  `bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
-  dependency to `package.json`.
-- **The slot keeps `openapi.json` and `schema.raml`.** They are ~27 MB of the ~35 MB base slot, so
-  dropping them was considered for storage — but `docs/openapi.html` is a live consumer of the
-  slot's `openapi.json` (`openapi.html?version=nightly&nightly=true` loads it), and `schema.raml`
-  stays for parity with every versioned build. Consecutive `ab` builds are near-identical, so the single-slot git delta
-  is small (~4.5 MiB of objects for the first ~85 MB publish). If RAML generation is ever retired
-  repo-wide, the nightly slot follows that decision — it is not a nightly-specific call.
-- **`/app` is validated offline against the root `*.latest.json`**, never per-version. Minting
-  `docs/nightly/routeros-app-yaml-schema.json` would create a stable `$id` URL whose content
-  changes daily, breaking schema identity and editor caching. The validation step runs in
-  `publish-nightly` *after* `nightly.json` is aggregated (so the filed issue embeds real
-  provenance) and is `continue-on-error` — a drift issue is the early-warning signal for the next
-  beta/RC promotion, not a publish gate. `app.json` publishes either way as the debuggable raw
-  artifact.
+**`@tikoci/quickchr` is a devDependency from npm** (`^0.4.7`), not `file:../quickchr`. CI runs
+`bun install --frozen-lockfile` on a runner where no sibling checkout exists, so a `file:` path
+fails the install outright. To iterate against a local quickchr working copy, use
+`bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
+dependency to `package.json`.
 
 ### `auto.yaml` — `skip_versions` Input
 
@@ -1153,8 +1115,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
    packages under TCG, it causes memory pressure that inflates REST calls from ~70ms to ~10s+.
    Use 1024 MB for any job that installs extra packages. Note quickchr only defaults to 1024 MB
    for **cross-arch** emulation (`defaultMem` → `isCrossArchEmulation`); an arm64 guest on a
-   native arm64 runner gets **512 MB**, so pass `mem: 1024` explicitly as
-   `scripts/nightly-build.ts` does.
+   native arm64 runner gets **512 MB**, so pass `mem: 1024` explicitly.
    This RAM/REST-stall behaviour is a **separate issue** from the `/console/inspect path=do`
    hang tracked as MikroTik **SUP-127641**. The `do`-path hang on 7.20.8 reproduces identically
    at 128 MB **and** 512 MB (confirmed April 2026 via `bun scripts/test-crash-path-memory.ts`) —
@@ -1199,7 +1160,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
 | Package | Used by | Purpose |
 |---|---|---|
 | `js-yaml` | `rest2raml.js`, `appyamlvalidate.js` (Bun) | Serialize RAML output as YAML; parse /app YAML for validation |
-| `@tikoci/quickchr` | `scripts/nightly-build.ts`, `scripts/deep-inspect-multi-arch.ts` (dev) | Boots/manages CHR VMs via QEMU. Installed from npm so CI can resolve it; `bun link` for local iteration |
+| `@tikoci/quickchr` | `scripts/deep-inspect-multi-arch.ts` (dev) | Boots/manages CHR VMs via QEMU. Installed from npm so CI can resolve it; `bun link` for local iteration |
 | `ajv` | `appyamlvalidate.js` (Bun) | JSON Schema validation (draft-07) for /app YAML schemas |
 | `ajv-formats` | `appyamlvalidate.js` (Bun) | AJV plugin for format validators (uri, email, etc.) |
 | `@apidevtools/swagger-parser` | `validate-openapi.ts` (Bun) | OpenAPI 3.0 schema validation |

@@ -5,10 +5,10 @@
 // Usage:
 //   bun appyamlvalidate.js <version>
 //   URLBASE=http://localhost:9180/rest BASICAUTH=admin: bun appyamlvalidate.js 7.22
-//   bun appyamlvalidate.js <version> --no-schema-write --app-json docs/nightly/extra/app.json
+//   bun appyamlvalidate.js <version> --no-schema-write --app-json docs/7.24/app.json
 //
-// Offline nightly example (no live CHR, no per-version schemas):
-//   bun appyamlvalidate.js nightly --no-schema-write --app-json docs/nightly/extra/app.json
+// Offline example (no live CHR, no per-version schemas):
+//   bun appyamlvalidate.js 7.24 --no-schema-write --app-json docs/7.24/app.json
 //
 // Environment variables:
 //   URLBASE     - RouterOS REST API base URL (enables live /app validation)
@@ -89,19 +89,19 @@ function printUsageAndExit(code = 0) {
     [
       "Usage: bun appyamlvalidate.js <version> [options]",
       "",
-      "  <version>                    RouterOS version (e.g. 7.22, 7.24rc4, nightly)",
+      "  <version>                    RouterOS version (e.g. 7.22, 7.24rc4)",
       "",
       "Options:",
       "  --no-schema-write            Skip writing per-version schemas to docs/<version>/",
-      "                               (validates base schemas in place; use for nightly)",
+      "                               (validates base schemas in place)",
       "  --app-json <path>            Validate apps from a JSON file instead of GET /rest/app",
-      "                               (offline mode; e.g. docs/nightly/extra/app.json)",
+      "                               (offline mode; e.g. docs/7.24/app.json)",
       "  --help                       Show this help",
       "",
       "Examples:",
       "  bun appyamlvalidate.js 7.22",
       "  URLBASE=http://localhost:9180/rest BASICAUTH=admin: bun appyamlvalidate.js 7.22",
-      "  bun appyamlvalidate.js nightly --no-schema-write --app-json docs/nightly/extra/app.json",
+      "  bun appyamlvalidate.js 7.24 --no-schema-write --app-json docs/7.24/app.json",
     ].join("\n")
   )
   process.exit(code)
