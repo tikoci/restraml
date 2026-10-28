@@ -660,6 +660,55 @@
             return merged
         }
 
+        // --- YAML key parsing (quote-aware) ---
+        // RouterOS 7.25+ re-emits /app YAML with single-quoted keys ('code-server':),
+        // so every schema lookup (hover, inlay hints, completions) must accept quoted
+        // keys exactly like their bare equivalents. Keep these pure: tikapp-keys.test.ts
+        // extracts this block verbatim and runs it under bun.
+        function stripYamlQuotes(token) {
+            if (token.length >= 2) {
+                const first = token[0]
+                const last = token[token.length - 1]
+                if ((first === "'" && last === "'") || (first === '"' && last === '"')) {
+                    return token.slice(1, -1)
+                }
+            }
+            return token
+        }
+
+        // Match a full editor line of the form "[indent][- ]key:..." and return the
+        // indent prefix, the unquoted key, the raw key token, and the text after the
+        // colon. Returns null when the line carries no mapping key.
+        function matchKeyLine(line) {
+            const m = line.match(/^(\s*(?:-\s+)?)('[^']*'|"[^"]*"|[\w-]+)\s*:(.*)$/)
+            if (!m) return null
+            return { prefix: m[1], key: stripYamlQuotes(m[2]), token: m[2], rest: m[3] }
+        }
+
+        // Match a trimmed "key:" line with no value (a parent mapping). Unquoted key or null.
+        function matchKeyOnlyLine(trimmed) {
+            const m = trimmed.match(/^(?:'([^']*)'|"([^"]*)"|([\w-]+)):\s*$/)
+            return m ? (m[1] ?? m[2] ?? m[3]) : null
+        }
+
+        // Match a trimmed "- key:" array-item line. Unquoted key or null.
+        function matchArrayKeyLine(trimmed) {
+            const m = trimmed.match(/^-\s+(?:'([^']*)'|"([^"]*)"|([\w-]+))\s*:/)
+            return m ? (m[1] ?? m[2] ?? m[3]) : null
+        }
+
+        // Match a trimmed "[ - ]key:..." line in any form. Unquoted key or null.
+        function matchAnyKeyLine(trimmed) {
+            const m = trimmed.match(/^(?:-\s+)?(?:'([^']*)'|"([^"]*)"|([\w-]+))\s*:/)
+            return m ? (m[1] ?? m[2] ?? m[3]) : null
+        }
+
+        // True when the cursor sits in value position after "key: " (bare or quoted key).
+        function isAfterKeyColon(text) {
+            return /^(?:'[^']*'|"[^"]*"|[\w-]+):\s+$/.test(text)
+        }
+        // --- end YAML key parsing ---
+
         function collectSchemaVariants(root, node) {
             const resolved = resolveRef(root, node)
             if (!resolved) return []
@@ -793,12 +842,12 @@
                     const lineBefore = line.substring(0, position.column - 1)
                     const indent = lineBefore.match(/^(\s*)/)[1].length
                     const trimmed = lineBefore.trim()
-                    const arrayItemContext = lineBefore.match(/^(\s*)-\s*([\w-]*)$/)
+                    const arrayItemContext = lineBefore.match(/^(\s*)-\s*['"]?([\w-]*)$/)
 
                     // --- Value completions: after "key: " offer enum/boolean values ---
-                    const valueMatch = lineBefore.match(/^(\s*(?:-\s+)?)([\w-]+):\s*(.*)$/)
+                    const valueMatch = matchKeyLine(lineBefore)
                     if (valueMatch) {
-                        const valueKey = valueMatch[2]
+                        const valueKey = valueMatch.key
                         // Build parent path for this key
                         const valParentKeys = []
                         let valTargetIndent = indent - 2
@@ -807,16 +856,16 @@
                             const l = allLines[i]
                             const li = l.match(/^(\s*)/)[1].length
                             if (li === valTargetIndent) {
-                                const m = l.trim().match(/^(\w[\w-]*):\s*$/)
-                                if (m) { valParentKeys.unshift(m[1]); valTargetIndent -= 2 }
+                                const keyOnly = matchKeyOnlyLine(l.trim())
+                                if (keyOnly) { valParentKeys.unshift(keyOnly); valTargetIndent -= 2 }
                                 else if (l.trim().startsWith('- ') || l.trim() === '-') {
                                     // Plain array marker — skip without extracting key
                                     valTargetIndent -= 2
                                 }
                             } else if (li === valTargetIndent - 2) {
                                 // "- key:" line at 2 less indent — the key is logically at li+2
-                                const akm = l.trim().match(/^-\s+([\w-]+):/)
-                                if (akm) { valParentKeys.unshift(akm[1]); valTargetIndent = li - 2 }
+                                const arrayKey = matchArrayKeyLine(l.trim())
+                                if (arrayKey) { valParentKeys.unshift(arrayKey); valTargetIndent = li - 2 }
                             }
                         }
                         const valNode = schemaAtPath(root, [...valParentKeys, valueKey])
@@ -843,16 +892,16 @@
                         const l = lines[i]
                         const li = l.match(/^(\s*)/)[1].length
                         if (li === targetIndent) {
-                            const m = l.trim().match(/^(\w[\w-]*):\s*$/)
-                            if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
+                            const keyOnly = matchKeyOnlyLine(l.trim())
+                            if (keyOnly) { parentKeys.unshift(keyOnly); targetIndent -= 2 }
                             else if (l.trim().startsWith('- ') || l.trim() === '-') {
                                 // Plain array marker — skip without extracting key
                                 targetIndent -= 2
                             }
                         } else if (li === targetIndent - 2) {
                             // "- key:" line at 2 less indent — the key is logically at li+2
-                            const akm = l.trim().match(/^-\s+([\w-]+):/)
-                            if (akm) { parentKeys.unshift(akm[1]); targetIndent = li - 2 }
+                            const arrayKey = matchArrayKeyLine(l.trim())
+                            if (arrayKey) { parentKeys.unshift(arrayKey); targetIndent = li - 2 }
                         }
                     }
 
@@ -885,14 +934,14 @@
                         if (li < indent) {
                             // "- key:" at indent-2 is logically a sibling at this indent
                             if (li === indent - 2 && l.trimStart().startsWith('- ')) {
-                                const km = l.trim().match(/^(?:-\s+)?([\w-]+):/)
-                                if (km) usedKeys.add(km[1])
+                                const usedKey = matchAnyKeyLine(l.trim())
+                                if (usedKey) usedKeys.add(usedKey)
                             }
                             break
                         }
                         if (li === indent) {
-                            const km = l.trim().match(/^(?:-\s+)?([\w-]+):/)
-                            if (km) usedKeys.add(km[1])
+                            const usedKey = matchAnyKeyLine(l.trim())
+                            if (usedKey) usedKeys.add(usedKey)
                         }
                     }
                     // Also check lines below current position at same indent
@@ -901,8 +950,8 @@
                         const li = l.match(/^(\s*)/)[1].length
                         if (li < indent) break
                         if (li === indent) {
-                            const km = l.trim().match(/^(?:-\s+)?([\w-]+):/)
-                            if (km) usedKeys.add(km[1])
+                            const usedKey = matchAnyKeyLine(l.trim())
+                            if (usedKey) usedKeys.add(usedKey)
                         }
                     }
 
@@ -980,16 +1029,16 @@
                 provideHover(model, position) {
                     const line = model.getLineContent(position.lineNumber)
                     // Match a YAML key at the current position (including "- key:" array item lines)
-                    const keyMatch = line.match(/^(\s*(?:-\s+)?)([\w-]+)\s*:/)
+                    const keyMatch = matchKeyLine(line)
                     if (!keyMatch) return null
-                    const keyStart = keyMatch[1].length + 1
-                    const keyEnd = keyStart + keyMatch[2].length
+                    const keyStart = keyMatch.prefix.length + 1
+                    const keyEnd = keyStart + keyMatch.token.length
                     if (position.column < keyStart || position.column > keyEnd) return null
 
-                    const key = keyMatch[2]
+                    const key = keyMatch.key
                     // Effective indent: for "- key:" lines, the key is logically at indent+2
                     const rawIndent = line.match(/^(\s*)/)[1].length
-                    const indent = keyMatch[1].includes('-') ? rawIndent + 2 : rawIndent
+                    const indent = keyMatch.prefix.includes('-') ? rawIndent + 2 : rawIndent
 
                     // Build parent path
                     const parentKeys = []
@@ -999,14 +1048,14 @@
                         const l = lines[i]
                         const li = l.match(/^(\s*)/)[1].length
                         if (li === targetIndent) {
-                            const m = l.trim().match(/^([\w-]+):\s*$/)
-                            if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
+                            const keyOnly = matchKeyOnlyLine(l.trim())
+                            if (keyOnly) { parentKeys.unshift(keyOnly); targetIndent -= 2 }
                             else if (l.trim().startsWith('- ') || l.trim() === '-') {
                                 targetIndent -= 2
                             }
                         } else if (li === targetIndent - 2) {
-                            const akm = l.trim().match(/^-\s+([\w-]+):/)
-                            if (akm) { parentKeys.unshift(akm[1]); targetIndent = li - 2 }
+                            const arrayKey = matchArrayKeyLine(l.trim())
+                            if (arrayKey) { parentKeys.unshift(arrayKey); targetIndent = li - 2 }
                         }
                     }
 
@@ -1056,12 +1105,12 @@
                     for (let i = range.startLineNumber - 1; i < Math.min(range.endLineNumber, lines.length); i++) {
                         const line = lines[i]
                         // Match YAML key lines: "  key:" or "  key: value" or "- key:"
-                        const keyMatch = line.match(/^(\s*(?:-\s+)?)([\w-]+)\s*:(.*)$/)
+                        const keyMatch = matchKeyLine(line)
                         if (!keyMatch) continue
                         const rawIndent = line.match(/^(\s*)/)[1].length
-                        const lineIndent = keyMatch[1].includes('-') ? rawIndent + 2 : rawIndent
-                        const key = keyMatch[2]
-                        const afterColon = keyMatch[3]
+                        const lineIndent = keyMatch.prefix.includes('-') ? rawIndent + 2 : rawIndent
+                        const key = keyMatch.key
+                        const afterColon = keyMatch.rest
 
                         // Skip if the line already has a comment
                         if (afterColon.includes('#')) continue
@@ -1073,14 +1122,14 @@
                             const l = lines[j]
                             const li = l.match(/^(\s*)/)[1].length
                             if (li === targetIndent) {
-                                const m = l.trim().match(/^([\w-]+):\s*$/)
-                                if (m) { parentKeys.unshift(m[1]); targetIndent -= 2 }
+                                const keyOnly = matchKeyOnlyLine(l.trim())
+                                if (keyOnly) { parentKeys.unshift(keyOnly); targetIndent -= 2 }
                                 else if (l.trim().startsWith('- ') || l.trim() === '-') {
                                     targetIndent -= 2
                                 }
                             } else if (li === targetIndent - 2) {
-                                const akm = l.trim().match(/^-\s+([\w-]+):/)
-                                if (akm) { parentKeys.unshift(akm[1]); targetIndent = li - 2 }
+                                const arrayKey = matchArrayKeyLine(l.trim())
+                                if (arrayKey) { parentKeys.unshift(arrayKey); targetIndent = li - 2 }
                             }
                         }
 
@@ -1760,7 +1809,7 @@
                     const before = line.substring(0, e.position.column - 1)
                     const trimmed = before.trim()
                     // Trigger on: empty line, whitespace-only, after "key: " (value position)
-                    if (trimmed === '' || /^[\w-]+:\s+$/.test(before.trimStart())) {
+                    if (trimmed === '' || isAfterKeyColon(before.trimStart())) {
                         // Small delay to let Monaco settle after the keystroke
                         autoSuggestTimer = setTimeout(() => {
                             autoSuggestTimer = null
