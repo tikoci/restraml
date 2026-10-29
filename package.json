@@ -27,10 +27,10 @@
     "test:native-api-drops": "bun scripts/test-native-api-drops.ts"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^5.4.1"
   },
   "devDependencies": {
-    "@apidevtools/swagger-parser": "^12.1.0",
+    "@apidevtools/swagger-parser": "^13.0.0",
     "@biomejs/biome": "^2.0.0",
     "@tikoci/quickchr": "^0.4.7",
     "actionlint": "^2.0.6",
