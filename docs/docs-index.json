@@ -1,8 +1,8 @@
 {
   "format": "restraml-docs-index@1",
-  "generatedAt": "2026-11-03T11:54:26.338Z",
+  "generatedAt": "2026-11-23T08:37:26.248Z",
   "rootPath": "docs",
-  "latestVersion": "7.26beta5",
+  "latestVersion": "7.26beta7",
   "latestStableVersion": "7.25.1",
   "files": [
     {
@@ -107,6 +107,19 @@
     }
   ],
   "versions": [
+    {
+      "name": "7.26beta7",
+      "path": "docs/7.26beta7",
+      "type": "dir",
+      "files": [
+        {
+          "name": "app.json",
+          "path": "docs/7.26beta7/app.json",
+          "type": "file"
+        }
+      ],
+      "dirs": []
+    },
     {
       "name": "7.26beta5",
       "path": "docs/7.26beta5",
