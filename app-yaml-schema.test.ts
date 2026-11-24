@@ -198,7 +198,9 @@ describe("routeros-app-yaml-schema (strict only)", () => {
     expect(validate(YAML.load(badRetries))).toBe(false);
   });
 
-  // tikapp.html validates without ajv-formats, so the dns pattern alone must reject these too
+  // Formats differ by validator: CI uses ajv-formats, tikapp.html uses Ajv 6.12.6's built-in
+  // ipv4/ipv6 (which accepts leading-zero octets), and some editors skip formats entirely.
+  // The pattern alone must still reject every form RouterOS was seen to drop.
   for (const [mode, validateFormats] of [["with formats", true], ["without formats", false]] as const) {
     test.each(dnsIgnored)(`rejects dns %s (${mode})`, (_label, fragment) => {
       const ajv = new Ajv({ allErrors: true, strict: false, validateFormats });
@@ -206,6 +208,12 @@ describe("routeros-app-yaml-schema (strict only)", () => {
       expect(ajv.compile(schemas.strict)(serviceWith(fragment))).toBe(false);
     });
   }
+
+  // Not CHR-tested. Malformed colon strings get past the pattern and are rejected only by the
+  // ipv6 format, which both CI (ajv-formats) and tikapp.html (Ajv 6 built-in) apply.
+  test.each(["::::", "1:2:3:4:5:6:7:8:9", "8.8.8.8:"])("rejects malformed IPv6 dns %p (with formats)", (dns) => {
+    expect(validatorFor(schemas.strict)(serviceWith(`dns: '${dns}'`))).toBe(false);
+  });
 });
 
 describe("routeros-app-yaml-schema (editor only)", () => {
