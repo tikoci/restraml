@@ -45,6 +45,27 @@ function assertSafeVersion(version) {
   return version
 }
 
+// Service properties RouterOS honors only from a given major.minor, checked on CHR by enabling an
+// app and reading /container. Below that version RouterOS accepts the key and silently ignores it,
+// so a per-version schema for an older version leaves it out. Needed when a schema miss is
+// backfilled into already-published versions (back to the current long-term).
+const SERVICE_PROPERTY_MIN_VERSION = {
+  dns: [7, 23],
+  privileged: [7, 25],
+}
+
+function withoutServicePropertiesAfter(version, schema) {
+  const [major, minor] = version.split(/[^0-9]+/).map(Number)
+  const tooNew = Object.entries(SERVICE_PROPERTY_MIN_VERSION)
+    .filter(([, [minMajor, minMinor]]) => major < minMajor || (major === minMajor && minor < minMinor))
+    .map(([name]) => name)
+  if (tooNew.length === 0) return schema
+  const copy = structuredClone(schema)
+  const serviceProperties = copy.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties
+  for (const name of tooNew) delete serviceProperties[name]
+  return copy
+}
+
 function resolveDocsPath(version, fileName) {
   const docsRoot = path.resolve("docs")
   const versionRoot = path.resolve(docsRoot, version)
@@ -174,10 +195,10 @@ async function main() {
   )
 
   // --- Create per-version schemas with version-specific $id and $ref ---
-  const versionedSingleSchema = {
+  const versionedSingleSchema = withoutServicePropertiesAfter(version, {
     ...singleSchema,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
-  }
+  })
   const versionedStoreSchema = {
     ...storeSchemaBase,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-store-schema.json`,

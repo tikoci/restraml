@@ -222,3 +222,24 @@ describe("routeros-app-yaml-schema (editor only)", () => {
     expect(validatorFor(schemas.editor)(serviceWith(fragment))).toBe(true);
   });
 });
+
+// Published per-version schemas from the current long-term on were backfilled with dns and
+// privileged. appyamlvalidate.js leaves privileged out below 7.25 (7.24.7 ignores it on CHR).
+describe("published per-version schemas (backfilled to long-term)", () => {
+  const serviceKeys = async (version: string) => {
+    const s = await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json();
+    return Object.keys(s.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties);
+  };
+
+  test.each(["7.24", "7.24.5", "7.24.7"])("%s has dns but not privileged", async (version) => {
+    const keys = await serviceKeys(version);
+    expect(keys).toContain("dns");
+    expect(keys).not.toContain("privileged");
+  });
+
+  test.each(["7.25", "7.25.2", "7.26beta7"])("%s has dns and privileged", async (version) => {
+    const keys = await serviceKeys(version);
+    expect(keys).toContain("dns");
+    expect(keys).toContain("privileged");
+  });
+});

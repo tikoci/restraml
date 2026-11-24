@@ -181,7 +181,8 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 ### Update schema generation
 1. Edit `rest2raml.js` — runs under Bun, not Node.js.
 2. Test locally: `URLBASE=http://192.168.88.1/rest BASICAUTH=admin: bun rest2raml.js`
-3. Use `INSPECTFILE` env var to test with a cached inspect JSON (offline testing).
+3. Use `INSPECTFILE` env var to test with a cached inspect JSON. `URLBASE` must still answer the
+   version call; see "Run rest2raml.js locally" in `CLAUDE.md` for a fully offline stub.
 
 ### Update CLAUDE.md / AGENTS.md
 - Keep these files current with any architectural changes you make.
