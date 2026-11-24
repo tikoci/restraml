@@ -93,7 +93,7 @@
     },
     "compatible-boards": {
       "type": "array",
-      "description": "Board names supported by the /app, for example `RDS2216`; the `*` wildcard is accepted. Devices not matching the specified board name do not display the /app",
+      "description": "Board names supported by the /app, for example `RDS2216`; the `*` wildcard is accepted. Devices not matching the specified board name do not display the /app (RouterOS 7.25+)",
       "items": {
         "type": "string"
       },
@@ -329,7 +329,7 @@
               "description": "Linux user or UID the container runs as"
             },
             "dns": {
-              "description": "DNS servers for the container (sets /container dns=). RouterOS 7.23+. One IP address or a list of them; RouterOS silently ignores anything else (hostnames, placeholders, comma-joined strings, scoped IPv6 such as fe80::1%ether1, 0.0.0.0 and ::)",
+              "description": "DNS servers for the container (sets /container dns=). RouterOS 7.23+. One IP address or a list of them; RouterOS silently ignores anything else (hostnames, placeholders, comma-joined strings, scoped IPv6 such as fe80::1%ether1, and the unspecified address in any spelling: 0.0.0.0, ::, 0:0:0:0:0:0:0:0)",
               "oneOf": [
                 {
                   "type": "string",
@@ -343,10 +343,7 @@
                     }
                   ],
                   "not": {
-                    "enum": [
-                      "0.0.0.0",
-                      "::"
-                    ]
+                    "pattern": "^[0:.]+$"
                   }
                 },
                 {
@@ -363,10 +360,7 @@
                       }
                     ],
                     "not": {
-                      "enum": [
-                        "0.0.0.0",
-                        "::"
-                      ]
+                      "pattern": "^[0:.]+$"
                     }
                   }
                 }

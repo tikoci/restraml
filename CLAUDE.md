@@ -274,11 +274,16 @@ version's built-in apps:
 bun appyamlvalidate.js 7.24.7 --app-json docs/7.24.7/app.json   # repeat per version; exit 0 = all built-ins pass
 ```
 
-If the feature arrived after some of those versions, add the service property to
-`SERVICE_PROPERTY_MIN_VERSION` in `appyamlvalidate.js` first; per-version schemas below that
-major.minor leave it out. Find the minimum version on a CHR, not just from the changelog: RouterOS
-accepts any key at `/app/add` and silently ignores what it doesn't support, so check the resulting
-`/container` entry (for example, `privileged: true` on 7.24.7 still gives `privileged=false`).
+If the feature arrived after some of those versions, add the property to
+`APP_PROPERTY_MIN_VERSION` (top-level keys) or `SERVICE_PROPERTY_MIN_VERSION` (keys under a
+service) in `appyamlvalidate.js` first; per-version schemas below that major.minor leave it out.
+Find the minimum version on a CHR, not just from the changelog: RouterOS accepts any key at
+`/app/add` and silently ignores what it doesn't support. Check the effect instead. For a service
+key, read the resulting `/container` entry (`privileged: true` on 7.24.7 still gives
+`privileged=false`). For a catalog key, serve a small store over `app-store-urls` (the host is
+`10.0.2.2` from a quickchr user-mode NIC) and see which apps get listed: 7.24.7 lists an app
+restricted to `supported-archs: [arm64]` or `compatible-boards: [RDS2216]` on an x86 CHR, and
+7.25.2 hides it. A custom app from `/app/add` is not filtered on either version.
 `docs-index.json` lists file names only, so a backfill does not need `docs:index`.
 
 - **Stable releases** (e.g., `7.22`, no qualifier): only on `download.mikrotik.com`
@@ -936,8 +941,9 @@ INSPECTFILE=./ros-inspect-all.json URLBASE=http://192.168.88.1/rest BASICAUTH=ad
 
 # Fully offline: answer the version call with a stub (the version string goes into the RAML title)
 bun -e 'Bun.serve({ port: 19999, fetch: () => Response.json({ ret: "7.25.2 (stable)" }) })' &
+stub=$!
 INSPECTFILE=docs/7.25.2/extra/inspect.json URLBASE=http://127.0.0.1:19999/rest BASICAUTH=x: bun rest2raml.js
-kill %1
+kill "$stub"
 ```
 
 ### "Validate schemas"

@@ -102,6 +102,7 @@ const dnsHonored: [string, string][] = [
   ["IPv6", "dns:\n      - 2001:4860:4860::8888"],
   ["link-local IPv6", "dns:\n      - fe80::1"],
   ["IPv4-mapped IPv6", "dns: '::ffff:8.8.8.8'"],
+  ["IPv6 loopback", "dns: '::1'"],
 ];
 
 // All silently dropped from /container dns= (8.8.8 is rewritten to 8.8.0.8 instead)
@@ -117,6 +118,9 @@ const dnsIgnored: [string, string][] = [
   ["0.0.0.0", "dns: 0.0.0.0"],
   ["::", "dns: '::'"],
   ["0.0.0.0 alongside a valid entry", "dns:\n      - 0.0.0.0\n      - 1.1.1.1"],
+  ["expanded unspecified IPv6", "dns: '0:0:0:0:0:0:0:0'"],
+  ["expanded unspecified IPv6 in a list", "dns:\n      - 0:0:0:0:0:0:0:0"],
+  ["::0", "dns: '::0'"],
 ];
 
 const privilegedHonored: [string, string][] = [
@@ -235,6 +239,22 @@ describe("published per-version schemas (backfilled to long-term)", () => {
     const keys = await serviceKeys(version);
     expect(keys).toContain("dns");
     expect(keys).not.toContain("privileged");
+  });
+
+  // App-level catalog filters, 7.25+ (checked through app-store-urls on 7.24.7 and 7.25.2)
+  const appKeys = async (version: string) =>
+    Object.keys((await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json()).properties);
+
+  test.each(["7.24", "7.24.5", "7.24.7"])("%s has no supported-archs or compatible-boards", async (version) => {
+    const keys = await appKeys(version);
+    expect(keys).not.toContain("supported-archs");
+    expect(keys).not.toContain("compatible-boards");
+  });
+
+  test.each(["7.25", "7.25.2", "7.26beta7"])("%s has supported-archs and compatible-boards", async (version) => {
+    const keys = await appKeys(version);
+    expect(keys).toContain("supported-archs");
+    expect(keys).toContain("compatible-boards");
   });
 
   test.each(["7.25", "7.25.2", "7.26beta7"])("%s has dns and privileged", async (version) => {
