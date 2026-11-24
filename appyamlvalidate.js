@@ -45,6 +45,40 @@ function assertSafeVersion(version) {
   return version
 }
 
+// Properties RouterOS honors only from a given major.minor, checked on CHR. Below that version
+// RouterOS accepts the key and silently ignores it, so a per-version schema for an older version
+// leaves it out. Needed when a schema miss is backfilled into already-published versions (back to
+// the current long-term).
+// App level: checked through app-store-urls on x86 CHR; 7.24.7 still lists an app restricted to
+// arm64 or to board RDS2216, 7.25.2 hides it.
+const APP_PROPERTY_MIN_VERSION = {
+  "supported-archs": [7, 25],
+  "compatible-boards": [7, 25],
+}
+// Service level: checked by enabling an app and reading /container.
+const SERVICE_PROPERTY_MIN_VERSION = {
+  dns: [7, 23],
+  privileged: [7, 25],
+}
+
+function namesNewerThan(version, table) {
+  const [major, minor] = version.split(/[^0-9]+/).map(Number)
+  return Object.entries(table)
+    .filter(([, [minMajor, minMinor]]) => major < minMajor || (major === minMajor && minor < minMinor))
+    .map(([name]) => name)
+}
+
+function withoutPropertiesAfter(version, schema) {
+  const appTooNew = namesNewerThan(version, APP_PROPERTY_MIN_VERSION)
+  const serviceTooNew = namesNewerThan(version, SERVICE_PROPERTY_MIN_VERSION)
+  if (appTooNew.length === 0 && serviceTooNew.length === 0) return schema
+  const copy = structuredClone(schema)
+  const serviceProperties = copy.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties
+  for (const name of appTooNew) delete copy.properties[name]
+  for (const name of serviceTooNew) delete serviceProperties[name]
+  return copy
+}
+
 function resolveDocsPath(version, fileName) {
   const docsRoot = path.resolve("docs")
   const versionRoot = path.resolve(docsRoot, version)
@@ -174,10 +208,10 @@ async function main() {
   )
 
   // --- Create per-version schemas with version-specific $id and $ref ---
-  const versionedSingleSchema = {
+  const versionedSingleSchema = withoutPropertiesAfter(version, {
     ...singleSchema,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
-  }
+  })
   const versionedStoreSchema = {
     ...storeSchemaBase,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-store-schema.json`,

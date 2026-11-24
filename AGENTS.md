@@ -175,13 +175,18 @@ All pages in `docs/` are static HTML files served by GitHub Pages. Rules:
 2. Edit `docs/routeros-app-yaml-store-schema.latest.json` for the store schema.
 3. Run `bun install js-yaml ajv ajv-formats` then `bun appyamlvalidate.js <version>` to validate.
 4. If testing against a live router: `URLBASE=http://<ip>/rest BASICAUTH=admin: bun appyamlvalidate.js <version>`
-5. Per-version files (`docs/{version}/routeros-app-yaml-schema.json`) are regenerated automatically
-   by the `appyamlschemas.yaml` workflow when schemas change.
+5. The `appyamlschemas.yaml` workflow writes per-version files
+   (`docs/{version}/routeros-app-yaml-schema.json`) only for versions that don't have one yet.
+   When a schema fix covers a feature that published versions have, backfill them back to the
+   current long-term release with `bun appyamlvalidate.js <version> --app-json docs/<version>/app.json`.
+   See "Backfill published versions" in `CLAUDE.md`, including the version gates in
+   `appyamlvalidate.js` for keys newer than some of those versions.
 
 ### Update schema generation
 1. Edit `rest2raml.js` — runs under Bun, not Node.js.
 2. Test locally: `URLBASE=http://192.168.88.1/rest BASICAUTH=admin: bun rest2raml.js`
-3. Use `INSPECTFILE` env var to test with a cached inspect JSON (offline testing).
+3. Use `INSPECTFILE` env var to test with a cached inspect JSON. `URLBASE` must still answer the
+   version call; see "Run rest2raml.js locally" in `CLAUDE.md` for a fully offline stub.
 
 ### Update CLAUDE.md / AGENTS.md
 - Keep these files current with any architectural changes you make.
