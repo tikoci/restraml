@@ -328,6 +328,47 @@
               "type": "string",
               "description": "Linux user or UID the container runs as"
             },
+            "dns": {
+              "description": "DNS servers for the container (sets /container dns=). RouterOS 7.23+. One IP address or a list of them; RouterOS silently ignores anything else (hostnames, placeholders, comma-joined strings)",
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9A-Fa-f.:]+$",
+                  "anyOf": [
+                    {
+                      "format": "ipv4"
+                    },
+                    {
+                      "format": "ipv6"
+                    }
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[0-9A-Fa-f.:]+$",
+                    "anyOf": [
+                      {
+                        "format": "ipv4"
+                      },
+                      {
+                        "format": "ipv6"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "privileged": {
+              "description": "Run the container privileged (sets /container privileged=). RouterOS 7.25+. Only true is honored; yes, 1 and other values silently leave it unprivileged",
+              "enum": [
+                true,
+                false,
+                "true",
+                "false"
+              ]
+            },
             "security_opt": {
               "type": "array",
               "items": {
