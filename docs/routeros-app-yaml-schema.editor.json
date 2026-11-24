@@ -281,7 +281,7 @@
               "description": "Linux user or UID the container runs as (name or `uid:gid`)"
             },
             "dns": {
-              "description": "DNS servers for the container (sets /container dns=). RouterOS 7.23+. One IP address or a list of them, e.g. `- 8.8.8.8`. RouterOS silently ignores hostnames, placeholders and comma-joined strings",
+              "description": "DNS servers for the container (sets /container dns=). RouterOS 7.23+. One IP address or a list of them, e.g. `- 8.8.8.8`. RouterOS silently ignores hostnames, placeholders, comma-joined strings, scoped IPv6 (`fe80::1%ether1`), `0.0.0.0` and `::`",
               "oneOf": [
                 {"type": "string"},
                 {"type": "array", "items": {"type": "string"}}
