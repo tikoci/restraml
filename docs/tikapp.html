@@ -983,7 +983,7 @@
                             insertText = `${key}:\n${' '.repeat(indent + 2)}- \${1}`
                         } else if (rm?.enum) {
                             // Offer choice placeholder for enums
-                            const choices = rm.enum.map(v => String(v)).join(',')
+                            const choices = [...new Set(rm.enum.map(v => String(v)))].join(',')
                             insertText = `${key}: \${1|${choices}|}`
                         } else if (Array.isArray(rawType) ? rawType.includes('boolean') : rawType === 'boolean') {
                             insertText = `${key}: \${1|true,false|}`
