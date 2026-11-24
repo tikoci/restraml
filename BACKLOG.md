@@ -160,18 +160,19 @@ extra package adds a command would improve docs and downstream search.
 **Why:** the workflow hand-rolls QEMU, package install, licensing and boot-wait
 loops in bash, duplicated per arch, while `scripts/deep-inspect-multi-arch.ts`
 already does all of it through `@tikoci/quickchr` and is the documented local
-path. `nightly.yaml` proves the CI shape works — its arm64 job runs on the same
-`ubuntu-24.04-arm` runner under TCG at free tier and is green (34,735 args,
-21m43s). Keeping two harnesses is what allowed #96 to hide: the two arch jobs had
-drifted onto different package mechanisms and only one rotted. #96 fixed the
-divergence; this removes the duplication that caused it.
+path. The retired `nightly.yaml` proved the CI shape works — its arm64 job ran on
+the same `ubuntu-24.04-arm` runner under TCG at free tier and was green (34,735
+args, 21m43s). Keeping two harnesses is what allowed #96 to hide: the two arch
+jobs had drifted onto different package mechanisms and only one rotted. #96 fixed
+the divergence; this removes the duplication that caused it.
 
 **Prerequisites discovered while fixing #96 — get these wrong and it will not boot:**
 
 - Pass `mem: 1024` explicitly. quickchr's `defaultMem()` only returns 1024 for
   *cross-arch* emulation (`isCrossArchEmulation`), so arm64-on-arm64 gets 512 MB —
-  the exact RAM anti-pattern from the April postmortem. `scripts/nightly-build.ts`
-  already does this; `scripts/deep-inspect-multi-arch.ts` does **not** yet.
+  the exact RAM anti-pattern from the April postmortem. The retired
+  `scripts/nightly-build.ts` did this; `scripts/deep-inspect-multi-arch.ts`
+  does **not** yet.
 - Install `qemu-utils` on the arm64 runner. quickchr builds per-machine EFI vars
   with `qemu-img convert` on every aarch64 launch; without it the CHR never boots.
 - Add `bun install --frozen-lockfile`. The workflow has no dependency install step
@@ -183,8 +184,9 @@ divergence; this removes the duplication that caused it.
   `MIKROTIK_WEB_*` env names), or wait for an upstream `optional`/fallback option
   in `tikoci/quickchr`.
 - The workflow's `argsTotal >= 30000` floor and the `pathsOnlyB >= 500` diff gate
-  live only in shell; the script has neither. Port them (nightly uses typed
-  helpers, `getArgsTotalFloor`).
+  live only in shell; the script has neither. Port them (the retired nightly
+  script used typed helpers like `getArgsTotalFloor` — reimplement, see git
+  history).
 
 **Acceptance criteria:**
 

@@ -246,8 +246,7 @@ and naming nothing. Replaced by `deep-inspect.ts --require-roots`, which reads
 `_meta.census` and fails immediately naming the missing roots. The multi-arch
 workflow requires `container,iot,dude,user-manager,tr069-client,openflow` — all
 six are present in every published versioned artifact back to 7.20.8 on both
-arches. Nightly deliberately does not use this list: its NPK set carries no
-`dude`, `openflow`, `tr069-client` or `user-manager` (see `absentRoots`).
+arches.
 
 `diff-deep-inspect.ts` additionally reports root-menu drift between the two
 arches. That one is report-only — `/blink` and `/zerotier` are legitimately

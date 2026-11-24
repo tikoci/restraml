@@ -67,8 +67,8 @@ runs:
         # Split by kind: deletions cannot be replayed with `git restore
         # --source=LOCAL_COMMIT` (they do not exist in that commit, so git aborts
         # with "pathspec did not match").  A publish that replaces a whole
-        # directory — the nightly single slot — legitimately drops files between
-        # runs, so both kinds have to survive a retry.
+        # directory legitimately drops files between runs, so both kinds have
+        # to survive a retry.
         mapfile -t STAGED_PRESENT < <(git diff --cached --name-only --diff-filter=d)
         mapfile -t STAGED_DELETED < <(git diff --cached --name-only --diff-filter=D)
         echo "Staged: ${#STAGED_PRESENT[@]} added/modified, ${#STAGED_DELETED[@]} deleted"

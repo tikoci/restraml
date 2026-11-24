@@ -438,12 +438,12 @@ jobs:
         # activation trigger is the explicit reboot in the next step — never
         # /system/package/apply-changes, which prompts and defaults to no (#96).
         #
-        # Expect ~1 min: nightly.yaml pushes a comparable 52 MiB of NPKs to an
-        # arm64 TCG CHR at 1024 MB and completes upload+reboot+boot in ~64s. The
-        # 52-MINUTE SCP seen in April 2026 (run 24553141540) was the 256 MB
-        # memory-pressure artifact, not SCP being unsuited to TCG. The bound
-        # below exists so a return of that pressure fails fast instead of
-        # quietly consuming the job's 60-minute budget.
+        # Expect ~1 min: a comparable 52 MiB NPK upload to an arm64 TCG CHR at
+        # 1024 MB completes upload+reboot+boot in ~64s (measured by the retired
+        # nightly workflow). The 52-MINUTE SCP seen in April 2026 (run 24553141540)
+        # was the 256 MB memory-pressure artifact, not SCP being unsuited to TCG.
+        # The bound below exists so a return of that pressure fails fast instead
+        # of quietly consuming the job's 60-minute budget.
         timeout-minutes: 15
         run: |
           started=$(date +%s)

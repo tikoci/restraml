@@ -38,7 +38,6 @@ restraml/
 │   ├── test-ros-api.sh             # Integration + stress tests (ros-api-protocol) against local CHR
 │   ├── benchmark-qemu.sh           # REST vs native API timing benchmark against local CHR
 │   ├── deep-inspect-multi-arch.ts  # Per-arch deep-inspect orchestrator (quickchr library, x86 + arm64)
-│   ├── nightly-build.ts            # Nightly (ab) build driver: stable CHR → nightly NPK upgrade → crawl
 │   ├── diff-deep-inspect.ts        # Diff two deep-inspect.<arch>.json files (enum drift + path delta)
 │   ├── build-docs-index.mjs        # Generate docs/docs-index.json from the checked-in docs tree
 │   ├── experiment-arm64-reboot-timing.sh # Local QEMU arm64 reboot-timing experiment helper
@@ -75,11 +74,7 @@ restraml/
 │   │   ├── app.json                             # Raw GET /rest/app output (built-in /app YAMLs)
 │   │   ├── routeros-app-yaml-schema.json        # /app YAML schema for this version
 │   │   └── routeros-app-yaml-store-schema.json  # /app store schema for this version
-│   ├── {version}/extra/  # Same files, but built with all_packages (extra features)
-│   └── nightly/          # Single overwritten slot for the mt.lv/nightly-build (ab) train
-│       ├── {schema.raml,inspect.json,openapi.json,deep-inspect.json}  # x86 base phase
-│       ├── nightly.json  # Provenance: nightlyVersion, buildWindow, per-arch packages, absentRoots
-│       └── extra/        # x86 extra phase + deep-inspect.{x86,arm64}.json + diff + app.json
+│   └── {version}/extra/  # Same files, but built with all_packages (extra features)
 ├── CLAUDE.md             # Full architecture guide for AI agents
 ├── AGENTS.md             # GitHub Copilot agent-specific instructions
 └── .github/
@@ -91,7 +86,6 @@ restraml/
         ├── manual-using-extra-docker-in-docker.yaml     # Build: schema with extra packages
         ├── appyamlschemas.yaml                          # Build: validate and publish /app YAML schemas
         ├── deep-inspect-multi-arch.yaml                 # Build: per-arch deep-inspect (x86 KVM + arm64 KVM/TCG fallback) with diff
-        ├── nightly.yaml                                 # Build: nightly (ab) single slot → docs/nightly/
         ├── manual-from-secrets.yaml                     # Build: using a real RouterOS device (secrets)
         ├── codeql.yml                                   # Code scanning (JS/TS + GitHub Actions)
         └── dependency-review.yml                        # PR dependency review
@@ -132,6 +126,13 @@ Shape (summary):
 returns `versions[]` (same `{name, path, type}` core shape as before, with extra file metadata).
 Existing pages can keep using `fetchVersionList()`; pages that need file-aware filtering can inspect
 the added `files` / `dirs` fields.
+
+**`RESTRAML.pagesUrl` is derived from the URL `restraml-shared.js` was loaded from — never hardcode
+the Pages host for fetches.** The org site `tikoci.github.io` has the custom domain `tikoci.dev`, so
+GitHub Pages 301-redirects `tikoci.github.io/restraml/*` → `tikoci.dev/restraml/*` (project sites
+inherit the org domain; `tikoci/restraml` itself cannot and need not claim `tikoci.dev`). That
+redirect has no `Access-Control-Allow-Origin` header, so a hardcoded cross-origin data URL fails
+CORS. `<link rel="canonical">` / `og:url` and schema `$id` values are identifiers, not fetches.
 
 ### RouterOS /app YAML Schema System (7.22+)
 
@@ -177,7 +178,11 @@ in the filename since the parent directory already implies the version.
 **`appyamlschemas.yaml` workflow:**
 - Takes `rosver` input; boots CHR with extra packages (container/app feature requires them)
 - Runs `appyamlvalidate.js` against the live CHR
-- Handles three distinct exit codes from `appyamlvalidate.js`:
+- Handles four distinct exit codes from `appyamlvalidate.js`:
+  - **Exit 3** (live `/app` list unreachable, or still empty after `APP_LIST_WAIT_SECONDS`, default 180 s)
+    → fails, commits nothing. RouterOS 7.25+ returns `[]` from `GET /rest/app` right after boot, so
+    the script polls; an empty list is never published (7.25beta3–7.26beta3 shipped `app.json` = `[]`
+    before this gate existed).
   - **Exit 0** (all passed) → commits `app.json` + per-version schemas to `docs/{version}/`
   - **Exit 1** (meta-validation failed — schemas are invalid JSON Schema) → fails immediately, commits nothing
   - **Exit 2** (live validation failed — schemas valid but some MikroTik apps don't conform) → commits `app.json` only (for debugging); schemas are NOT committed so `auto.yaml` will detect them as missing and retry the build
@@ -227,7 +232,9 @@ listing the failing app names and error messages. To resolve:
    and examine the properties that cause errors.
 3. **Identify new patterns**: map each error class to a schema change:
    - `must NOT have additional properties` → new service property (e.g., `entrypoint`, `devices`)
-   - `must be equal to one of the allowed values` → new enum value (e.g., new `category`)
+   - `must be equal to one of the allowed values` → new enum value (e.g., new `restart` policy;
+     `category` accepts any string — verified on a 7.25 CHR, which took `system`, `Two Words` and
+     `123` — with the built-in categories kept only as editor suggestions)
    - `must match pattern` → port format change or new regex syntax
 4. **Update `docs/routeros-app-yaml-schema.latest.json`** (strict, CI validation) and
    `docs/routeros-app-yaml-schema.editor.json` (relaxed, SchemaStore/editor) with the new properties.
@@ -235,6 +242,20 @@ listing the failing app names and error messages. To resolve:
 6. Run `bun appyamlvalidate.js <version>` locally to confirm the schema is valid JSON Schema;
    also manually validate the YAML fields from failing apps against the updated schema.
 7. Per-version `routeros-app-yaml-schema.json` files are regenerated on the next CI run.
+
+**RouterOS re-serializes store and built-in `/app` YAML (7.25+).** Apps loaded from
+`app-store-urls`, and the built-in collection from 7.25 on, come back from `GET /rest/app` as
+RouterOS's own re-emitted YAML, not the authored file. Apps added with `/app/add yaml=` are
+returned verbatim, even after a reboot. The re-emitter sorts keys and quotes every scalar that is
+not letters-only, so `retries: 5` becomes `'5'` and long-form ports `published: '25'`. A
+letters-only string stays bare, which changes its type for a standard YAML parser: `"true"` becomes
+`true`, `"null"`/`"NULL"` become `null`, and `""` is emitted empty (also `null`). Verified on a 7.25
+CHR: RouterOS's own parser is string-typed and reads all of these back correctly — container argv,
+`env` and `healthcheck-*` come out as authored. Because this is what users copy out of RouterOS,
+the schemas accept digit-only strings wherever an integer is expected (`healthcheck.retries`,
+long-form `ports` `target`/`published`, `ulimits`) and string/number/boolean/null items in the
+`command`, `entrypoint` and `healthcheck.test` lists. Compare against the previous release's
+`app.json` before treating a type mismatch as a new upstream syntax.
 
 **Key: make schema changes only in `*.latest.json` and `*.editor.json`** — do NOT edit per-version
 `docs/{version}/routeros-app-yaml-schema.json` files directly; those are generated by `appyamlvalidate.js`.
@@ -963,60 +984,28 @@ half mid-flight, then probes the router — clean queue = &lt;5 s; ghost regress
 | `auto.yaml` | Daily cron + manual | Checks all 4 RouterOS channels; per unique version, independently checks base schema, extra schema, /app YAML schema, and deep-inspect multi-arch artifacts (`deep-inspect.x86.json`, `deep-inspect.arm64.json`, `diff-deep-inspect.json`) and dispatches only the builds that are missing; outputs a step summary table. Accepts a `skip_versions` input (see below). |
 | `manual-using-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Installs QEMU, boots CHR, builds base schema, commits to `/docs/{version}/` |
 | `manual-using-extra-docker-in-docker.yaml` | Manual (`rosver` input) or `auto.yaml` | Same as above + installs extra packages, commits to `/docs/{version}/extra/` |
-| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2), commits `app.json` always; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2 |
+| `appyamlschemas.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots CHR with extra packages, validates /app YAML schemas (exit codes 0/1/2/3), commits a freshly fetched `app.json` on exit 0 or 2; commits per-version schemas only on full pass (exit 0); files GitHub issue on exit 2; fails without committing on exit 1 or 3 (exit 3: live `/app` list unreachable or still empty) |
 | `deep-inspect-multi-arch.yaml` | Manual (`rosver` input) or `auto.yaml` | Boots x86 (KVM) and arm64 (KVM preferred, TCG fallback) CHRs in parallel. Both arches install extra packages identically — `all_packages-<arch>` zip → SCP → **explicit** reboot — then run a live deep-inspect crawl gated on `--require-roots`, diff results, and publish `deep-inspect.{x86,arm64}.json` and `diff-deep-inspect.json` to `/docs/{version}/extra/`. Per-arch OpenAPI publication is deferred to `BACKLOG.md` P2. |
-| `nightly.yaml` | Daily cron (06:00 UTC) + manual | Discovers the current `mt.lv/nightly-build` (ab) version, boots stable CHRs via quickchr, upgrades them with the nightly NPKs, crawls x86 base + x86 extra + arm64 extra, and publishes the single overwritten `docs/nightly/` slot. Independent of `auto.yaml` so a flaky Box share never blocks stable/beta. Accepts `force` and `nightly_version` dispatch inputs. |
 | `manual-from-secrets.yaml` | Manual | Builds using a real router via GitHub Secrets (no QEMU) |
 | `codeql.yml` | Push + PR + weekly schedule | Runs repository-managed CodeQL for JavaScript/TypeScript and GitHub Actions, using repo path ignores for generated versioned docs artifacts |
 | `dependency-review.yml` | Pull requests | Uses GitHub dependency review to block new high-severity vulnerable dependency changes |
 
 All builds commit schema files to `main` as `github-actions[bot]` and publish via GitHub Pages.
 
-### `nightly.yaml` — the `docs/nightly/` single slot
+### Nightly builds (retired)
 
-MikroTik's nightly ("ab") builds are published only as `.npk` files on a Box/Seafile share behind
-`https://mt.lv/nightly-build` — there is no nightly CHR disk image. `scripts/nightly-build.ts`
-therefore boots a **stable** CHR via quickchr, uploads the arch-filtered nightly NPKs over SCP,
-reboots, verifies `/system/resource` reports the nightly version, and only then runs the normal
-`rest2raml.js` + `deep-inspect.ts` collection. Output goes to one overwritten `docs/nightly/`
-directory — never one directory per `ab` build (see #90 for the storage rationale).
+MikroTik no longer publishes nightly ("ab") builds via the `mt.lv/nightly-build` Box share,
+so the nightly workflow (`nightly.yaml`), its driver (`scripts/nightly-build.ts`), the
+`docs/nightly/` single slot, and all nightly UI affordances were removed. If MikroTik
+introduces a new nightly release scheme, reintroduce support in whatever new form fits —
+see git history for the retired implementation. Do not re-add a `nightly` synthetic version
+to `docs-index.json` or the page version lists without a live data source behind it.
 
-Rules that are easy to get wrong:
-
-- **Harness names must not reach `docs/`.** `docs/nightly/nightly.json` embeds the full per-arch
-  provenance, including `outputSuffix` and `machineName`. Those are named for the *artifact*
-  (`x86`, `x86-base`, `arm64`, `restraml-nightly-<arch>`), never for quickchr or any other tool
-  that happens to run the build.
-- **Discovery reads a marker, not prose.** `nightly-build.ts --dry-run` prints
-  `nightly-version=<ver>` as a dedicated line and `nightly.yaml` extracts exactly that. The Box
-  share holds two `ab` builds during the upload window, so scraping any other log line can select
-  the older one.
-- **Each `--phase` gets its own `--output-dir`.** Base and extra crawls otherwise collide on the
-  `ros-*` artifacts at the repo root, and the `deep-inspect.<suffix>.json` floor gate would
-  validate the wrong phase.
-- **Package floors are phase-aware** (`getExpectedMinPackageCount`, `getArgsTotalFloor`). The
-  nightly NPK set is smaller than `all_packages` — the Box share carries no `dude`, `openflow`,
-  `tr069-client`, or `user-manager`, which is why `nightly.json` records `absentRoots`. Do not
-  compare nightly `argsTotal` against the versioned `docs/{version}/extra/` numbers without
-  accounting for that.
-- **`@tikoci/quickchr` is a devDependency from npm** (`^0.4.7`), not `file:../quickchr`. CI runs
-  `bun install --frozen-lockfile` on a runner where no sibling checkout exists, so a `file:` path
-  fails the install outright. To iterate against a local quickchr working copy, use
-  `bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
-  dependency to `package.json`.
-- **The slot keeps `openapi.json` and `schema.raml`.** They are ~27 MB of the ~35 MB base slot, so
-  dropping them was considered for storage — but `docs/openapi.html` is a live consumer of the
-  slot's `openapi.json` (`openapi.html?version=nightly&nightly=true` loads it), and `schema.raml`
-  stays for parity with every versioned build. Consecutive `ab` builds are near-identical, so the single-slot git delta
-  is small (~4.5 MiB of objects for the first ~85 MB publish). If RAML generation is ever retired
-  repo-wide, the nightly slot follows that decision — it is not a nightly-specific call.
-- **`/app` is validated offline against the root `*.latest.json`**, never per-version. Minting
-  `docs/nightly/routeros-app-yaml-schema.json` would create a stable `$id` URL whose content
-  changes daily, breaking schema identity and editor caching. The validation step runs in
-  `publish-nightly` *after* `nightly.json` is aggregated (so the filed issue embeds real
-  provenance) and is `continue-on-error` — a drift issue is the early-warning signal for the next
-  beta/RC promotion, not a publish gate. `app.json` publishes either way as the debuggable raw
-  artifact.
+**`@tikoci/quickchr` is a devDependency from npm** (`^0.4.7`), not `file:../quickchr`. CI runs
+`bun install --frozen-lockfile` on a runner where no sibling checkout exists, so a `file:` path
+fails the install outright. To iterate against a local quickchr working copy, use
+`bun link` in `../quickchr` then `bun link @tikoci/quickchr` here — do not re-add the `file:`
+dependency to `package.json`.
 
 ### `auto.yaml` — `skip_versions` Input
 
@@ -1153,8 +1142,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
    packages under TCG, it causes memory pressure that inflates REST calls from ~70ms to ~10s+.
    Use 1024 MB for any job that installs extra packages. Note quickchr only defaults to 1024 MB
    for **cross-arch** emulation (`defaultMem` → `isCrossArchEmulation`); an arm64 guest on a
-   native arm64 runner gets **512 MB**, so pass `mem: 1024` explicitly as
-   `scripts/nightly-build.ts` does.
+   native arm64 runner gets **512 MB**, so pass `mem: 1024` explicitly.
    This RAM/REST-stall behaviour is a **separate issue** from the `/console/inspect path=do`
    hang tracked as MikroTik **SUP-127641**. The `do`-path hang on 7.20.8 reproduces identically
    at 128 MB **and** 512 MB (confirmed April 2026 via `bun scripts/test-crash-path-memory.ts`) —
@@ -1199,7 +1187,7 @@ These rules apply to **all agents working on CI workflows** in this repository:
 | Package | Used by | Purpose |
 |---|---|---|
 | `js-yaml` | `rest2raml.js`, `appyamlvalidate.js` (Bun) | Serialize RAML output as YAML; parse /app YAML for validation |
-| `@tikoci/quickchr` | `scripts/nightly-build.ts`, `scripts/deep-inspect-multi-arch.ts` (dev) | Boots/manages CHR VMs via QEMU. Installed from npm so CI can resolve it; `bun link` for local iteration |
+| `@tikoci/quickchr` | `scripts/deep-inspect-multi-arch.ts` (dev) | Boots/manages CHR VMs via QEMU. Installed from npm so CI can resolve it; `bun link` for local iteration |
 | `ajv` | `appyamlvalidate.js` (Bun) | JSON Schema validation (draft-07) for /app YAML schemas |
 | `ajv-formats` | `appyamlvalidate.js` (Bun) | AJV plugin for format validators (uri, email, etc.) |
 | `@apidevtools/swagger-parser` | `validate-openapi.ts` (Bun) | OpenAPI 3.0 schema validation |

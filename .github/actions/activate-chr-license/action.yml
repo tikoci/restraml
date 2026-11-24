@@ -109,10 +109,10 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          // Deliberately create-if-absent WITHOUT commenting on reruns. Unlike the
-          // nightly /app failures — which are version-specific and episodic — an
-          // exhausted trial pool is a persistent condition, so a daily comment would
-          // be pure noise. The open issue is the standing signal; per-run detail
+          // Deliberately create-if-absent WITHOUT commenting on reruns. Unlike
+          // version-specific, episodic validation failures, an exhausted trial
+          // pool is a persistent condition, so a daily comment would be pure
+          // noise. The open issue is the standing signal; per-run detail
           // lives in the job summary. Both arch jobs may reach here: the first
           // creates, the rest find it and skip.
           const title = 'deep-inspect multi-arch: CHR trial licensing degraded to free tier'

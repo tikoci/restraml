@@ -192,11 +192,15 @@ jobs:
         # Exit code 0 or 2 are OK for continuing — 0 means all passed, 2 means schemas
         # are valid but some /app YAMLs don't conform. Exit 1 (meta-validation failed)
         # means the schemas are invalid JSON Schema and should not be committed.
-        if [ $EXIT_CODE -eq 1 ]; then
-          echo "::error::JSON Schema meta-validation failed — schemas are invalid and will not be committed"
-          exit 1
-        fi
-        exit 0
+        # Exit 3 means the live /app list was unreachable or stayed empty, so nothing
+        # was validated — publishing would ship an empty app.json.
+        case $EXIT_CODE in
+          0|2) exit 0 ;;
+          1) echo "::error::JSON Schema meta-validation failed — schemas are invalid and will not be committed" ;;
+          3) echo "::error::Live /app list was unavailable or empty — nothing validated, nothing will be committed" ;;
+          *) echo "::error::appyamlvalidate.js exited with unexpected code $EXIT_CODE" ;;
+        esac
+        exit 1
 
     - name: Create GitHub issue if /app YAML validation failed
       # Only triggered when exit code 2 (/app YAML validation failures found).
@@ -259,8 +263,11 @@ jobs:
 
     - name: Commit app.json (raw /app data) if fetch succeeded
       # app.json is valuable for debugging/review — commit it if we fetched it,
-      # regardless of whether the schemas passed validation or not.
-      if: always() && steps.connection-check.outcome == 'success' && steps.app-json-artifact.outputs.exists == 'true'
+      # regardless of whether the schemas passed validation or not. Exit codes 1 and 3
+      # mean no fresh app.json was fetched; any file present is the stale checked-in copy.
+      if: >-
+        always() && steps.connection-check.outcome == 'success' && steps.app-json-artifact.outputs.exists == 'true'
+        && (steps.validate.outputs.exit_code == '0' || steps.validate.outputs.exit_code == '2')
       uses: ./.github/actions/publish-with-retry
       with:
         publish-paths: |
