@@ -87,6 +87,51 @@ services:
       retries: abc
 `;
 
+// Service `dns` and `privileged`, checked on CHR 7.25.2 and 7.26beta7 by enabling each app and
+// reading the resulting /container entry. RouterOS accepts any /app YAML at add time (even an
+// unknown key), so "honored"/"ignored" below is what reached the container, not add-time acceptance.
+function serviceWith(fragment: string) {
+  return YAML.load(`name: x\nservices:\n  svc:\n    image: alpine:latest\n    ${fragment}\n`);
+}
+
+const dnsHonored: [string, string][] = [
+  ["block list", "dns:\n      - 8.8.8.8"],
+  ["block list of two", "dns:\n      - 8.8.8.8\n      - 1.1.1.1"],
+  ["plain string", "dns: 8.8.8.8"],
+  ["flow list", "dns: [9.9.9.9, 1.0.0.1]"],
+  ["IPv6", "dns:\n      - 2001:4860:4860::8888"],
+  ["link-local IPv6", "dns:\n      - fe80::1"],
+  ["IPv4-mapped IPv6", "dns: '::ffff:8.8.8.8'"],
+];
+
+// All silently dropped from /container dns= (8.8.8 is rewritten to 8.8.0.8 instead)
+const dnsIgnored: [string, string][] = [
+  ["comma-joined string", "dns: 8.8.8.8,1.1.1.1"],
+  ["hostname", "dns:\n      - not-an-ip"],
+  ["placeholder", 'dns:\n      - "[routerIP]"'],
+  ["leading-zero octets", "dns: 010.000.000.001"],
+  ["out-of-range octets", "dns: 999.999.999.999"],
+  ["three octets", "dns: 8.8.8"],
+  ["scoped IPv6 in a list", "dns:\n      - fe80::1%ether1"],
+  ["scoped IPv6 string", "dns: 'fe80::1%ether1'"],
+  ["0.0.0.0", "dns: 0.0.0.0"],
+  ["::", "dns: '::'"],
+  ["0.0.0.0 alongside a valid entry", "dns:\n      - 0.0.0.0\n      - 1.1.1.1"],
+];
+
+const privilegedHonored: [string, string][] = [
+  ["true", "privileged: true"],
+  ["quoted 'true'", "privileged: 'true'"],
+  ["false", "privileged: false"],
+  ["quoted 'false'", "privileged: 'false'"],
+];
+
+const privilegedIgnored: [string, string][] = [
+  ["yes", "privileged: yes"],
+  ["maybe", "privileged: maybe"],
+  ["an object", "privileged: {}"],
+];
+
 for (const [variant, schema] of Object.entries(schemas)) {
   describe(`routeros-app-yaml-schema (${variant})`, () => {
     const validate = validatorFor(schema);
@@ -114,6 +159,22 @@ for (const [variant, schema] of Object.entries(schemas)) {
       expect(validate({ name: "x", category: 5, services: { app: { image: "alpine" } } })).toBe(false);
     });
 
+    test.each(dnsHonored)("accepts dns %s (RouterOS sets /container dns=)", (_label, fragment) => {
+      const ok = validate(serviceWith(fragment));
+      expect(validate.errors ?? []).toEqual([]);
+      expect(ok).toBe(true);
+    });
+
+    test.each(privilegedHonored)("accepts privileged %s", (_label, fragment) => {
+      const ok = validate(serviceWith(fragment));
+      expect(validate.errors ?? []).toEqual([]);
+      expect(ok).toBe(true);
+    });
+
+    test.each(privilegedIgnored)("rejects privileged %s (RouterOS silently leaves it unprivileged)", (_label, fragment) => {
+      expect(validate(serviceWith(fragment))).toBe(false);
+    });
+
     // Built-in collections captured from live CHRs. Each must be non-empty and carry YAML,
     // so an empty app.json ([]) cannot pass as green.
     test.each(builtinCollections)("validates every built-in app in docs/%s/app.json", (version) => {
@@ -135,5 +196,21 @@ describe("routeros-app-yaml-schema (strict only)", () => {
   test("rejects non-numeric healthcheck.retries", () => {
     const validate = validatorFor(schemas.strict);
     expect(validate(YAML.load(badRetries))).toBe(false);
+  });
+
+  // tikapp.html validates without ajv-formats, so the dns pattern alone must reject these too
+  for (const [mode, validateFormats] of [["with formats", true], ["without formats", false]] as const) {
+    test.each(dnsIgnored)(`rejects dns %s (${mode})`, (_label, fragment) => {
+      const ajv = new Ajv({ allErrors: true, strict: false, validateFormats });
+      if (validateFormats) addFormats(ajv);
+      expect(ajv.compile(schemas.strict)(serviceWith(fragment))).toBe(false);
+    });
+  }
+});
+
+describe("routeros-app-yaml-schema (editor only)", () => {
+  // The editor schema keeps dns loose so autocompletion is not blocked; its description warns instead
+  test.each(dnsIgnored)("accepts dns %s", (_label, fragment) => {
+    expect(validatorFor(schemas.editor)(serviceWith(fragment))).toBe(true);
   });
 });
