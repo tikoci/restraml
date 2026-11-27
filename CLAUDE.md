@@ -196,11 +196,24 @@ in the filename since the parent directory already implies the version.
 - Top-level keys: `name`, `descr`, `page`, `category`, `icon`, `default-credentials`, `services`,
   `configs`, `volumes`, `networks`
 - Each service under `services:` maps to one container
-- Placeholders `[accessIP]`, `[accessPort]`, `[containerIP]`, `[routerIP]` etc. are expanded at deploy time
-- Port format: two styles are supported:
-  - Old (OCI-style): `host-port:container-port[/tcp|/udp][:label]` (e.g., `8080:80/tcp:web`)
-  - New (RouterOS 7.23+ style): `host-port:container-port[:label][:tcp|:udp]` (e.g., `8080:80:web:tcp`)
-  Both forms are valid; new apps from 7.23beta2 onward use the colon-separated `:tcp`/`:udp` suffix.
+- Placeholders `[accessIP]`, `[accessPort]`, `[containerIP]`, `[routerIP]` etc. are expanded at deploy
+  time, but **not in `ports`** (see below)
+- Port format (checked via `/app/add` on CHR 7.24.7, 7.25.2, 7.26beta7, 7.26beta8 by reading
+  `firewall-redirects`, and the dst-nat rules of an enabled app on 7.26beta8):
+  - OCI-style: `host-port:container-port[/tcp|/udp][:label]` (e.g., `8080:80/tcp:web`, `1700:1700/udp`)
+  - RouterOS 7.23+ style: `host-port:container-port[:label][:tcp]` (e.g., `8080:80:web:tcp`; built-in
+    apps from 7.23beta2 use it)
+  - Container port only, same host port, no label: `8080`, `8080/tcp`
+  - **Only `/udp` selects UDP.** RouterOS treats only a trailing `:tcp` as a protocol:
+    `8080:80:web:udp` maps TCP, and `8080:80:udp` maps TCP with the label `udp` (every version
+    through 7.26beta8). The strict schema rejects a trailing `:udp`.
+  - **Port ranges (7.26beta8+):** `8000-8010:8000-8010[/udp][:label]`, a range on both sides of
+    the same length (`8000-8010:9000-9010` works), and bare `8000-8010[/udp]`; long syntax takes
+    `target`/`published` ranges and honors `protocol: udp`. 7.26beta8 refuses a range on one side,
+    unequal lengths, descending ranges, port 0, ports above 65535, `[placeholder]` ports, and a
+    long-syntax entry without `published`. Earlier versions accepted all of these and silently
+    produced a wrong redirect (first port of a range only, host port 0, no redirect for a
+    placeholder, and TCP for bare `/udp` or `protocol: udp`).
 - The `/app` REST endpoint (`GET /rest/app`) requires the **container** extra package
 
 **VSCode / Editor Integration:**
@@ -277,6 +290,10 @@ bun appyamlvalidate.js 7.24.7 --app-json docs/7.24.7/app.json   # repeat per ver
 If the feature arrived after some of those versions, add the property to
 `APP_PROPERTY_MIN_VERSION` (top-level keys) or `SERVICE_PROPERTY_MIN_VERSION` (keys under a
 service) in `appyamlvalidate.js` first; per-version schemas below that major.minor leave it out.
+For new syntax inside an existing property, or a feature that arrived in a beta, put it in its own
+`anyOf`/`oneOf` branch in `*.latest.json` marked `"x-routeros-since": "7.26beta8"` (full version,
+betas and RCs compared). Per-version schemas for older versions drop that branch, and every
+per-version schema drops the marker. Port ranges are gated this way.
 Find the minimum version on a CHR, not just from the changelog: RouterOS accepts any key at
 `/app/add` and silently ignores what it doesn't support. Check the effect instead. For a service
 key, read the resulting `/container` entry (`privileged: true` on 7.24.7 still gives

@@ -154,15 +154,15 @@
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "Two formats supported: (1) `host:container[/tcp|/udp][:label]` (OCI-style, pre-7.23) or (2) `host:container[:label][:tcp|:udp]` (RouterOS 7.23+, protocol after label). RouterOS placeholders `[accessIP]`, `[accessPort]`, `[accessPort2]`, `[containerIP]`, `[routerIP]` expand at deploy time. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
-                    "$comment": "Two strict patterns used in .latest.json (anyOf): (1) old OCI-style: ^host:container(/tcp|/udp)?(:label)?$ and (2) new RouterOS 7.23+ style: ^host:container(:label)?(:tcp|:udp)?$ where label may not contain / or :. Mixing both protocol styles in one entry is rejected.",
+                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: RouterOS ignores a trailing `:udp` and maps TCP, and `host:container:udp` makes `udp` the label. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
+                    "$comment": "Strict patterns live in .latest.json (anyOf). This editor variant keeps ports unpatterned so autocompletion is not blocked; the description carries the rules.",
                     "examples": [
                       "80:80",
                       "80:80:web",
                       "8080:8080/tcp:rest api",
                       "8080:8080:web:tcp",
-                      "[accessIP]:[accessPort]:80:web",
-                      "127.0.0.1:9000:9000"
+                      "1700:1700/udp",
+                      "10000-10100:10000-10100/udp:rtp"
                     ]
                   },
                   {
@@ -176,16 +176,16 @@
                       },
                       "target": {
                         "type": ["integer", "string"],
-                        "description": "Container port"
+                        "description": "Container port, or a range such as 8000-8010 (RouterOS 7.26beta8+; published must be a range of the same length)"
                       },
                       "published": {
                         "type": ["integer", "string"],
-                        "description": "Host port"
+                        "description": "Host port, or a range such as 8000-8010 (RouterOS 7.26beta8+; target must be a range of the same length)"
                       },
                       "protocol": {
                         "type": "string",
                         "enum": ["tcp", "udp"],
-                        "description": "Protocol (tcp or udp)"
+                        "description": "Protocol, tcp (default) or udp. Before RouterOS 7.26beta8, protocol: udp was ignored and the redirect was TCP."
                       },
                       "app_protocol": {
                         "type": "string",

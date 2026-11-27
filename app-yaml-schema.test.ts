@@ -19,7 +19,7 @@ const schemas = {
 };
 
 // One authored-YAML collection per minor before the 7.25 re-emitter, and the re-emitted 7.25+ ones
-const builtinCollections = ["7.22", "7.23.8", "7.24.5", "7.25", "7.26beta1", "7.26beta3"];
+const builtinCollections = ["7.22", "7.23.8", "7.24.5", "7.25", "7.26beta1", "7.26beta3", "7.26beta8"];
 
 function validatorFor(schema: object) {
   // Same Ajv options as appyamlvalidate.js
@@ -136,6 +136,63 @@ const privilegedIgnored: [string, string][] = [
   ["an object", "privileged: {}"],
 ];
 
+// Port mappings, checked through /app/add on CHR 7.24.7, 7.25.2, 7.26beta7 and 7.26beta8 (x86) by
+// reading firewall-redirects, and on 7.26beta8 by enabling an app and reading its dst-nat rules.
+function portsWith(...ports: unknown[]) {
+  return { name: "x", services: { svc: { image: "alpine:latest", ports } } };
+}
+
+// Mapped as written on every version checked
+const portsHonored: unknown[] = [
+  "8080:80",
+  "8080:80/udp",
+  "8080:80/udp:web",
+  "8080:80:web:tcp",
+  "8080:80:tcp",
+  "9200:9200:rest api",
+  "65535:65535",
+  "08080:080",
+  "8080",
+  "8080/tcp",
+  { target: "25", published: "25", name: "smtp", app_protocol: "smtp" },
+  { target: 80, published: 8080, protocol: "tcp" },
+];
+
+// 7.26beta8 maps these as written. Before it, a range kept only its first port and /udp or
+// protocol: udp without a host port mapped TCP.
+const portsSince26beta8: unknown[] = [
+  "8000-8010:8000-8010",
+  "8000-8010:9000-9010",
+  "8000-8010:8000-8010/udp:rtp",
+  "8000-8010:8000-8010:rest api:tcp",
+  "1-65535:1-65535",
+  "8000-8010",
+  "8000-8010/udp",
+  "8080/udp",
+  { target: "8000-8010", published: "8000-8010", protocol: "udp", name: "rtp" },
+  { target: 53, published: 53, protocol: "udp" },
+];
+
+// Refused by 7.26beta8, or accepted by RouterOS but mapped wrongly (or not at all) on every version
+const portsBroken: [string, unknown][] = [
+  ["new-style :udp suffix (maps TCP)", "8080:80:web:udp"],
+  ["host:container:udp ('udp' becomes the label, maps TCP)", "8080:80:udp"],
+  ["range with :udp suffix (maps TCP)", "8000-8010:8000-8010:web:udp"],
+  ["[placeholder] host port (no redirect)", "[accessPort]:80"],
+  ["[placeholder] range", "[accessPort]-[accessPort2]:80-81"],
+  ["IP prefix", "127.0.0.1:8080:80"],
+  ["label without host port", "8080:web"],
+  ["bare port with label", "8080/udp:web"],
+  ["range on host side only", "8000-8010:80"],
+  ["range on container side only", "8000:8000-8010"],
+  ["half-open range", "8000-:8000-"],
+  ["spaces in range", "8000 - 8010:8000 - 8010"],
+  ["uppercase protocol", "8080:80/UDP"],
+  ["non-numeric host port", "abc:80"],
+  ["long syntax without published", { target: 80, name: "t" }],
+  ["long syntax range on one side", { target: 80, published: "8000-8010" }],
+];
+
 for (const [variant, schema] of Object.entries(schemas)) {
   describe(`routeros-app-yaml-schema (${variant})`, () => {
     const validate = validatorFor(schema);
@@ -179,6 +236,12 @@ for (const [variant, schema] of Object.entries(schemas)) {
       expect(validate(serviceWith(fragment))).toBe(false);
     });
 
+    test.each([...portsHonored, ...portsSince26beta8])("accepts port %j", (port) => {
+      const ok = validate(portsWith(port));
+      expect(validate.errors ?? []).toEqual([]);
+      expect(ok).toBe(true);
+    });
+
     // Built-in collections captured from live CHRs. Each must be non-empty and carry YAML,
     // so an empty app.json ([]) cannot pass as green.
     test.each(builtinCollections)("validates every built-in app in docs/%s/app.json", (version) => {
@@ -217,6 +280,18 @@ describe("routeros-app-yaml-schema (strict only)", () => {
   // ipv6 format, which both CI (ajv-formats) and tikapp.html (Ajv 6 built-in) apply.
   test.each(["::::", "1:2:3:4:5:6:7:8:9", "8.8.8.8:"])("rejects malformed IPv6 dns %p (with formats)", (dns) => {
     expect(validatorFor(schemas.strict)(serviceWith(`dns: '${dns}'`))).toBe(false);
+  });
+});
+
+describe("routeros-app-yaml-schema (strict only): ports", () => {
+  const validate = validatorFor(schemas.strict);
+
+  test.each(portsBroken)("rejects port %s", (_label, port) => {
+    expect(validate(portsWith(port))).toBe(false);
+  });
+
+  test("rejects a long-syntax protocol other than tcp/udp", () => {
+    expect(validate(portsWith({ target: 80, published: 80, protocol: "sctp" }))).toBe(false);
   });
 });
 
@@ -261,5 +336,34 @@ describe("published per-version schemas (backfilled to long-term)", () => {
     const keys = await serviceKeys(version);
     expect(keys).toContain("dns");
     expect(keys).toContain("privileged");
+  });
+});
+
+// Port ranges, bare /udp and long-syntax protocol: udp work from 7.26beta8 (a beta, so the
+// x-routeros-since gate compares full versions, not major.minor).
+describe("published per-version schemas: ports", () => {
+  const perVersion = async (version: string) =>
+    validatorFor(await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json());
+  const backfilled = ["7.24", "7.24.7", "7.25.2", "7.26beta7", "7.26beta8"];
+
+  test.each(backfilled)("%s accepts single-port mappings and rejects broken ones", async (version) => {
+    const validate = await perVersion(version);
+    for (const port of portsHonored) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(true);
+    for (const [label, port] of portsBroken) expect(validate(portsWith(port)), label).toBe(false);
+  });
+
+  test.each(["7.24", "7.24.7", "7.25.2", "7.26beta7"])("%s rejects 7.26beta8 port syntax", async (version) => {
+    const validate = await perVersion(version);
+    for (const port of portsSince26beta8) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(false);
+  });
+
+  test("7.26beta8 accepts port ranges", async () => {
+    const validate = await perVersion("7.26beta8");
+    for (const port of portsSince26beta8) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(true);
+  });
+
+  test.each(backfilled)("%s carries no x-routeros-since keyword", async (version) => {
+    const text = await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).text();
+    expect(text).not.toContain('"x-routeros-since":');
   });
 });

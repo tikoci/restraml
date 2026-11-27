@@ -181,30 +181,83 @@
             },
             "ports": {
               "type": "array",
-              "description": "Port mappings",
+              "description": "Port mappings. Use /udp for UDP (host:container/udp[:label]); a trailing :udp is ignored by RouterOS and maps TCP. Port ranges (8000-8010:8000-8010, same length on both sides) need RouterOS 7.26beta8+.",
               "items": {
-                "$comment": "Port mappings can be strings (two formats) or objects (long syntax with name/target/published/app_protocol).",
+                "$comment": "Port mappings can be strings or objects (long syntax with name/target/published/protocol/app_protocol). Branches marked x-routeros-since are dropped from per-version schemas for older versions by appyamlvalidate.js. Checked on CHR 7.24.7, 7.25.2, 7.26beta7 and 7.26beta8 via /app/add and the resulting firewall-redirects / dst-nat rules.",
                 "oneOf": [
                   {
                     "type": "string",
-                    "$comment": "Two port formats supported, exactly one protocol style per entry: (1) old OCI-style host:container[/tcp|/udp][:label] and (2) new RouterOS 7.23+ style host:container[:label][:tcp|:udp]. Mixing styles (e.g. host:container/tcp:label:tcp) is rejected.",
+                    "$comment": "Exactly one protocol style per entry: (1) OCI-style host:container[/tcp|/udp][:label], (2) RouterOS 7.23+ style host:container[:label][:tcp], (3) container port only, published on the same host port, no label. RouterOS treats only a trailing :tcp as a protocol: host:container:label:udp maps TCP and host:container:udp makes 'udp' the label (every version through 7.26beta8), so a trailing :udp is rejected. [placeholder] ports are rejected: 7.24.7-7.26beta7 accepted them but created no redirect, 7.26beta8 refuses them. RouterOS 7.26beta8 also refuses port 0, ports above 65535, descending ranges and ranges of different length (not expressible here).",
+                    "not": {
+                      "pattern": ":udp$"
+                    },
                     "anyOf": [
                       {
-                        "$comment": "Old OCI-style: host:container[/tcp|/udp][:label]",
-                        "pattern": "^(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+                        "$comment": "OCI-style: host:container[/tcp|/udp][:label]",
+                        "pattern": "^\\d+:\\d+(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
                       },
                       {
-                        "$comment": "New RouterOS 7.23+ style: host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
-                        "pattern": "^(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
+                        "$comment": "RouterOS 7.23+ style: host:container[:label][:tcp]. Label may not contain / or : to stay distinct from OCI style.",
+                        "pattern": "^\\d+:\\d+(:[^:\\/\\n\\r]+)?(:tcp)?$"
+                      },
+                      {
+                        "$comment": "Container port only, published on the same host port. Before 7.26beta8 a /udp here still mapped TCP.",
+                        "pattern": "^\\d+(\\/tcp)?$"
                       }
                     ]
                   },
                   {
                     "type": "object",
-                    "$comment": "Long syntax port mapping with named fields",
+                    "$comment": "Long syntax port mapping with named fields. 7.26beta8 refuses an entry without published, and a range on only one side; before it, the redirect got host port 0 or kept the first port of a range.",
                     "required": [
                       "target",
                       "published"
+                    ],
+                    "allOf": [
+                      {
+                        "$comment": "A range in published needs a range in target",
+                        "if": {
+                          "required": [
+                            "published"
+                          ],
+                          "properties": {
+                            "published": {
+                              "type": "string",
+                              "pattern": "-"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "target": {
+                              "type": "string",
+                              "pattern": "-"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "$comment": "A range in target needs a range in published",
+                        "if": {
+                          "required": [
+                            "target"
+                          ],
+                          "properties": {
+                            "target": {
+                              "type": "string",
+                              "pattern": "-"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "published": {
+                              "type": "string",
+                              "pattern": "-"
+                            }
+                          }
+                        }
+                      }
                     ],
                     "properties": {
                       "name": {
@@ -216,24 +269,33 @@
                           "integer",
                           "string"
                         ],
-                        "pattern": "^[0-9]+$",
-                        "description": "Container port"
+                        "anyOf": [
+                          {
+                            "pattern": "^[0-9]+$"
+                          }
+                        ],
+                        "description": "Container port, or a range such as 8000-8010 (RouterOS 7.26beta8+; published must be a range of the same length)"
                       },
                       "published": {
                         "type": [
                           "integer",
                           "string"
                         ],
-                        "pattern": "^[0-9]+$",
-                        "description": "Host port"
+                        "anyOf": [
+                          {
+                            "pattern": "^[0-9]+$"
+                          }
+                        ],
+                        "description": "Host port, or a range such as 8000-8010 (RouterOS 7.26beta8+; target must be a range of the same length)"
                       },
                       "protocol": {
                         "type": "string",
-                        "enum": [
-                          "tcp",
-                          "udp"
+                        "anyOf": [
+                          {
+                            "const": "tcp"
+                          }
                         ],
-                        "description": "Protocol (tcp or udp)"
+                        "description": "Protocol, tcp (default) or udp. Before RouterOS 7.26beta8, protocol: udp was ignored and the redirect was TCP."
                       },
                       "app_protocol": {
                         "type": "string",
