@@ -203,10 +203,9 @@ in the filename since the parent directory already implies the version.
   Both forms are valid; new apps from 7.23beta2 onward use the colon-separated `:tcp`/`:udp` suffix.
   Prefer `/udp` in examples: on CHR (7.24.7–7.26beta8) a trailing `:udp` still produced a TCP
   dst-nat rule (tikoci/routeros-skills#81).
-- RouterOS 7.26beta8 adds port ranges (`8000-8010:8000-8010`, on both sides, same length) and a
-  honors `/udp` on a bare container port (`8080/udp`), and refuses `[placeholder]` ports and ports outside 1–65535.
-  Those are in `*.latest.json` and the 7.26beta8 per-version schema only; older per-version
-  schemas were not backfilled, since earlier versions keep only the first port of a range.
+- RouterOS 7.26beta8 adds port ranges (`8000-8010:8000-8010`, on both sides, same length),
+  honors `/udp` on a bare container port (`8080/udp`), and refuses `[placeholder]` ports and
+  ports outside 1–65535. Those are in `*.latest.json` and the 7.26beta8 per-version schema only.
 - The `/app` REST endpoint (`GET /rest/app`) requires the **container** extra package
 
 **VSCode / Editor Integration:**
@@ -272,7 +271,9 @@ long-form `ports` `target`/`published`, `ulimits`) and string/number/boolean/nul
 of `*.latest.json` taken when that version was built, and `tikapp.html` validates against the copy
 for the selected version, so a fix to `latest` alone leaves the editor wrong for every version
 already published. When a fix covers a RouterOS feature those versions have, regenerate them, but
-only back to the **current long-term** release (older versions stay as published). Regenerate
+only back to the **current long-term** release (older versions stay as published). Backfill only
+for something the schema missed, and only from the release whose notes introduced the feature: a
+7.26beta8 feature found later is backfilled to 7.26beta8 and newer, never further. Regenerate
 with the generator, offline against each version's committed `app.json`, which also validates that
 version's built-in apps:
 
