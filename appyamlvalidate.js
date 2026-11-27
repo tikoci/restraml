@@ -79,42 +79,6 @@ function withoutPropertiesAfter(version, schema) {
   return copy
 }
 
-// Syntax RouterOS honors only from a given version, betas included (port ranges arrived in
-// 7.26beta8), is an anyOf/oneOf branch marked "x-routeros-since" in *.latest.json. Per-version
-// schemas drop the branches newer than their version and every marker.
-const SINCE_KEY = "x-routeros-since"
-const PRE_RELEASE_RANK = { beta: 0, rc: 1, "": 2 }
-
-function versionKey(version) {
-  const m = /^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/.exec(version)
-  if (!m) throw new Error(`Cannot compare RouterOS version '${version}'`)
-  return [Number(m[1]), Number(m[2]), Number(m[3] || 0), PRE_RELEASE_RANK[m[4] || ""], Number(m[5] || 0)]
-}
-
-function versionBefore(a, b) {
-  const ka = versionKey(a)
-  const kb = versionKey(b)
-  const i = ka.findIndex((n, j) => n !== kb[j])
-  return i !== -1 && ka[i] < kb[i]
-}
-
-function withoutBranchesAfter(version, node) {
-  if (Array.isArray(node)) return node.map((item) => withoutBranchesAfter(version, item))
-  if (node === null || typeof node !== "object") return node
-  const out = {}
-  for (const [key, value] of Object.entries(node)) {
-    if (key === SINCE_KEY) continue
-    if ((key === "anyOf" || key === "oneOf") && Array.isArray(value)) {
-      const kept = value.filter((branch) => !(branch?.[SINCE_KEY] && versionBefore(version, branch[SINCE_KEY])))
-      if (kept.length === 0) throw new Error(`Every ${key} branch is newer than ${version}`)
-      out[key] = withoutBranchesAfter(version, kept)
-    } else {
-      out[key] = withoutBranchesAfter(version, value)
-    }
-  }
-  return out
-}
-
 function resolveDocsPath(version, fileName) {
   const docsRoot = path.resolve("docs")
   const versionRoot = path.resolve(docsRoot, version)
@@ -244,13 +208,10 @@ async function main() {
   )
 
   // --- Create per-version schemas with version-specific $id and $ref ---
-  const versionedSingleSchema = withoutBranchesAfter(
-    version,
-    withoutPropertiesAfter(version, {
-      ...singleSchema,
-      $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
-    })
-  )
+  const versionedSingleSchema = withoutPropertiesAfter(version, {
+    ...singleSchema,
+    $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
+  })
   const versionedStoreSchema = {
     ...storeSchemaBase,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-store-schema.json`,
@@ -510,12 +471,7 @@ async function main() {
   process.exit(0)
 }
 
-// Exported for app-yaml-schema.test.ts; runs only as a script
-module.exports = { versionBefore, withoutBranchesAfter }
-
-if (require.main === module) {
-  main().catch((err) => {
-    console.error("Fatal error:", err)
-    process.exit(1)
-  })
-}
+main().catch((err) => {
+  console.error("Fatal error:", err)
+  process.exit(1)
+})

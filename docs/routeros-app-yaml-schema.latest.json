@@ -166,67 +166,47 @@
             },
             "ports": {
               "type": "array",
-              "description": "Port mappings. In short syntax only /udp selects UDP (host:container/udp[:label]). A trailing :udp on an entry without /tcp or /udp is not read as a protocol (8080:80:web:udp maps TCP, 8080:80:udp makes udp the label), so it is rejected; 53:53/udp:udp is UDP with the label udp. Ports are 1-65535. Port ranges (8000-8010:8000-8010) need RouterOS 7.26beta8+. The schema does not check that a range ascends or that both ranges have the same length; RouterOS refuses those.",
+              "description": "Port mappings",
               "items": {
-                "$comment": "Port mappings can be strings, integers (container port only) or objects (long syntax with name/target/published/protocol/app_protocol). Branches marked x-routeros-since are dropped from per-version schemas for older versions by appyamlvalidate.js. Checked on CHR 7.24.7, 7.25.2, 7.26beta7 and 7.26beta8 via /app/add and the resulting firewall-redirects / dst-nat rules.",
+                "$comment": "Strings, a bare container port, or long-syntax objects. Ports are 1-65535. Ranges (RouterOS 7.26beta8+) go on both sides; RouterOS also requires equal length and ascending order, which a pattern cannot check. 7.26beta8 refuses [placeholder] ports.",
                 "oneOf": [
                   {
                     "type": "string",
-                    "$comment": "Exactly one protocol style per entry: (1) OCI-style host:container[/tcp|/udp][:label], (2) RouterOS 7.23+ style host:container[:label][:tcp], (3) container port only, published on the same host port, no label. RouterOS treats only a trailing :tcp as a protocol: host:container:label:udp maps TCP and host:container:udp makes 'udp' the label (every version through 7.26beta8), so a trailing :udp is rejected unless the entry already names /tcp or /udp (53:53/udp:udp is UDP with the label udp). Ports must be 1-65535 (leading zeros are accepted). [placeholder] ports are rejected: 7.24.7-7.26beta7 accepted them but created no redirect, 7.26beta8 refuses them. RouterOS 7.26beta8 also refuses descending ranges and ranges of different length, which a pattern cannot check.",
-                    "not": {
-                      "pattern": "^[^/]*:udp$"
-                    },
+                    "$comment": "Exactly one protocol style per entry: (1) OCI-style host:container[/tcp|/udp][:label], (2) RouterOS 7.23+ style host:container[:label][:tcp|:udp], (3) container[/tcp|/udp] on the same host port. Mixing styles is rejected.",
                     "anyOf": [
                       {
-                        "$comment": "OCI-style: host:container[/tcp|/udp][:label]",
-                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+                        "$comment": "Old OCI-style: host:container[/tcp|/udp][:label]",
+                        "pattern": "^(?:0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])|0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
                       },
                       {
-                        "$comment": "RouterOS 7.23+ style: host:container[:label][:tcp]. Label may not contain / or : to stay distinct from OCI style.",
-                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(:[^:\\/\\n\\r]+)?(:tcp)?$"
+                        "$comment": "New RouterOS 7.23+ style: host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
+                        "pattern": "^(?:0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])|0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
                       },
                       {
-                        "$comment": "Container port only, published on the same host port. Before 7.26beta8 a /udp here still mapped TCP.",
-                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(\\/tcp)?$"
-                      },
-                      {
-                        "x-routeros-since": "7.26beta8",
-                        "$comment": "Container port or range only, with /udp honored. Earlier versions kept only the first port of a range and mapped TCP.",
+                        "$comment": "Container port or range only, published on the same host port",
                         "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(\\/tcp|\\/udp)?$"
-                      },
-                      {
-                        "x-routeros-since": "7.26beta8",
-                        "$comment": "OCI-style with port ranges on both sides: host-host:container-container[/tcp|/udp][:label]",
-                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
-                      },
-                      {
-                        "x-routeros-since": "7.26beta8",
-                        "$comment": "RouterOS 7.23+ style with port ranges on both sides: host-host:container-container[:label][:tcp]",
-                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]):0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(:[^:\\/\\n\\r]+)?(:tcp)?$"
                       }
                     ]
                   },
                   {
                     "type": "integer",
-                    "$comment": "Container port only, unquoted (- 8080 parses as a number); published on the same host port.",
+                    "description": "Container port, published on the same host port",
                     "minimum": 1,
                     "maximum": 65535
                   },
                   {
                     "type": "object",
-                    "$comment": "Long syntax port mapping with named fields. 7.26beta8 refuses an entry without published, and a range on only one side; before it, the redirect got host port 0 or kept the first port of a range.",
+                    "$comment": "Long syntax port mapping with named fields. A range in target or published needs one in the other.",
                     "required": [
                       "target",
                       "published"
                     ],
                     "allOf": [
                       {
-                        "$comment": "A range in published needs a range in target",
                         "if": { "required": ["published"], "properties": { "published": { "type": "string", "pattern": "-" } } },
                         "then": { "properties": { "target": { "type": "string", "pattern": "-" } } }
                       },
                       {
-                        "$comment": "A range in target needs a range in published",
                         "if": { "required": ["target"], "properties": { "target": { "type": "string", "pattern": "-" } } },
                         "then": { "properties": { "published": { "type": "string", "pattern": "-" } } }
                       }
@@ -238,46 +218,25 @@
                       },
                       "target": {
                         "type": ["integer", "string"],
+                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
                         "minimum": 1,
                         "maximum": 65535,
-                        "anyOf": [
-                          {
-                            "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
-                          },
-                          {
-                            "x-routeros-since": "7.26beta8",
-                            "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
-                          }
-                        ],
-                        "description": "Container port, or a range such as 8000-8010 (RouterOS 7.26beta8+; published must be a range of the same length)"
+                        "description": "Container port or range"
                       },
                       "published": {
                         "type": ["integer", "string"],
+                        "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
                         "minimum": 1,
                         "maximum": 65535,
-                        "anyOf": [
-                          {
-                            "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
-                          },
-                          {
-                            "x-routeros-since": "7.26beta8",
-                            "pattern": "^0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-0*(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
-                          }
-                        ],
-                        "description": "Host port, or a range such as 8000-8010 (RouterOS 7.26beta8+; target must be a range of the same length)"
+                        "description": "Host port or range"
                       },
                       "protocol": {
                         "type": "string",
-                        "anyOf": [
-                          {
-                            "enum": ["tcp"]
-                          },
-                          {
-                            "x-routeros-since": "7.26beta8",
-                            "enum": ["udp"]
-                          }
+                        "enum": [
+                          "tcp",
+                          "udp"
                         ],
-                        "description": "Protocol. tcp is the default. Use udp on RouterOS 7.26beta8 or later; earlier versions ignored protocol: udp and mapped TCP."
+                        "description": "Protocol (tcp or udp)"
                       },
                       "app_protocol": {
                         "type": "string",

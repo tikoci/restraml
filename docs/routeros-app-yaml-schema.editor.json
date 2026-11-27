@@ -154,20 +154,19 @@
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: without `/tcp` or `/udp`, a trailing `:udp` is not read as a protocol (`host:container:label:udp` maps TCP, `host:container:udp` makes `udp` the label); `53:53/udp:udp` is UDP with the label `udp`. Ports are 1-65535. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. RouterOS refuses descending ranges and ranges of different length. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
-                    "$comment": "Strict patterns live in .latest.json (anyOf). This editor variant keeps ports unpatterned so autocompletion is not blocked; the description carries the rules.",
+                    "description": "`host:container[/tcp|/udp][:label]`, or `container[/tcp|/udp]`. Ranges such as `8000-8010:8000-8010` need RouterOS 7.26beta8+. The label `web` marks the port opened from Winbox/WebFig.",
+                    "$comment": "Strict patterns live in .latest.json; ports stay unpatterned here so they do not block autocompletion.",
                     "examples": [
                       "80:80",
                       "80:80:web",
                       "8080:8080/tcp:rest api",
-                      "8080:8080:web:tcp",
                       "1700:1700/udp",
                       "10000-10100:10000-10100/udp:rtp"
                     ]
                   },
                   {
                     "type": "integer",
-                    "description": "Container port only (1-65535), published on the same host port",
+                    "description": "Container port, published on the same host port",
                     "minimum": 1,
                     "maximum": 65535
                   },
@@ -182,16 +181,16 @@
                       },
                       "target": {
                         "type": ["integer", "string"],
-                        "description": "Container port, or a range such as 8000-8010 (RouterOS 7.26beta8+; published must be a range of the same length)"
+                        "description": "Container port or range"
                       },
                       "published": {
                         "type": ["integer", "string"],
-                        "description": "Host port, or a range such as 8000-8010 (RouterOS 7.26beta8+; target must be a range of the same length)"
+                        "description": "Host port or range"
                       },
                       "protocol": {
                         "type": "string",
                         "enum": ["tcp", "udp"],
-                        "description": "Protocol. tcp is the default. Use udp on RouterOS 7.26beta8 or later; earlier versions ignored protocol: udp and mapped TCP."
+                        "description": "Protocol (tcp or udp)"
                       },
                       "app_protocol": {
                         "type": "string",

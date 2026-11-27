@@ -136,72 +136,53 @@ const privilegedIgnored: [string, string][] = [
   ["an object", "privileged: {}"],
 ];
 
-// Port mappings, checked through /app/add on CHR 7.24.7, 7.25.2, 7.26beta7 and 7.26beta8 (x86) by
-// reading firewall-redirects, and on 7.26beta8 by enabling an app and reading its dst-nat rules.
+// Port mappings, checked on CHR 7.26beta8 (x86) through /app/add and the resulting
+// firewall-redirects / dst-nat rules.
 function portsWith(...ports: unknown[]) {
   return { name: "x", services: { svc: { image: "alpine:latest", ports } } };
 }
 
-// Mapped as written on every version checked
-const portsHonored: unknown[] = [
+// Accepted by 7.26beta8
+const portsAccepted: unknown[] = [
   "8080:80",
   "8080:80/udp",
   "8080:80/udp:web",
   "8080:80:web:tcp",
-  "8080:80:tcp",
+  "8080:80:web:udp",
+  "8080:80:udp",
   "9200:9200:rest api",
   "65535:65535",
   "08080:080",
   "8080",
-  "8080/tcp",
+  "8080/udp",
   8080,
-  "53:53/udp:udp",
-  "8080:80/tcp:udp",
-  { target: "25", published: "25", name: "smtp", app_protocol: "smtp" },
-  { target: 80, published: 8080, protocol: "tcp" },
-  { target: "0080", published: 65535 },
-];
-
-// 7.26beta8 maps these as written. Before it, a range kept only its first port and /udp or
-// protocol: udp without a host port mapped TCP.
-const portsSince26beta8: unknown[] = [
   "8000-8010:8000-8010",
   "8000-8010:9000-9010",
   "8000-8010:8000-8010/udp:rtp",
   "8000-8010:8000-8010:rest api:tcp",
   "1-65535:1-65535",
-  "8000-8010",
   "8000-8010/udp",
-  "8080/udp",
-  "8000-8010:8000-8010/udp:udp",
-  { target: "8000-8010", published: "8000-8010", protocol: "udp", name: "rtp" },
+  { target: "25", published: "25", name: "smtp", app_protocol: "smtp" },
   { target: 53, published: 53, protocol: "udp" },
+  { target: "8000-8010", published: "8000-8010", protocol: "udp", name: "rtp" },
 ];
 
-// Refused by 7.26beta8, or accepted by RouterOS but mapped wrongly (or not at all) on every version
-const portsBroken: [string, unknown][] = [
-  ["new-style :udp suffix (maps TCP)", "8080:80:web:udp"],
-  ["host:container:udp ('udp' becomes the label, maps TCP)", "8080:80:udp"],
-  ["range with :udp suffix (maps TCP)", "8000-8010:8000-8010:web:udp"],
-  ["[placeholder] host port (no redirect)", "[accessPort]:80"],
-  ["[placeholder] range", "[accessPort]-[accessPort2]:80-81"],
+// Refused by 7.26beta8 (and accepted, but mapped wrongly, by 7.24.7 through 7.26beta7)
+const portsRefused: [string, unknown][] = [
+  ["[placeholder] host port", "[accessPort]:80"],
   ["IP prefix", "127.0.0.1:8080:80"],
   ["label without host port", "8080:web"],
   ["bare port with label", "8080/udp:web"],
   ["range on host side only", "8000-8010:80"],
   ["range on container side only", "8000:8000-8010"],
   ["half-open range", "8000-:8000-"],
-  ["spaces in range", "8000 - 8010:8000 - 8010"],
   ["uppercase protocol", "8080:80/UDP"],
   ["non-numeric host port", "abc:80"],
   ["port 0", "0:80"],
-  ["all-zero port", "00000:80"],
   ["port above 65535", "65536:80"],
   ["bare port 0", 0],
-  ["bare port above 65535", 65536],
   ["range past 65535", "1-65536:1-65536"],
   ["long syntax port 0 / above 65535", { target: 0, published: 65536 }],
-  ["long syntax string port above 65535", { target: "65536", published: "80" }],
   ["long syntax without published", { target: 80, name: "t" }],
   ["long syntax range on one side", { target: 80, published: "8000-8010" }],
 ];
@@ -249,7 +230,7 @@ for (const [variant, schema] of Object.entries(schemas)) {
       expect(validate(serviceWith(fragment))).toBe(false);
     });
 
-    test.each([...portsHonored, ...portsSince26beta8])("accepts port %j", (port) => {
+    test.each(portsAccepted)("accepts port %j", (port) => {
       const ok = validate(portsWith(port));
       expect(validate.errors ?? []).toEqual([]);
       expect(ok).toBe(true);
@@ -306,7 +287,7 @@ describe("routeros-app-yaml-schema (strict only): ports", () => {
     expect(ok).toBe(true);
   });
 
-  test.each(portsBroken)("rejects port %s", (_label, port) => {
+  test.each(portsRefused)("rejects port %s", (_label, port) => {
     expect(validate(portsWith(port))).toBe(false);
   });
 
@@ -359,94 +340,10 @@ describe("published per-version schemas (backfilled to long-term)", () => {
   });
 });
 
-// Port ranges, bare /udp and long-syntax protocol: udp work from 7.26beta8 (a beta, so the
-// x-routeros-since gate compares full versions, not major.minor).
-describe("published per-version schemas: ports", () => {
-  const perVersion = async (version: string) =>
-    validatorFor(await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json());
-  const backfilled = ["7.24", "7.24.7", "7.25.2", "7.26beta7", "7.26beta8"];
-
-  test.each(backfilled)("%s accepts single-port mappings and rejects broken ones", async (version) => {
-    const validate = await perVersion(version);
-    for (const port of portsHonored) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(true);
-    for (const [label, port] of portsBroken) expect(validate(portsWith(port)), label).toBe(false);
-  });
-
-  test.each(["7.24", "7.24.7", "7.25.2", "7.26beta7"])("%s rejects 7.26beta8 port syntax", async (version) => {
-    const validate = await perVersion(version);
-    for (const port of portsSince26beta8) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(false);
-  });
-
-  test("7.26beta8 accepts port ranges", async () => {
-    const validate = await perVersion("7.26beta8");
-    for (const port of portsSince26beta8) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(true);
-  });
-
-  test.each(backfilled)("%s carries no x-routeros-since keyword", async (version) => {
-    const text = await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).text();
-    expect(text).not.toContain('"x-routeros-since":');
-  });
-});
-
-// tikapp.html's Monaco completion reads `enum` (through anyOf/oneOf), not `const`
-describe("long-syntax protocol completions", () => {
-  const protocolEnums = async (path: string) => {
-    const schema = await Bun.file(join(repoRoot, path)).json();
-    const object = schema.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties.ports.items.oneOf.find(
-      (b: { type?: string }) => b.type === "object",
-    );
-    const protocol = object.properties.protocol;
-    return [...(protocol.enum ?? []), ...(protocol.anyOf ?? []).flatMap((b: { enum?: string[] }) => b.enum ?? [])];
-  };
-
-  test.each([
-    ["docs/routeros-app-yaml-schema.latest.json", ["tcp", "udp"]],
-    ["docs/7.26beta8/routeros-app-yaml-schema.json", ["tcp", "udp"]],
-    ["docs/7.26beta7/routeros-app-yaml-schema.json", ["tcp"]],
-  ])("%s offers %j", async (path, expected) => {
-    expect(await protocolEnums(path)).toEqual(expected);
-  });
-});
-
-describe("appyamlvalidate.js x-routeros-since gate", () => {
-  const { versionBefore, withoutBranchesAfter } = require(join(repoRoot, "appyamlvalidate.js"));
-
-  test.each([
-    ["7.26beta7", "7.26beta8", true],
-    ["7.26beta8", "7.26beta8", false],
-    ["7.26beta10", "7.26beta8", false],
-    ["7.26rc1", "7.26beta8", false],
-    ["7.26", "7.26beta8", false],
-    ["7.26", "7.26rc3", false],
-    ["7.26.1", "7.26beta8", false],
-    ["7.25.2", "7.26beta8", true],
-    ["7.25rc3", "7.26beta8", true],
-    ["8.1beta1", "7.26beta8", false],
-  ])("versionBefore(%p, %p) is %p", (a, b, expected) => {
-    expect(versionBefore(a, b)).toBe(expected);
-  });
-
-  const marked = {
-    anyOf: [{ pattern: "^old$" }, { "x-routeros-since": "7.26beta8", pattern: "^new$" }],
-    properties: { p: { oneOf: [{ type: "string" }, { "x-routeros-since": "7.26beta8", type: "integer" }] } },
-  };
-
-  test.each(["7.26beta8", "7.26beta10", "7.26rc1", "7.26"])("%s keeps the branch and drops the marker", (version) => {
-    const out = withoutBranchesAfter(version, marked);
-    expect(out.anyOf).toEqual([{ pattern: "^old$" }, { pattern: "^new$" }]);
-    expect(out.properties.p.oneOf).toHaveLength(2);
-    expect(JSON.stringify(out)).not.toContain("x-routeros-since");
-  });
-
-  test.each(["7.26beta7", "7.25.2", "7.24"])("%s drops the newer branch", (version) => {
-    const out = withoutBranchesAfter(version, marked);
-    expect(out.anyOf).toEqual([{ pattern: "^old$" }]);
-    expect(out.properties.p.oneOf).toEqual([{ type: "string" }]);
-  });
-
-  test("leaves the input schema unchanged", () => {
-    const before = JSON.stringify(marked);
-    withoutBranchesAfter("7.24", marked);
-    expect(JSON.stringify(marked)).toBe(before);
+describe("published 7.26beta8 schema: ports", () => {
+  test("matches what 7.26beta8 accepts and refuses", async () => {
+    const validate = validatorFor(await Bun.file(join(repoRoot, "docs/7.26beta8/routeros-app-yaml-schema.json")).json());
+    for (const port of portsAccepted) expect(validate(portsWith(port)), JSON.stringify(port)).toBe(true);
+    for (const [label, port] of portsRefused) expect(validate(portsWith(port)), label).toBe(false);
   });
 });

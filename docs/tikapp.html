@@ -660,18 +660,6 @@
             return merged
         }
 
-        // Values of a closed enum: the node's own enum, or the union of its anyOf/oneOf branches when
-        // every branch is an enum (ports protocol: tcp, plus udp from 7.26beta8). An open list such as
-        // category (anyOf: [{enum}, {type: string}]) returns null: its values are suggestions only.
-        function closedEnumValues(root, node) {
-            const resolved = resolveRef(root, node)
-            if (!resolved) return null
-            if (Array.isArray(resolved.enum)) return resolved.enum
-            const branches = [...(resolved.anyOf || []), ...(resolved.oneOf || [])].map(b => resolveRef(root, b))
-            if (branches.length === 0 || !branches.every(b => Array.isArray(b?.enum))) return null
-            return [...new Set(branches.flatMap(b => b.enum))]
-        }
-
         // --- YAML key parsing (quote-aware) ---
         // RouterOS 7.25+ re-emits /app YAML with single-quoted keys ('code-server':),
         // so every schema lookup (hover, inlay hints, completions) must accept quoted
@@ -982,7 +970,6 @@
                         .map(([key, propDef]) => {
                         const resolved = resolveRef(root, propDef)
                         const rm = mergeSchema(root, resolved)
-                        const enumValues = closedEnumValues(root, resolved)
                         const rawType = rm?.type
                         const type = rawType || (rm?.properties ? 'object' : undefined)
                         const isReq = required.has(key)
@@ -994,9 +981,9 @@
                             insertText = `${key}:\n${' '.repeat(indent + 2)}\${1}`
                         } else if (type === 'array') {
                             insertText = `${key}:\n${' '.repeat(indent + 2)}- \${1}`
-                        } else if (enumValues) {
+                        } else if (rm?.enum) {
                             // Offer choice placeholder for enums
-                            const choices = [...new Set(enumValues.map(v => String(v)))].join(',')
+                            const choices = [...new Set(rm.enum.map(v => String(v)))].join(',')
                             insertText = `${key}: \${1|${choices}|}`
                         } else if (Array.isArray(rawType) ? rawType.includes('boolean') : rawType === 'boolean') {
                             insertText = `${key}: \${1|true,false|}`
@@ -1083,8 +1070,7 @@
                     if (merged.description) parts.push(merged.description)
                     const type = merged.type || (merged.properties ? 'object' : '')
                     if (type) parts.push(`**Type:** \`${Array.isArray(type) ? type.join(' | ') : type}\``)
-                    const enumValues = closedEnumValues(hRoot, node)
-                    if (enumValues) parts.push(`**Values:** ${enumValues.map(v => `\`${v}\``).join(', ')}`)
+                    if (merged.enum) parts.push(`**Values:** ${merged.enum.map(v => `\`${v}\``).join(', ')}`)
                     if (merged.examples?.length) parts.push(`**Example:** \`${merged.examples[0]}\``)
 
                     // Check if required in parent
@@ -1155,9 +1141,8 @@
                         // Build a concise hint: type info + description snippet
                         const parts = []
                         const type = merged.type || (merged.properties ? 'object' : '')
-                        const enumValues = closedEnumValues(root, node)
-                        if (enumValues) {
-                            parts.push(enumValues.join(' | '))
+                        if (merged.enum) {
+                            parts.push(merged.enum.join(' | '))
                         } else if (type && type !== 'object') {
                             parts.push(Array.isArray(type) ? type.join(' | ') : type)
                         }
