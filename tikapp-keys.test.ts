@@ -42,9 +42,10 @@ interface KeyLib {
   matchArrayKeyLine(trimmed: string): string | null;
   matchAnyKeyLine(trimmed: string): string | null;
   isAfterKeyColon(text: string): boolean;
+  closedEnumValues(root: SchemaNode, node: SchemaNode | null): unknown[] | null;
 }
 const lib = new Function(
-  `${html.slice(libStart, helpersEnd)}; return { schemaAtPath, mergeSchema, matchKeyLine, matchKeyOnlyLine, matchArrayKeyLine, matchAnyKeyLine, isAfterKeyColon };`,
+  `${html.slice(libStart, helpersEnd)}; return { schemaAtPath, mergeSchema, closedEnumValues, matchKeyLine, matchKeyOnlyLine, matchArrayKeyLine, matchAnyKeyLine, isAfterKeyColon };`,
 )() as KeyLib;
 
 const schema = (await Bun.file(join(repoRoot, "docs/routeros-app-yaml-schema.latest.json")).json()) as SchemaNode;
@@ -157,5 +158,34 @@ describe("tikapp.html schema resolution for re-emitted YAML", () => {
       expect(lib.matchKeyLine(line)?.key).toBe(path[path.length - 1]);
       expect(resolved(path)).not.toBeNull();
     }
+  });
+});
+
+// Hover, inlay hints and key completion list a closed enum's values. ports.protocol keeps its
+// values in version-gated anyOf branches, which mergeSchema does not copy.
+describe("tikapp.html closedEnumValues", () => {
+  const perVersion = async (version: string) =>
+    (await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json()) as SchemaNode;
+  const protocolPath = ["services", "svc", "ports", "protocol"];
+
+  test.each([
+    ["7.26beta8", ["tcp", "udp"]],
+    ["7.26beta7", ["tcp"]],
+    ["7.24.7", ["tcp"]],
+  ])("%s ports protocol lists %j", async (version, expected) => {
+    const root = await perVersion(version);
+    expect(lib.closedEnumValues(root, lib.schemaAtPath(root, protocolPath))).toEqual(expected);
+  });
+
+  test("latest ports protocol lists tcp and udp", () => {
+    expect(lib.closedEnumValues(schema, lib.schemaAtPath(schema, protocolPath))).toEqual(["tcp", "udp"]);
+  });
+
+  test("an open list such as category is not a closed enum", () => {
+    expect(lib.closedEnumValues(schema, lib.schemaAtPath(schema, ["category"]))).toBeNull();
+  });
+
+  test("a plain enum is returned as is", () => {
+    expect(lib.closedEnumValues(schema, { enum: ["a", "b"] })).toEqual(["a", "b"]);
   });
 });

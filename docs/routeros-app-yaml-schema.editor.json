@@ -154,7 +154,7 @@
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: RouterOS ignores a trailing `:udp` and maps TCP, and `host:container:udp` makes `udp` the label. Ports are 1-65535. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
+                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: without `/tcp` or `/udp`, a trailing `:udp` is not read as a protocol (`host:container:label:udp` maps TCP, `host:container:udp` makes `udp` the label); `53:53/udp:udp` is UDP with the label `udp`. Ports are 1-65535. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. RouterOS refuses descending ranges and ranges of different length. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
                     "$comment": "Strict patterns live in .latest.json (anyOf). This editor variant keeps ports unpatterned so autocompletion is not blocked; the description carries the rules.",
                     "examples": [
                       "80:80",
@@ -191,7 +191,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": ["tcp", "udp"],
-                        "description": "Protocol, tcp (default) or udp. Before RouterOS 7.26beta8, protocol: udp was ignored and the redirect was TCP."
+                        "description": "Protocol. tcp is the default. Use udp on RouterOS 7.26beta8 or later; earlier versions ignored protocol: udp and mapped TCP."
                       },
                       "app_protocol": {
                         "type": "string",

@@ -181,7 +181,7 @@
             },
             "ports": {
               "type": "array",
-              "description": "Port mappings. Use /udp for UDP (host:container/udp[:label]); a trailing :udp is ignored by RouterOS and maps TCP. Port ranges (8000-8010:8000-8010, same length on both sides) need RouterOS 7.26beta8+.",
+              "description": "Port mappings. In short syntax only /udp selects UDP (host:container/udp[:label]). A trailing :udp on an entry without /tcp or /udp is not read as a protocol (8080:80:web:udp maps TCP, 8080:80:udp makes udp the label), so it is rejected; 53:53/udp:udp is UDP with the label udp. Ports are 1-65535. Port ranges (8000-8010:8000-8010) need RouterOS 7.26beta8+. The schema does not check that a range ascends or that both ranges have the same length; RouterOS refuses those.",
               "items": {
                 "$comment": "Port mappings can be strings, integers (container port only) or objects (long syntax with name/target/published/protocol/app_protocol). Branches marked x-routeros-since are dropped from per-version schemas for older versions by appyamlvalidate.js. Checked on CHR 7.24.7, 7.25.2, 7.26beta7 and 7.26beta8 via /app/add and the resulting firewall-redirects / dst-nat rules.",
                 "oneOf": [
@@ -307,7 +307,7 @@
                             ]
                           }
                         ],
-                        "description": "Protocol, tcp (default) or udp. Before RouterOS 7.26beta8, protocol: udp was ignored and the redirect was TCP."
+                        "description": "Protocol. tcp is the default. Use udp on RouterOS 7.26beta8 or later; earlier versions ignored protocol: udp and mapped TCP."
                       },
                       "app_protocol": {
                         "type": "string",
