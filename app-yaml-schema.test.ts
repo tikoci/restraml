@@ -154,8 +154,12 @@ const portsHonored: unknown[] = [
   "08080:080",
   "8080",
   "8080/tcp",
+  8080,
+  "53:53/udp:udp",
+  "8080:80/tcp:udp",
   { target: "25", published: "25", name: "smtp", app_protocol: "smtp" },
   { target: 80, published: 8080, protocol: "tcp" },
+  { target: "0080", published: 65535 },
 ];
 
 // 7.26beta8 maps these as written. Before it, a range kept only its first port and /udp or
@@ -169,6 +173,7 @@ const portsSince26beta8: unknown[] = [
   "8000-8010",
   "8000-8010/udp",
   "8080/udp",
+  "8000-8010:8000-8010/udp:udp",
   { target: "8000-8010", published: "8000-8010", protocol: "udp", name: "rtp" },
   { target: 53, published: 53, protocol: "udp" },
 ];
@@ -189,6 +194,14 @@ const portsBroken: [string, unknown][] = [
   ["spaces in range", "8000 - 8010:8000 - 8010"],
   ["uppercase protocol", "8080:80/UDP"],
   ["non-numeric host port", "abc:80"],
+  ["port 0", "0:80"],
+  ["all-zero port", "00000:80"],
+  ["port above 65535", "65536:80"],
+  ["bare port 0", 0],
+  ["bare port above 65535", 65536],
+  ["range past 65535", "1-65536:1-65536"],
+  ["long syntax port 0 / above 65535", { target: 0, published: 65536 }],
+  ["long syntax string port above 65535", { target: "65536", published: "80" }],
   ["long syntax without published", { target: 80, name: "t" }],
   ["long syntax range on one side", { target: 80, published: "8000-8010" }],
 ];
@@ -286,6 +299,13 @@ describe("routeros-app-yaml-schema (strict only)", () => {
 describe("routeros-app-yaml-schema (strict only): ports", () => {
   const validate = validatorFor(schemas.strict);
 
+  // Unquoted YAML ports parse as numbers, as users write them
+  test("accepts unquoted bare ports from YAML", () => {
+    const ok = validate(YAML.load("name: x\nservices:\n  svc:\n    image: alpine\n    ports:\n      - 8080\n      - 53"));
+    expect(validate.errors ?? []).toEqual([]);
+    expect(ok).toBe(true);
+  });
+
   test.each(portsBroken)("rejects port %s", (_label, port) => {
     expect(validate(portsWith(port))).toBe(false);
   });
@@ -365,5 +385,68 @@ describe("published per-version schemas: ports", () => {
   test.each(backfilled)("%s carries no x-routeros-since keyword", async (version) => {
     const text = await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).text();
     expect(text).not.toContain('"x-routeros-since":');
+  });
+});
+
+// tikapp.html's Monaco completion reads `enum` (through anyOf/oneOf), not `const`
+describe("long-syntax protocol completions", () => {
+  const protocolEnums = async (path: string) => {
+    const schema = await Bun.file(join(repoRoot, path)).json();
+    const object = schema.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties.ports.items.oneOf.find(
+      (b: { type?: string }) => b.type === "object",
+    );
+    const protocol = object.properties.protocol;
+    return [...(protocol.enum ?? []), ...(protocol.anyOf ?? []).flatMap((b: { enum?: string[] }) => b.enum ?? [])];
+  };
+
+  test.each([
+    ["docs/routeros-app-yaml-schema.latest.json", ["tcp", "udp"]],
+    ["docs/7.26beta8/routeros-app-yaml-schema.json", ["tcp", "udp"]],
+    ["docs/7.26beta7/routeros-app-yaml-schema.json", ["tcp"]],
+  ])("%s offers %j", async (path, expected) => {
+    expect(await protocolEnums(path)).toEqual(expected);
+  });
+});
+
+describe("appyamlvalidate.js x-routeros-since gate", () => {
+  const { versionBefore, withoutBranchesAfter } = require(join(repoRoot, "appyamlvalidate.js"));
+
+  test.each([
+    ["7.26beta7", "7.26beta8", true],
+    ["7.26beta8", "7.26beta8", false],
+    ["7.26beta10", "7.26beta8", false],
+    ["7.26rc1", "7.26beta8", false],
+    ["7.26", "7.26beta8", false],
+    ["7.26", "7.26rc3", false],
+    ["7.26.1", "7.26beta8", false],
+    ["7.25.2", "7.26beta8", true],
+    ["7.25rc3", "7.26beta8", true],
+    ["8.1beta1", "7.26beta8", false],
+  ])("versionBefore(%p, %p) is %p", (a, b, expected) => {
+    expect(versionBefore(a, b)).toBe(expected);
+  });
+
+  const marked = {
+    anyOf: [{ pattern: "^old$" }, { "x-routeros-since": "7.26beta8", pattern: "^new$" }],
+    properties: { p: { oneOf: [{ type: "string" }, { "x-routeros-since": "7.26beta8", type: "integer" }] } },
+  };
+
+  test.each(["7.26beta8", "7.26beta10", "7.26rc1", "7.26"])("%s keeps the branch and drops the marker", (version) => {
+    const out = withoutBranchesAfter(version, marked);
+    expect(out.anyOf).toEqual([{ pattern: "^old$" }, { pattern: "^new$" }]);
+    expect(out.properties.p.oneOf).toHaveLength(2);
+    expect(JSON.stringify(out)).not.toContain("x-routeros-since");
+  });
+
+  test.each(["7.26beta7", "7.25.2", "7.24"])("%s drops the newer branch", (version) => {
+    const out = withoutBranchesAfter(version, marked);
+    expect(out.anyOf).toEqual([{ pattern: "^old$" }]);
+    expect(out.properties.p.oneOf).toEqual([{ type: "string" }]);
+  });
+
+  test("leaves the input schema unchanged", () => {
+    const before = JSON.stringify(marked);
+    withoutBranchesAfter("7.24", marked);
+    expect(JSON.stringify(marked)).toBe(before);
   });
 });

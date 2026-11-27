@@ -154,7 +154,7 @@
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: RouterOS ignores a trailing `:udp` and maps TCP, and `host:container:udp` makes `udp` the label. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
+                    "description": "`host:container[/tcp|/udp][:label]` (OCI-style), `host:container[:label][:tcp]` (RouterOS 7.23+), or just `container` (published on the same host port). For UDP use `/udp`: RouterOS ignores a trailing `:udp` and maps TCP, and `host:container:udp` makes `udp` the label. Ports are 1-65535. Port ranges such as `8000-8010:8000-8010` (same length on both sides) need RouterOS 7.26beta8+; earlier versions keep only the first port. Ports are numbers only: no `[placeholder]` and no IP prefix. The `:label` suffix (e.g. `web`) is RouterOS-specific — `web` marks this port for browser forwarding and appears in the admin URL shown in Winbox/WebFig.",
                     "$comment": "Strict patterns live in .latest.json (anyOf). This editor variant keeps ports unpatterned so autocompletion is not blocked; the description carries the rules.",
                     "examples": [
                       "80:80",
@@ -164,6 +164,12 @@
                       "1700:1700/udp",
                       "10000-10100:10000-10100/udp:rtp"
                     ]
+                  },
+                  {
+                    "type": "integer",
+                    "description": "Container port only (1-65535), published on the same host port",
+                    "minimum": 1,
+                    "maximum": 65535
                   },
                   {
                     "type": "object",

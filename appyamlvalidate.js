@@ -105,7 +105,7 @@ function withoutBranchesAfter(version, node) {
   for (const [key, value] of Object.entries(node)) {
     if (key === SINCE_KEY) continue
     if ((key === "anyOf" || key === "oneOf") && Array.isArray(value)) {
-      const kept = value.filter((branch) => !(branch && branch[SINCE_KEY] && versionBefore(version, branch[SINCE_KEY])))
+      const kept = value.filter((branch) => !(branch?.[SINCE_KEY] && versionBefore(version, branch[SINCE_KEY])))
       if (kept.length === 0) throw new Error(`Every ${key} branch is newer than ${version}`)
       out[key] = withoutBranchesAfter(version, kept)
     } else {
@@ -510,7 +510,12 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err)
-  process.exit(1)
-})
+// Exported for app-yaml-schema.test.ts; runs only as a script
+module.exports = { versionBefore, withoutBranchesAfter }
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Fatal error:", err)
+    process.exit(1)
+  })
+}
