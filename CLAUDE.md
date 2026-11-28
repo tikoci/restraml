@@ -273,7 +273,10 @@ for the selected version, so a fix to `latest` alone leaves the editor wrong for
 already published. When a fix covers a RouterOS feature those versions have, regenerate them, but
 only back to the **current long-term** release (older versions stay as published). Backfill only
 for something the schema missed, and only from the release whose notes introduced the feature: a
-7.26beta8 feature found later is backfilled to 7.26beta8 and newer, never further. Regenerate
+7.26beta8 feature found later is backfilled to 7.26beta8 and newer, never further. The generator copies
+all of `*.latest.json`, so a backfill below a feature's release (for some other missed key) also
+copies that feature in: compare the regenerated snapshot with the published one and keep the newer
+syntax out. Port ranges in `ports` are the current case (7.26beta8+). Regenerate
 with the generator, offline against each version's committed `app.json`, which also validates that
 version's built-in apps:
 

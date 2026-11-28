@@ -185,6 +185,8 @@ const portsRefused: [string, unknown][] = [
   ["long syntax port 0 / above 65535", { target: 0, published: 65536 }],
   ["long syntax without published", { target: 80, name: "t" }],
   ["long syntax range on one side", { target: 80, published: "8000-8010" }],
+  ["long syntax range in target only", { target: "8000-8010", published: 8080 }],
+  ["long syntax without target", { published: 8080 }],
 ];
 
 for (const [variant, schema] of Object.entries(schemas)) {

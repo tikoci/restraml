@@ -149,12 +149,12 @@
             },
             "ports": {
               "type": "array",
-              "description": "Port mappings",
+              "description": "host:container[/tcp|/udp][:label] or container[/tcp|/udp]. Ranges like 8000-8010:8000-8010 need RouterOS 7.26beta8+",
               "items": {
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "`host:container[/tcp|/udp][:label]`, or `container[/tcp|/udp]`. Ranges such as `8000-8010:8000-8010` need RouterOS 7.26beta8+. The label `web` marks the port opened from Winbox/WebFig.",
+                    "description": "The label `web` marks the port opened from Winbox/WebFig",
                     "$comment": "Strict patterns live in .latest.json; ports stay unpatterned here so they do not block autocompletion.",
                     "examples": [
                       "80:80",
