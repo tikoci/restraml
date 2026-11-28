@@ -166,7 +166,7 @@
             },
             "ports": {
               "type": "array",
-              "description": "host:container[/tcp|/udp][:label] or container[/tcp|/udp]. Ranges like 8000-8010:8000-8010 need RouterOS 7.26beta8+",
+              "description": "host:container[/tcp|/udp][:label] or container[/tcp|/udp]. Same-length ranges (8000-8010:9000-9010) need 7.26beta8+",
               "items": {
                 "$comment": "Strings, a bare container port, or long-syntax objects. Ports are 1-65535. Ranges (RouterOS 7.26beta8+) go on both sides; RouterOS also requires equal length and ascending order, which a pattern cannot check. 7.26beta8 refuses [placeholder] ports.",
                 "oneOf": [

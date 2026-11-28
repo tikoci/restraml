@@ -274,9 +274,11 @@ already published. When a fix covers a RouterOS feature those versions have, reg
 only back to the **current long-term** release (older versions stay as published). Backfill only
 for something the schema missed, and only from the release whose notes introduced the feature: a
 7.26beta8 feature found later is backfilled to 7.26beta8 and newer, never further. The generator copies
-all of `*.latest.json`, so a backfill below a feature's release (for some other missed key) also
-copies that feature in: compare the regenerated snapshot with the published one and keep the newer
-syntax out. Port ranges in `ports` are the current case (7.26beta8+). Regenerate
+all of `*.latest.json`, and its gates drop only whole properties. So a backfill below 7.26beta8 (for
+some other missed key) would also copy in the 7.26beta8 `ports` syntax (ranges). Before such a
+backfill, add a version gate for that syntax to `appyamlvalidate.js`; do not hand-edit the
+generated per-version files. PR #127's first commits had one (`x-routeros-since` on `anyOf`
+branches, full-version compare) that can be restored. Regenerate
 with the generator, offline against each version's committed `app.json`, which also validates that
 version's built-in apps:
 

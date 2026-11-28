@@ -149,7 +149,7 @@
             },
             "ports": {
               "type": "array",
-              "description": "host:container[/tcp|/udp][:label] or container[/tcp|/udp]. Ranges like 8000-8010:8000-8010 need RouterOS 7.26beta8+",
+              "description": "host:container[/tcp|/udp][:label] or container[/tcp|/udp]. Same-length ranges (8000-8010:9000-9010) need 7.26beta8+",
               "items": {
                 "oneOf": [
                   {
