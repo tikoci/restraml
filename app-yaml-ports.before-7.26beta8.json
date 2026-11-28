@@ -1,0 +1,66 @@
+{
+  "type": "array",
+  "description": "Port mappings",
+  "items": {
+    "$comment": "Port mappings can be strings (two formats) or objects (long syntax with name/target/published/app_protocol).",
+    "oneOf": [
+      {
+        "type": "string",
+        "$comment": "Two port formats supported, exactly one protocol style per entry: (1) old OCI-style host:container[/tcp|/udp][:label] and (2) new RouterOS 7.23+ style host:container[:label][:tcp|:udp]. Mixing styles (e.g. host:container/tcp:label:tcp) is rejected.",
+        "anyOf": [
+          {
+            "$comment": "Old OCI-style: host:container[/tcp|/udp][:label]",
+            "pattern": "^(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(\\/tcp|\\/udp)?(:[^:\\n\\r]+)?$"
+          },
+          {
+            "$comment": "New RouterOS 7.23+ style: host:container[:label][:tcp|:udp]. Label may not contain / or : to stay distinct from old style.",
+            "pattern": "^(\\d+|\\[[a-zA-Z0-9]+\\]):(\\d+|\\[[a-zA-Z0-9]+\\])(:[^:\\/\\n\\r]+)?(:(tcp|udp))?$"
+          }
+        ]
+      },
+      {
+        "type": "object",
+        "$comment": "Long syntax port mapping with named fields",
+        "required": [
+          "target",
+          "published"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Port mapping label"
+          },
+          "target": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "pattern": "^[0-9]+$",
+            "description": "Container port"
+          },
+          "published": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "pattern": "^[0-9]+$",
+            "description": "Host port"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "description": "Protocol (tcp or udp)"
+          },
+          "app_protocol": {
+            "type": "string",
+            "description": "Application protocol hint"
+          }
+        },
+        "additionalProperties": false
+      }
+    ]
+  }
+}

@@ -201,6 +201,13 @@ in the filename since the parent directory already implies the version.
   - Old (OCI-style): `host-port:container-port[/tcp|/udp][:label]` (e.g., `8080:80/tcp:web`)
   - New (RouterOS 7.23+ style): `host-port:container-port[:label][:tcp|:udp]` (e.g., `8080:80:web:tcp`)
   Both forms are valid; new apps from 7.23beta2 onward use the colon-separated `:tcp`/`:udp` suffix.
+  Prefer `/udp` in examples: on CHR (7.24.7–7.26beta8) a trailing `:udp` still produced a TCP
+  dst-nat rule (tikoci/routeros-skills#81).
+- RouterOS 7.26beta8 adds port ranges (`8000-8010:8000-8010`, on both sides, same length),
+  honors `/udp` on a bare container port (`8080/udp`), and refuses `[placeholder]` ports and
+  ports outside 1–65535. `appyamlvalidate.js` applies that `ports` schema from 7.26beta8 on (full
+  version compare, betas included); older versions, and later 7.25.x or 7.24.x releases, get the
+  previous one from `app-yaml-ports.before-7.26beta8.json`. Do not edit that file.
 - The `/app` REST endpoint (`GET /rest/app`) requires the **container** extra package
 
 **VSCode / Editor Integration:**
@@ -266,7 +273,13 @@ long-form `ports` `target`/`published`, `ulimits`) and string/number/boolean/nul
 of `*.latest.json` taken when that version was built, and `tikapp.html` validates against the copy
 for the selected version, so a fix to `latest` alone leaves the editor wrong for every version
 already published. When a fix covers a RouterOS feature those versions have, regenerate them, but
-only back to the **current long-term** release (older versions stay as published). Regenerate
+only back to the **current long-term** release (older versions stay as published). Backfill only
+for something the schema missed, and only from the release whose notes introduced the feature: a
+7.26beta8 feature found later is backfilled to 7.26beta8 and newer, never further. The generator copies
+all of `*.latest.json` into every version it builds, including new releases on older lines (the
+next 7.25.x or long-term 7.24.x), so a change that older versions don't have needs a gate in
+`appyamlvalidate.js`, like the `ports` one above; do not hand-edit the generated per-version files.
+Regenerate
 with the generator, offline against each version's committed `app.json`, which also validates that
 version's built-in apps:
 
