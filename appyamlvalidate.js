@@ -79,6 +79,44 @@ function withoutPropertiesAfter(version, schema) {
   return copy
 }
 
+// Port syntax changed in 7.26beta8 (ranges; placeholders and ports outside 1-65535 refused).
+// Older versions, including later 7.25.x and 7.24.x releases, keep the previous ports schema.
+const PORTS_SINCE = "7.26beta8"
+const PORTS_BEFORE_PATH = path.join(__dirname, "app-yaml-ports.before-7.26beta8.json")
+const PRE_RELEASE_RANK = { beta: 0, rc: 1, "": 2 }
+
+function versionKey(version) {
+  const m = /^(\d+)\.(\d+)(?:\.(\d+))?(beta|rc)?(\d+)?$/.exec(version)
+  if (!m) throw new Error(`Cannot compare RouterOS version '${version}'`)
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0), PRE_RELEASE_RANK[m[4] || ""], Number(m[5] || 0)]
+}
+
+function versionBefore(a, b) {
+  const ka = versionKey(a)
+  const kb = versionKey(b)
+  const i = ka.findIndex((n, j) => n !== kb[j])
+  return i !== -1 && ka[i] < kb[i]
+}
+
+function withPortsFor(version, schema) {
+  if (!versionBefore(version, PORTS_SINCE)) return schema
+  const copy = structuredClone(schema)
+  copy.properties.services.patternProperties["^[a-zA-Z0-9_-]+$"].properties.ports = JSON.parse(
+    fs.readFileSync(PORTS_BEFORE_PATH, "utf8")
+  )
+  return copy
+}
+
+function versionedSingleSchemaFor(version, singleSchema) {
+  return withPortsFor(
+    version,
+    withoutPropertiesAfter(version, {
+      ...singleSchema,
+      $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
+    })
+  )
+}
+
 function resolveDocsPath(version, fileName) {
   const docsRoot = path.resolve("docs")
   const versionRoot = path.resolve(docsRoot, version)
@@ -208,10 +246,7 @@ async function main() {
   )
 
   // --- Create per-version schemas with version-specific $id and $ref ---
-  const versionedSingleSchema = withoutPropertiesAfter(version, {
-    ...singleSchema,
-    $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-schema.json`,
-  })
+  const versionedSingleSchema = versionedSingleSchemaFor(version, singleSchema)
   const versionedStoreSchema = {
     ...storeSchemaBase,
     $id: `https://tikoci.github.io/restraml/${version}/routeros-app-yaml-store-schema.json`,
@@ -471,7 +506,12 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err)
-  process.exit(1)
-})
+// Exported for app-yaml-schema.test.ts; runs only as a script
+module.exports = { versionBefore, versionedSingleSchemaFor }
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Fatal error:", err)
+    process.exit(1)
+  })
+}

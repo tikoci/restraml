@@ -349,3 +349,35 @@ describe("published 7.26beta8 schema: ports", () => {
     for (const [label, port] of portsRefused) expect(validate(portsWith(port)), label).toBe(false);
   });
 });
+
+// The generator applies the 7.26beta8 port syntax only from 7.26beta8, so a later 7.25.x or 7.24.x
+// release gets the same schema as the ones already published.
+describe("appyamlvalidate.js per-version generation", () => {
+  const { versionBefore, versionedSingleSchemaFor } = require("./appyamlvalidate.js");
+
+  test.each([
+    ["7.26beta7", "7.26beta8", true],
+    ["7.26beta8", "7.26beta8", false],
+    ["7.26beta10", "7.26beta8", false],
+    ["7.26rc1", "7.26beta8", false],
+    ["7.26", "7.26beta8", false],
+    ["7.25.3", "7.26beta8", true],
+    ["7.24.8", "7.26beta8", true],
+  ])("versionBefore(%s, %s) is %p", (a, b, expected) => {
+    expect(versionBefore(a, b)).toBe(expected);
+  });
+
+  test.each(["7.24", "7.24.7", "7.25", "7.25.2", "7.26beta1", "7.26beta7", "7.26beta8"])(
+    "reproduces the published docs/%s schema",
+    async (version) => {
+      const published = await Bun.file(join(repoRoot, "docs", version, "routeros-app-yaml-schema.json")).json();
+      expect(versionedSingleSchemaFor(version, schemas.strict)).toEqual(published);
+    }
+  );
+
+  test("a later 7.25.x keeps the pre-7.26beta8 ports", async () => {
+    const validate = validatorFor(versionedSingleSchemaFor("7.25.3", schemas.strict));
+    expect(validate(portsWith("[accessPort]:80"))).toBe(true);
+    expect(validate(portsWith("8000-8010:8000-8010"))).toBe(false);
+  });
+});
